@@ -1,0 +1,8 @@
+data/
+.env
+__pycache__/
+*.pyc
+
+# Contengono dati reali di contatto (nomi, telefoni, email) di locali e
+# referenti raccolti per l'importazione: non vanno resi pubblici.
+*.xlsx

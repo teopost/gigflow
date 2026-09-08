@@ -1,0 +1,2058 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<title>GigFlow</title>
+
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#10181f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GigFlow">
+
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#f2f2f7;
+    --bg-elevated:#ffffff;
+    --bg-navbar:rgba(248,248,250,.88);
+    --bg-tabbar:rgba(248,248,250,.88);
+    --text:#1c1c1e;
+    --text-secondary:#6c6c70;
+    --text-tertiary:#a8a8ad;
+    --separator:#dcdce0;
+    --separator-opaque:#c6c6c8;
+    --tint:#a06a0e;
+    --tint-soft:#f1dfae;
+    --destructive:#ff3b30;
+    --destructive-soft:#ffe5e3;
+    --fill:#e9e9eb;
+    --overlay-dim:rgba(0,0,0,.32);
+    --shadow:rgba(0,0,0,.14);
+
+    --slate:#8e8e93;   --slate-soft:#e9e9eb;
+    --blue:#007aff;    --blue-soft:#d9ecff;
+    --orange:#ff9500;  --orange-soft:#ffedd1;
+    --green:#34c759;   --green-soft:#dcf5e2;
+    --purple:#af52de;  --purple-soft:#f1e0f9;
+    --red:#ff3b30;     --red-soft:#ffe5e3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#000000;
+      --bg-elevated:#1c1c1e;
+      --bg-navbar:rgba(22,22,24,.82);
+      --bg-tabbar:rgba(22,22,24,.86);
+      --text:#ffffff;
+      --text-secondary:#98989f;
+      --text-tertiary:#68686d;
+      --separator:#38383a;
+      --separator-opaque:#38383a;
+      --tint:#e0ac47;
+      --tint-soft:#3a3115;
+      --destructive:#ff453a;
+      --destructive-soft:#3a221f;
+      --fill:#2c2c2e;
+      --overlay-dim:rgba(0,0,0,.5);
+      --shadow:rgba(0,0,0,.5);
+
+      --slate:#98989f;   --slate-soft:#28282a;
+      --blue:#0a84ff;    --blue-soft:#122a42;
+      --orange:#ff9f0a;  --orange-soft:#3a2a10;
+      --green:#30d158;   --green-soft:#123a1e;
+      --purple:#bf5af2;  --purple-soft:#301b3d;
+      --red:#ff453a;     --red-soft:#3a221f;
+    }
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overscroll-behavior-y:none;}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:17px;line-height:1.3;
+    user-select:none;
+  }
+  input,textarea{user-select:text;}
+  button{font-family:inherit;-webkit-appearance:none;appearance:none;}
+  :focus-visible{outline:2px solid var(--tint);outline-offset:2px;}
+
+  #app{position:fixed;inset:0;overflow:hidden;}
+
+  /* ---------- screens ---------- */
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);}
+  .screen[hidden]{display:none !important;}
+  .screen.pushed{z-index:40;transform:translateX(100%);transition:transform .32s cubic-bezier(.32,.72,0,1);}
+  .screen.pushed.in{transform:translateX(0);}
+  @media (prefers-reduced-motion:reduce){.screen.pushed{transition:none;}}
+
+  .screen-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(24px + env(safe-area-inset-bottom));}
+  .tab-screen .screen-scroll{padding-bottom:calc(90px + env(safe-area-inset-bottom));}
+
+  /* ---------- navbar ---------- */
+  .navbar{position:sticky;top:0;z-index:10;padding-top:env(safe-area-inset-top);background:var(--bg-navbar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:.5px solid transparent;transition:border-color .2s;}
+  .navbar.scrolled{border-bottom-color:var(--separator);}
+  .navbar-row{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:0 8px;}
+  .screen.pushed .navbar-row{min-height:52px;}
+  .navbar-row .nav-btn{background:none;border:none;color:var(--tint);font-size:17px;padding:6px;display:flex;align-items:center;gap:2px;cursor:pointer;}
+  .navbar-row .nav-btn:active{opacity:.4;}
+  .navbar-row .nav-btn.destructive{color:var(--destructive);}
+  .navbar-row .nav-btn.primary{font-weight:600;}
+  .navbar-row .nav-btn:disabled{opacity:.5;cursor:default;}
+  .btn-spinner{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:btn-spin .6s linear infinite;vertical-align:-2px;}
+  @keyframes btn-spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.btn-spinner{animation-duration:1.4s;}}
+  .navbar-trailing{display:flex;align-items:center;gap:2px;}
+  .navbar-row .nav-btn svg{display:block;}
+  .navbar-row .inline-title{position:absolute;left:50%;transform:translateX(-50%);font-size:17px;font-weight:600;opacity:0;transition:opacity .2s;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
+  .navbar.scrolled .inline-title{opacity:1;}
+  .large-title-wrap{padding:0 16px 8px;margin-top:-4px;transition:opacity .15s;}
+  .navbar.scrolled .large-title-wrap{opacity:0;pointer-events:none;height:0;padding:0 16px;overflow:hidden;}
+  .large-title{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:0;}
+  .subtitle-count{font-size:13px;color:var(--text-secondary);font-variant-numeric:tabular-nums;margin-top:2px;}
+
+  /* ---------- searchbar & scope chips ---------- */
+  .searchbar-wrap{padding:0 16px 8px;}
+  .searchbar{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;padding:8px 10px;}
+  .searchbar svg{flex:none;color:var(--text-secondary);}
+  .searchbar input{border:0;background:transparent;flex:1;min-width:0;font-size:17px;color:var(--text);font-family:inherit;}
+  .searchbar input:focus{outline:none;}
+  .searchbar input::placeholder{color:var(--text-secondary);}
+
+  .scope-bar{display:flex;gap:6px;overflow-x:auto;padding:0 16px 12px;scrollbar-width:none;}
+  .scope-bar::-webkit-scrollbar{display:none;}
+  .scope-chip{flex:none;display:flex;align-items:center;gap:5px;border:none;background:var(--fill);color:var(--text);padding:6px 12px;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;}
+  .scope-chip .sw{width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .scope-chip[aria-pressed="true"]{background:var(--tint);color:#fff;}
+
+  /* ---------- grouped list ---------- */
+  .section-header{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;}
+  .section-header:first-child{padding-top:8px;}
+  .section-footer{font-size:13px;color:var(--text-secondary);padding:6px 16px 4px;line-height:1.4;}
+  .grouped-list{margin:0 16px;background:var(--bg-elevated);border-radius:10px;overflow:hidden;}
+
+  /* swipeable rows (scroll-snap technique = native momentum, no custom JS drag) */
+  .swipe-row{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain;}
+  .swipe-row::-webkit-scrollbar{display:none;}
+  .row-content{flex:0 0 100%;scroll-snap-align:start;min-width:0;}
+  .row-actions{flex:0 0 84px;scroll-snap-align:end;display:flex;}
+  .row-actions button{flex:1;border:none;background:var(--destructive);color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+
+  .row{display:flex;align-items:center;gap:10px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);cursor:pointer;}
+  .row:active{background:var(--fill);}
+  .row + .row, .swipe-row + .swipe-row .row, .grouped-list > .swipe-row:not(:first-child) .row{box-shadow:none;}
+  .grouped-list > .swipe-row:not(:first-child) .row-content .row,
+  .grouped-list > .row:not(:first-child){border-top:.5px solid var(--separator);margin-left:0;}
+  .row-dot{flex:none;width:10px;height:10px;border-radius:50%;}
+  .row-main{flex:1;min-width:0;}
+  .row-title{font-size:16px;font-weight:590;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row-sub{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+  .row-sub .type-tag{color:var(--tint);font-weight:600;}
+  .row-trail{flex:none;display:flex;align-items:center;gap:6px;}
+  .row-chevron{flex:none;color:var(--text-tertiary);}
+  .row-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
+
+  .empty-state{padding:64px 32px;text-align:center;color:var(--text-secondary);}
+  .empty-state .glyph{font-size:38px;margin-bottom:12px;filter:grayscale(1) opacity(.55);}
+  .empty-state h2{font-size:17px;font-weight:600;color:var(--text);margin:0 0 6px;}
+  .empty-state p{font-size:14px;line-height:1.5;max-width:32ch;margin:0 auto;}
+
+  /* ---------- field rows (forms, native settings-style) ---------- */
+  .field-row{display:flex;align-items:center;gap:12px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);}
+  .field-row + .field-row{border-top:.5px solid var(--separator);}
+  .field-row label{flex:0 0 118px;font-size:16px;color:var(--text);}
+  .field-row input, .field-row select{flex:1;min-width:0;border:none;background:transparent;font-size:16px;color:var(--text);text-align:right;padding:0;font-family:inherit;}
+  .field-row input::placeholder{color:var(--text-tertiary);}
+  .field-row input:focus{outline:none;}
+  .field-row.stacked{flex-direction:column;align-items:stretch;gap:6px;}
+  .field-row.stacked label{flex:none;font-size:13px;color:var(--text-secondary);}
+  .field-row.stacked textarea{border:none;background:transparent;font-size:16px;color:var(--text);font-family:inherit;resize:vertical;min-height:44px;padding:0;}
+  .field-row.stacked textarea:focus{outline:none;}
+  .field-row.picker{cursor:pointer;}
+  .field-row.picker:active{background:var(--fill);}
+  .picker-value{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;color:var(--text-secondary);font-size:16px;min-width:0;}
+  .picker-value .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+
+  .ios-switch{position:relative;display:inline-block;width:44px;height:24px;flex:none;}
+  .field-row label.ios-switch{flex:0 0 44px;width:44px;}
+  .ios-switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1;}
+  .ios-switch-track{position:absolute;inset:0;background:var(--fill);border-radius:12px;transition:background .2s;}
+  .ios-switch-thumb{position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.25);transition:transform .2s;}
+  .ios-switch input:checked ~ .ios-switch-track{background:var(--green);}
+  .ios-switch input:checked ~ .ios-switch-track .ios-switch-thumb{transform:translateX(20px);}
+  .picker-value span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .d-title-name{padding:6px 16px 16px;}
+  .d-title-name input{width:100%;border:none;background:transparent;font-size:28px;font-weight:700;letter-spacing:-.01em;color:var(--text);padding:2px 0;font-family:inherit;}
+  .d-title-name input::placeholder{color:var(--text-tertiary);}
+  .d-title-name input:focus{outline:none;}
+  .d-title-type{font-size:13px;color:var(--text-secondary);margin-top:-10px;padding:0 16px 4px;}
+
+  /* ---------- quick actions (contacts-app style) ---------- */
+  .quick-actions{display:flex;justify-content:center;gap:22px;padding:4px 16px 22px;}
+
+  /* ---------- foto ---------- */
+  .photos-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 16px 14px;scrollbar-width:none;}
+  .photos-strip::-webkit-scrollbar{display:none;}
+  .photo-thumb{position:relative;flex:none;width:88px;height:88px;border-radius:12px;overflow:hidden;background:var(--fill);}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+  .photo-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .photo-cover-badge{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:600;text-align:center;padding:3px 0;letter-spacing:.04em;text-transform:uppercase;}
+  .photo-add-tile{flex:none;width:88px;height:88px;border-radius:12px;border:1.5px dashed var(--separator-opaque);background:none;color:var(--tint);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .photo-add-tile:active{background:var(--fill);}
+  .photo-lightbox{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.92);}
+  .photo-lightbox[hidden]{display:none;}
+  .lightbox-track{display:flex;width:100%;height:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .lightbox-track::-webkit-scrollbar{display:none;}
+  .lightbox-slide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;}
+  .lightbox-slide img{max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;-webkit-user-drag:none;}
+  .lightbox-close{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:2;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:15px;cursor:pointer;}
+  .lightbox-close:active{background:rgba(255,255,255,.28);}
+  .lightbox-counter{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:rgba(255,255,255,.85);font-size:13px;font-variant-numeric:tabular-nums;pointer-events:none;}
+  .row-cover{flex:none;width:40px;height:40px;border-radius:9px;object-fit:cover;background:var(--fill);}
+  .row-cover{flex:none;width:40px;height:40px;border-radius:9px;object-fit:cover;background:var(--fill);}
+  .qa{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;color:var(--tint);cursor:pointer;text-decoration:none;}
+  .qa .qa-circle{width:52px;height:52px;border-radius:50%;background:var(--tint-soft);display:flex;align-items:center;justify-content:center;font-size:21px;}
+  .qa:active .qa-circle{opacity:.6;}
+  .qa .qa-label{font-size:12px;color:var(--tint);}
+
+  /* ---------- add-note row ---------- */
+  .add-note-row{padding:11px 16px;display:flex;gap:8px;align-items:flex-end;background:var(--bg-elevated);}
+  .add-note-row textarea, .add-note-row input[type="text"]{flex:1;border:none;background:transparent;font-size:16px;color:var(--text);font-family:inherit;resize:none;min-height:22px;max-height:100px;padding:0;}
+  .add-note-row textarea:focus, .add-note-row input[type="text"]:focus{outline:none;}
+  .add-note-row button{flex:none;background:none;border:none;color:var(--tint);font-weight:600;font-size:16px;cursor:pointer;padding:2px 0 0;}
+  .add-note-row button:disabled{color:var(--text-tertiary);}
+  .note-row{padding:10px 16px;background:var(--bg-elevated);}
+  .note-row + .note-row{border-top:.5px solid var(--separator);}
+  .note-meta{font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums;margin-bottom:2px;}
+  .note-text{font-size:15px;color:var(--text);white-space:pre-wrap;line-height:1.4;}
+
+  /* ---------- tab bar ---------- */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:var(--bg-tabbar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid var(--separator);padding-bottom:env(safe-area-inset-bottom);}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 6px;background:none;border:none;color:var(--text-secondary);cursor:pointer;}
+  .tab svg{display:block;}
+  .tab .tab-label{font-size:10.5px;font-weight:500;}
+  .tab.active{color:var(--tint);}
+  .tab-badge-wrap{position:relative;}
+  .tab-dot{position:absolute;top:-2px;right:-6px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg-tabbar);}
+  .filter-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--tint);margin-left:4px;vertical-align:middle;}
+
+  /* ---------- sheets ---------- */
+  .sheet-backdrop{position:fixed;inset:0;background:var(--overlay-dim);z-index:60;opacity:0;pointer-events:none;transition:opacity .22s;}
+  .sheet-backdrop.show{opacity:1;pointer-events:auto;}
+  .sheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:61;transform:translateY(120%);transition:transform .28s cubic-bezier(.32,.72,0,1);}
+  .sheet.show{transform:translateY(0);}
+  @media (prefers-reduced-motion:reduce){.sheet{transition:none;} .sheet-backdrop{transition:none;}}
+  .sheet-title{text-align:center;font-size:13px;color:var(--text-secondary);padding:14px 16px 10px;background:var(--bg-elevated);border-radius:14px 14px 0 0;}
+  .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;}
+  .sheet-search{background:var(--bg-elevated);padding:8px 10px;border-bottom:.5px solid var(--separator);}
+  .sheet-search input{width:100%;border:none;background:var(--fill);border-radius:9px;padding:9px 12px;font-size:16px;color:var(--text);font-family:inherit;}
+  .sheet-search input:focus{outline:none;}
+  .sheet-search input::placeholder{color:var(--text-secondary);}
+  .sheet-option{width:100%;display:flex;align-items:center;gap:10px;justify-content:center;padding:16px;border:none;background:none;font-size:17px;color:var(--tint);cursor:pointer;text-align:center;}
+  .sheet-option + .sheet-option{border-top:.5px solid var(--separator);}
+  .sheet-option.destructive{color:var(--destructive);}
+  .sheet-option .dot{width:10px;height:10px;border-radius:50%;flex:none;}
+  .sheet-option .check{margin-left:4px;}
+  .sheet-option:active{background:var(--fill);}
+  .sheet-cancel{width:100%;margin-top:8px;padding:16px;border:none;border-radius:14px;background:var(--bg-elevated);color:var(--tint);font-size:17px;font-weight:600;cursor:pointer;}
+  .sheet-cancel:active{background:var(--fill);}
+
+  .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:rgba(28,28,30,.92);color:#fff;padding:10px 18px;border-radius:14px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .18s, transform .18s;z-index:80;text-align:center;max-width:80vw;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ TAB: PALCOSCENICI ============ -->
+  <section class="screen tab-screen" id="tabList" data-tab="list">
+    <header class="navbar" id="navList">
+      <div class="navbar-row">
+        <span class="nav-btn" style="visibility:hidden;">Filtri</span>
+        <span class="inline-title">Palcoscenici</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn" id="btnFilters">Filtri<span class="filter-dot" id="filterActiveDot" hidden></span></button>
+          <button class="nav-btn" id="fabAdd" aria-label="Aggiungi palcoscenico">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="large-title-wrap">
+        <h1 class="large-title">Palcoscenici</h1>
+        <div class="subtitle-count" id="countSub">0 palcoscenici</div>
+      </div>
+    </header>
+    <div class="screen-scroll" id="scrollList">
+      <div class="searchbar-wrap">
+        <div class="searchbar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="text" placeholder="Cerca per nome, città o tipo…" autocomplete="off">
+        </div>
+      </div>
+      <div id="list"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB: RICONTATTA ============ -->
+  <section class="screen tab-screen" id="tabRecontact" data-tab="recontact" hidden>
+    <header class="navbar" id="navRecontact">
+      <div class="navbar-row"><span class="inline-title">Da ricontattare</span></div>
+      <div class="large-title-wrap">
+        <h1 class="large-title">Da ricontattare</h1>
+        <div class="subtitle-count" id="recontactSub">0 palcoscenici in programma</div>
+      </div>
+    </header>
+    <div class="screen-scroll" id="scrollRecontact">
+      <div id="recontactList"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB: ART DIRECTOR ============ -->
+  <section class="screen tab-screen" id="tabAd" data-tab="ad" hidden>
+    <header class="navbar" id="navAd">
+      <div class="navbar-row">
+        <span class="nav-btn" style="visibility:hidden;">Filtri</span>
+        <span class="inline-title">Art director</span>
+        <button class="nav-btn" id="btnAddAd" aria-label="Aggiungi art director">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="large-title-wrap"><h1 class="large-title">Art director</h1></div>
+    </header>
+    <div class="screen-scroll" id="scrollAd">
+      <div id="adList"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB: BANDS ============ -->
+  <section class="screen tab-screen" id="tabBands" data-tab="bands" hidden>
+    <header class="navbar" id="navBands">
+      <div class="navbar-row">
+        <span class="nav-btn" style="visibility:hidden;">Filtri</span>
+        <span class="inline-title">Bands</span>
+        <button class="nav-btn" id="btnAddBand" aria-label="Aggiungi band">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="large-title-wrap"><h1 class="large-title">Bands</h1></div>
+    </header>
+    <div class="screen-scroll" id="scrollBands">
+      <div id="bandList"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB: IMPOSTAZIONI ============ -->
+  <section class="screen tab-screen" id="tabSettings" data-tab="settings" hidden>
+    <header class="navbar" id="navSettings">
+      <div class="navbar-row"><span class="inline-title">Impostazioni</span></div>
+      <div class="large-title-wrap"><h1 class="large-title">Impostazioni</h1></div>
+    </header>
+    <div class="screen-scroll" id="scrollSettings">
+      <div class="section-header">PALCOSCENICI</div>
+      <div class="grouped-list">
+        <div class="row" id="rowSettingsTypes">
+          <div class="row-main"><div class="row-title">Tipologie</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsTypesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-header">INFORMAZIONI</div>
+      <div class="grouped-list">
+        <div class="row" id="rowSettingsAbout">
+          <div class="row-main"><div class="row-title">Informazioni sull'app</div></div>
+          <div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: TIPOLOGIE ============ -->
+  <section class="screen pushed" id="typesScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnTypesBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Tipologie</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">TIPOLOGIE PALCOSCENICO</div>
+      <div class="grouped-list" id="typesList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="newTypeInput" placeholder="Nuova tipologia…" autocomplete="off">
+          <button id="btnAddType">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer">Tocca una tipologia per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome indica quanti palcoscenici la usano — una tipologia in uso non può essere eliminata, ma rinominandola si aggiornano automaticamente tutti i palcoscenici che la usano.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA TIPOLOGIA ============ -->
+  <section class="screen pushed" id="typeEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnTypeEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Tipologie
+        </button>
+        <span class="inline-title">Tipologia</span>
+        <button class="nav-btn primary" id="btnTypeEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="typeEditName" placeholder="Nome tipologia" /></div>
+      <div class="section-footer" id="typeEditUsage"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: INFORMAZIONI ============ -->
+  <section class="screen pushed" id="aboutScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnAboutBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Informazioni</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div style="text-align:center;padding:32px 16px 8px;">
+        <div style="width:72px;height:72px;border-radius:18px;background:var(--tint-soft);margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:32px;">🎤</div>
+        <div style="font-size:20px;font-weight:700;">GigFlow</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Versione 1.0</div>
+      </div>
+      <div class="section-footer" style="text-align:center;padding:8px 32px 24px;">
+        Gestionale live per tenere traccia dei posti dove far suonare la band: locali, feste di paese, bagni al mare e altro — con anagrafica art director, band e promemoria di ricontatto.
+      </div>
+      <div class="section-header">DATI</div>
+      <div class="grouped-list">
+        <div class="row" style="cursor:default;">
+          <div class="row-main"><div class="row-title">Palcoscenici</div></div>
+          <div class="row-trail"><span id="aboutCountVenues" class="row-badge" style="background:var(--fill);color:var(--text-secondary);"></span></div>
+        </div>
+        <div class="row" style="cursor:default;">
+          <div class="row-main"><div class="row-title">Art director</div></div>
+          <div class="row-trail"><span id="aboutCountAd" class="row-badge" style="background:var(--fill);color:var(--text-secondary);"></span></div>
+        </div>
+        <div class="row" style="cursor:default;">
+          <div class="row-main"><div class="row-title">Bands</div></div>
+          <div class="row-trail"><span id="aboutCountBands" class="row-badge" style="background:var(--fill);color:var(--text-secondary);"></span></div>
+        </div>
+      </div>
+      <div class="section-footer">Dati salvati localmente nel database di questo computer.</div>
+    </div>
+  </section>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-tab="list">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+      <span class="tab-label">Palcoscenici</span>
+    </button>
+    <button class="tab" data-tab="recontact">
+      <span class="tab-badge-wrap">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg>
+        <span class="tab-dot" id="tabRecontactDot" hidden></span>
+      </span>
+      <span class="tab-label">Ricontatta</span>
+    </button>
+    <button class="tab" data-tab="ad">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5" stroke-linecap="round"/></svg>
+      <span class="tab-label">Art director</span>
+    </button>
+    <button class="tab" data-tab="bands">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="17" r="2.6"/><circle cx="17" cy="15" r="2.6"/><path d="M9.6 17V6.5L19.6 4.5V15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="tab-label">Bands</span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="18" r="2"/></svg>
+      <span class="tab-label">Impostazioni</span>
+    </button>
+  </nav>
+
+  <!-- ============ PUSHED: FILTRI ============ -->
+  <section class="screen pushed" id="filtersScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnFiltersBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Palcoscenici
+        </button>
+        <span class="inline-title">Filtri</span>
+        <button class="nav-btn" id="btnFiltersReset">Reimposta</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">FILTRA PER</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowFilterStatus">
+          <label>Stato</label>
+          <div class="picker-value"><span class="dot" id="filterStatusDot" style="background:var(--text-tertiary);"></span><span id="filterStatusValue">Tutti</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowFilterType">
+          <label>Tipo</label>
+          <div class="picker-value"><span id="filterTypeValue">Tutti i tipi</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+
+      <div class="section-header">POSIZIONE</div>
+      <div class="grouped-list">
+        <div class="field-row">
+          <label for="nearMeToggle" style="flex:1;">Vicino a me</label>
+          <label class="ios-switch">
+            <input type="checkbox" id="nearMeToggle">
+            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+          </label>
+        </div>
+        <div class="field-row picker" id="rowNearMeRadius" hidden>
+          <label>Raggio</label>
+          <div class="picker-value"><span id="nearMeRadiusValue">30 km</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer" id="nearMeFooter">Usa la posizione del telefono per mostrare solo i palcoscenici entro il raggio scelto. Funzionano solo i palcoscenici con coordinate geografiche già impostate.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: DETTAGLIO PALCOSCENICO ============ -->
+  <section class="screen pushed" id="detail" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Palcoscenici
+        </button>
+        <span class="inline-title" id="detailInlineTitle">Palcoscenico</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn primary" id="btnSave">Salva</button>
+          <button class="nav-btn" id="btnMore" aria-label="Altre azioni">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name">
+        <input id="fName" placeholder="Nome del palcoscenico" />
+      </div>
+
+      <div class="photos-strip" id="photosStrip"></div>
+      <input type="file" id="photoFileInputCamera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="photoFileInputLibrary" accept="image/*" hidden>
+
+      <div class="quick-actions" id="quickActions"></div>
+
+      <div class="section-header">DOVE</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowType">
+          <label>Tipo</label>
+          <div class="picker-value"><span id="typeValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row"><label for="fAddress">Indirizzo</label><input id="fAddress" type="text" placeholder="Via, civico"></div>
+        <div class="field-row"><label for="fCity">Città</label><input id="fCity" type="text" placeholder="es. Riccione"></div>
+        <div class="field-row"><label for="fLat">Latitudine</label><input id="fLat" type="text" inputmode="decimal" placeholder="43.9891"></div>
+        <div class="field-row"><label for="fLng">Longitudine</label><input id="fLng" type="text" inputmode="decimal" placeholder="12.6544"></div>
+      </div>
+      <div class="section-footer">Servono per mettere in futuro tutti i palcoscenici su una mappa. Tienile premute su Google Maps per copiarle.</div>
+
+      <div class="section-header">INFO PALCOSCENICO</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="fCapacity">Capienza</label><input id="fCapacity" type="number" inputmode="numeric" placeholder="150"></div>
+        <div class="field-row"><label for="fGenre">Genere / vibe</label><input id="fGenre" type="text" placeholder="rock, cover…"></div>
+      </div>
+
+      <div class="section-header">ART DIRECTOR</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowArtDirector">
+          <label>Referente</label>
+          <div class="picker-value"><span id="artDirectorValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+
+      <div class="section-header">CONTATTI DIRETTI</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="fContactName">Titolare</label><input id="fContactName" type="text" placeholder="Nome di chi gestisce il posto"></div>
+        <div class="field-row"><label for="fPhone">Telefono</label><input id="fPhone" type="tel" placeholder="+39…"></div>
+        <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palcoscenico.it"></div>
+        <div class="field-row"><label for="fWebsite">Sito / social</label><input id="fWebsite" type="text" placeholder="instagram.com/…"></div>
+      </div>
+      <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palcoscenici.</div>
+
+      <div class="section-header">STATO</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowStatus">
+          <label>Stato attuale</label>
+          <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Da contattare</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+
+      <div class="section-header">QUANDO RICONTATTARE</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="fNextContact">Prossimo contatto</label><input id="fNextContact" type="date"></div>
+        <div class="field-row stacked">
+          <label for="fPlanningNote">Nota sulla pianificazione</label>
+          <input id="fPlanningNote" type="text" placeholder="es. Pianificano il cartellone a feb/mar" style="text-align:left;">
+        </div>
+      </div>
+
+      <div class="section-header">NOTE / STORICO CONTATTI</div>
+      <div class="grouped-list" id="notesList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <textarea id="fNewNote" placeholder="Aggiungi una nota…" rows="1"></textarea>
+          <button id="btnAddNote">Aggiungi</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: DETTAGLIO ART DIRECTOR ============ -->
+  <section class="screen pushed" id="adDetail" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnAdBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Art director
+        </button>
+        <span class="inline-title" id="adDetailInlineTitle">Art director</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn primary" id="btnAdSave">Salva</button>
+          <button class="nav-btn" id="btnAdMore" aria-label="Altre azioni">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="adName" placeholder="Nome e cognome" /></div>
+      <div class="quick-actions" id="adQuickActions"></div>
+      <div class="section-header">CONTATTI</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="adPhone">Telefono</label><input id="adPhone" type="tel" placeholder="+39…"></div>
+        <div class="field-row"><label for="adEmail">Email</label><input id="adEmail" type="email" placeholder="nome@mail.it"></div>
+      </div>
+      <div class="section-header">PALCOSCENICI PER CUI LAVORA</div>
+      <div class="grouped-list" id="adVenuesList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <button class="add-note-row" id="btnAdAddVenue" style="width:100%;justify-content:center;border:none;background:none;color:var(--tint);font-size:15px;font-weight:600;cursor:pointer;padding:12px 16px;">+ Aggiungi palcoscenico</button>
+      </div>
+
+      <div class="section-header">NOTE</div>
+      <div class="grouped-list">
+        <div class="field-row stacked"><textarea id="adNotes" rows="3" placeholder="es. gestisce anche il cartellone estivo…" style="text-align:left;"></textarea></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: DETTAGLIO BAND ============ -->
+  <section class="screen pushed" id="bandDetail" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnBandBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Bands
+        </button>
+        <span class="inline-title" id="bandDetailInlineTitle">Band</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn primary" id="btnBandSave">Salva</button>
+          <button class="nav-btn" id="btnBandMore" aria-label="Altre azioni">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="bandName" placeholder="Nome della band" /></div>
+      <div class="quick-actions" id="bandQuickActions"></div>
+      <div class="section-header">INFO</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="bandFacebook">Pagina Facebook</label><input id="bandFacebook" type="text" placeholder="facebook.com/…"></div>
+        <div class="field-row"><label for="bandFollowers">Follower</label><input id="bandFollowers" type="number" inputmode="numeric" placeholder="0"></div>
+        <div class="field-row"><label for="bandBase">Base</label><input id="bandBase" type="text" placeholder="es. Rimini (RN)"></div>
+        <div class="field-row"><label for="bandContact">Contatto</label><input id="bandContact" type="text" placeholder="email o telefono"></div>
+        <div class="field-row"><label for="bandGigs">Date live rilevate</label><input id="bandGigs" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <div class="section-header">NOTE</div>
+      <div class="grouped-list">
+        <div class="field-row stacked"><textarea id="bandNotes" rows="3" placeholder="es. cover band di zona, spesso in cartellone con noi…" style="text-align:left;"></textarea></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+  <div class="photo-lightbox" id="photoLightbox" hidden>
+    <button class="lightbox-close" id="lightboxClose" aria-label="Chiudi">✕</button>
+    <div class="lightbox-track" id="lightboxTrack"></div>
+    <div class="lightbox-counter" id="lightboxCounter"></div>
+  </div>
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-title" id="sheetTitle" hidden></div>
+    <div class="sheet-search" id="sheetSearch" hidden>
+      <input type="text" id="sheetSearchInput" placeholder="Cerca…" autocomplete="off">
+    </div>
+    <div class="sheet-group" id="sheetGroup"></div>
+    <button class="sheet-cancel" id="sheetCancel">Annulla</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STATUSES = [
+    {key:"da_contattare", label:"Da contattare", color:"var(--slate)", soft:"var(--slate-soft)"},
+    {key:"contattato",    label:"Contattato",    color:"var(--blue)",  soft:"var(--blue-soft)"},
+    {key:"trattativa",    label:"In trattativa", color:"var(--orange)",soft:"var(--orange-soft)"},
+    {key:"confermato",    label:"Confermato",    color:"var(--green)", soft:"var(--green-soft)"},
+    {key:"suonato",       label:"Suonato",       color:"var(--purple)",soft:"var(--purple-soft)"},
+    {key:"rifiutato",     label:"Rifiutato",     color:"var(--red)",   soft:"var(--red-soft)"}
+  ];
+  function statusInfo(k){ return STATUSES.find(function(s){return s.key===k;}) || STATUSES[0]; }
+
+  function esc(str){
+    return String(str==null?"":str).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function fmtDateTime(iso){
+    if(!iso) return "";
+    var d = new Date(iso);
+    if(isNaN(d)) return "";
+    return d.toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  function fmtDateShort(dateStr){
+    if(!dateStr) return "";
+    var d = new Date(dateStr + "T00:00:00");
+    if(isNaN(d)) return dateStr;
+    return d.toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  function daysUntil(dateStr){
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d = new Date(dateStr + "T00:00:00");
+    return Math.round((d - today) / 86400000);
+  }
+
+  function api(method, path, body){
+    var opts = {method:method, headers:{}};
+    if(body !== undefined){
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(path, opts).then(function(res){
+      if(res.status === 204) return null;
+      return res.json().then(function(data){
+        if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
+        return data;
+      });
+    });
+  }
+
+  /* ---------------- state ---------------- */
+  var venues = [];
+  var artDirectors = [];
+  var venueTypes = [];
+  var filterStatus = "all";
+  var filterType = "all";
+  var searchText = "";
+  var nearMeEnabled = false;
+  var nearMeRadiusKm = 30;
+  var nearMeCoords = null;
+  var currentId = null;
+  var currentAdId = null;
+  var saveTimers = {};
+  var returnToPalcoscenicoAfterAd = null;
+
+  var elToast = document.getElementById("toast");
+  function toast(msg){
+    elToast.textContent = msg;
+    elToast.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ elToast.classList.remove("show"); }, 1700);
+  }
+
+  /* Mostra uno spinner sul pulsante mentre la promise è in corso; se la
+     promise fallisce, ripristina il testo originale (in caso di successo di
+     solito la schermata si chiude subito dopo, quindi non serve ripristinare). */
+  function withButtonBusy(btn, run){
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span>';
+    return run().catch(function(err){
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      throw err;
+    }).then(function(result){
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      return result;
+    });
+  }
+
+  /* ---------------- navbar scroll collapse ---------------- */
+  [["scrollList","navList"],["scrollRecontact","navRecontact"],["scrollAd","navAd"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
+    var scroller = document.getElementById(pair[0]);
+    var nav = document.getElementById(pair[1]);
+    scroller.addEventListener("scroll", function(){
+      nav.classList.toggle("scrolled", scroller.scrollTop > 8);
+    });
+  });
+
+  /* ---------------- tab navigation ---------------- */
+  var tabs = {list: document.getElementById("tabList"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
+  document.getElementById("tabbar").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab");
+    if(!btn) return;
+    var name = btn.getAttribute("data-tab");
+    Object.keys(tabs).forEach(function(k){
+      tabs[k].hidden = k !== name;
+    });
+    document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.getAttribute("data-tab")===name); });
+    if(name === "recontact") renderRecontact();
+  });
+
+  /* ---------------- sheet component ---------------- */
+  var elSheetBackdrop = document.getElementById("sheetBackdrop");
+  var elSheet = document.getElementById("sheet");
+  var elSheetTitle = document.getElementById("sheetTitle");
+  var elSheetSearch = document.getElementById("sheetSearch");
+  var elSheetSearchInput = document.getElementById("sheetSearchInput");
+  var elSheetGroup = document.getElementById("sheetGroup");
+  var elSheetCancel = document.getElementById("sheetCancel");
+  var sheetActiveOnSelect = null;
+  var sheetOptions = [];
+  var sheetFreeText = null;
+
+  function renderSheetOptions(query){
+    var q = (query || "").trim();
+    var qLower = q.toLowerCase();
+    var indexed = sheetOptions.map(function(o, i){ return {o:o, i:i}; });
+    var filtered = qLower ? indexed.filter(function(x){ return x.o.label.toLowerCase().indexOf(qLower) > -1; }) : indexed;
+
+    var customHtml = "";
+    if(sheetFreeText && q && !sheetOptions.some(function(o){ return o.label.toLowerCase() === qLower; })){
+      customHtml = '<button class="sheet-option" data-custom="1">Usa "'+esc(q)+'"</button>';
+    }
+
+    if(!filtered.length && !customHtml){
+      elSheetGroup.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:14px;">Nessun risultato.</div>';
+      return;
+    }
+    elSheetGroup.innerHTML = customHtml + filtered.map(function(x){
+      var o = x.o;
+      return '<button class="sheet-option'+(o.destructive?' destructive':'')+'" data-i="'+x.i+'">'+
+        (o.color ? '<span class="dot" style="background:'+o.color+'"></span>' : '') +
+        esc(o.label) +
+        (o.checkmark ? ' <span class="check">✓</span>' : '') +
+        '</button>';
+    }).join("");
+  }
+
+  function openSheet(opts){
+    // opts: {title?, searchable?, searchPlaceholder?, freeText?, onFreeText?, options:[{label, value, color, checkmark, destructive}]}
+    sheetOptions = opts.options;
+    sheetFreeText = opts.freeText ? {onSelect: opts.onFreeText} : null;
+    var hasTitle = !!opts.title;
+    var hasSearch = !!opts.searchable;
+    if(hasTitle){ elSheetTitle.hidden = false; elSheetTitle.textContent = opts.title; }
+    else { elSheetTitle.hidden = true; }
+    elSheetTitle.style.borderRadius = "14px 14px 0 0";
+
+    if(hasSearch){
+      elSheetSearch.hidden = false;
+      elSheetSearchInput.value = "";
+      elSheetSearchInput.placeholder = opts.searchPlaceholder || "Cerca…";
+      elSheetSearch.style.borderRadius = hasTitle ? "0" : "14px 14px 0 0";
+    } else {
+      elSheetSearch.hidden = true;
+    }
+
+    elSheetGroup.style.borderRadius = (hasTitle || hasSearch) ? "0 0 14px 14px" : "14px";
+    renderSheetOptions("");
+
+    sheetActiveOnSelect = function(i){ sheetOptions[i].onSelect && sheetOptions[i].onSelect(); closeSheet(); };
+    elSheetBackdrop.classList.add("show");
+    requestAnimationFrame(function(){
+      elSheet.classList.add("show");
+      if(hasSearch) setTimeout(function(){ elSheetSearchInput.focus(); }, 260);
+    });
+  }
+  function closeSheet(){
+    elSheet.classList.remove("show");
+    elSheetBackdrop.classList.remove("show");
+  }
+  elSheetSearchInput.addEventListener("input", function(){
+    renderSheetOptions(elSheetSearchInput.value);
+  });
+  elSheetGroup.addEventListener("click", function(e){
+    var btn = e.target.closest(".sheet-option");
+    if(!btn) return;
+    if(btn.hasAttribute("data-custom")){
+      sheetFreeText.onSelect(elSheetSearchInput.value.trim());
+      closeSheet();
+      return;
+    }
+    sheetActiveOnSelect(Number(btn.getAttribute("data-i")));
+  });
+  elSheetCancel.addEventListener("click", closeSheet);
+  elSheetBackdrop.addEventListener("click", closeSheet);
+
+  function confirmDestructive(title, actionLabel, onConfirm){
+    openSheet({title:title, options:[{label:actionLabel, destructive:true, onSelect:onConfirm}]});
+  }
+
+  /* ---------------- load ----------------
+     Un solo elenco completo caricato dal server; filtro di stato e ricerca
+     sono applicati lato client così i tab "Palcoscenici" e "Ricontatta" restano
+     sempre coerenti tra loro, senza round-trip di rete ad ogni tocco. */
+  function loadVenues(){
+    return api("GET", "/api/locations").then(function(data){
+      venues = data;
+      renderAll();
+    });
+  }
+  function renderAll(){
+    updateFilterActiveDot();
+    renderList();
+    renderRecontact();
+    updateRecontactBadge();
+  }
+  function loadArtDirectors(){
+    return api("GET", "/api/art_directors").then(function(data){
+      artDirectors = data;
+      renderAdList();
+    });
+  }
+  function loadVenueTypes(){
+    return api("GET", "/api/venue_types").then(function(data){
+      venueTypes = data;
+      renderTypesList();
+      updateSettingsTypesCount();
+    });
+  }
+
+  /* ---------------- PALCOSCENICI tab ---------------- */
+  var elCountSub = document.getElementById("countSub");
+  var elSearch = document.getElementById("searchInput");
+  var elList = document.getElementById("list");
+
+  elSearch.addEventListener("input", function(){
+    searchText = elSearch.value;
+    renderList();
+  });
+
+  /* ---------------- schermata Filtri ---------------- */
+  var elFiltersScreen = document.getElementById("filtersScreen");
+  function updateFilterActiveDot(){
+    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && !nearMeEnabled);
+  }
+  function renderFilterStatusRow(){
+    var st = statusInfo(filterStatus === "all" ? null : filterStatus);
+    document.getElementById("filterStatusDot").style.background = filterStatus === "all" ? "var(--text-tertiary)" : st.color;
+    document.getElementById("filterStatusValue").textContent = filterStatus === "all" ? "Tutti" : st.label;
+  }
+  function renderFilterTypeRow(){
+    document.getElementById("filterTypeValue").textContent = filterType === "all" ? "Tutti i tipi" : filterType;
+  }
+  document.getElementById("rowFilterStatus").addEventListener("click", function(){
+    var opts = [{label:"Tutti", checkmark: filterStatus==="all", onSelect:function(){
+      filterStatus = "all"; renderFilterStatusRow(); renderAll();
+    }}];
+    STATUSES.forEach(function(s){
+      opts.push({label:s.label, color:s.color, checkmark: filterStatus===s.key, onSelect:function(){
+        filterStatus = s.key; renderFilterStatusRow(); renderAll();
+      }});
+    });
+    openSheet({title:"Filtra per stato", options:opts});
+  });
+  document.getElementById("rowFilterType").addEventListener("click", function(){
+    var opts = [{label:"Tutti i tipi", checkmark: filterType==="all", onSelect:function(){
+      filterType = "all"; renderFilterTypeRow(); renderAll();
+    }}];
+    venueTypes.forEach(function(t){
+      opts.push({label:t.name, checkmark: filterType===t.name, onSelect:function(){
+        filterType = t.name; renderFilterTypeRow(); renderAll();
+      }});
+    });
+    openSheet({title:"Filtra per tipo", searchable: venueTypes.length > 6, searchPlaceholder:"Cerca tipo…", options:opts});
+  });
+  var RADIUS_PRESETS_KM = [5, 10, 20, 30, 50, 100];
+  var elNearMeToggle = document.getElementById("nearMeToggle");
+  var elRowNearMeRadius = document.getElementById("rowNearMeRadius");
+
+  function renderNearMeRow(){
+    elNearMeToggle.checked = nearMeEnabled;
+    elRowNearMeRadius.hidden = !nearMeEnabled;
+    document.getElementById("nearMeRadiusValue").textContent = nearMeRadiusKm + " km";
+  }
+  elNearMeToggle.addEventListener("change", function(){
+    if(!elNearMeToggle.checked){
+      nearMeEnabled = false;
+      nearMeCoords = null;
+      renderNearMeRow();
+      renderAll();
+      return;
+    }
+    if(!("geolocation" in navigator)){
+      elNearMeToggle.checked = false;
+      toast("Geolocalizzazione non disponibile su questo browser");
+      return;
+    }
+    toast("Rilevo la posizione…");
+    navigator.geolocation.getCurrentPosition(function(pos){
+      nearMeCoords = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      nearMeEnabled = true;
+      renderNearMeRow();
+      renderAll();
+      toast("Posizione trovata");
+    }, function(err){
+      elNearMeToggle.checked = false;
+      nearMeEnabled = false;
+      var msg = err.code === err.PERMISSION_DENIED
+        ? "Permesso di posizione negato"
+        : "Impossibile ottenere la posizione (serve una connessione sicura HTTPS)";
+      toast(msg);
+    }, {enableHighAccuracy:false, timeout:10000, maximumAge:300000});
+  });
+  document.getElementById("rowNearMeRadius").addEventListener("click", function(){
+    var opts = RADIUS_PRESETS_KM.map(function(km){
+      return {label: km + " km", checkmark: nearMeRadiusKm===km, onSelect:function(){
+        nearMeRadiusKm = km; renderNearMeRow(); renderAll();
+      }};
+    });
+    openSheet({
+      title:"Raggio",
+      searchable:true,
+      searchPlaceholder:"Scrivi un raggio personalizzato in km…",
+      freeText:true,
+      onFreeText:function(value){
+        var km = parseFloat(value.replace(",", "."));
+        if(!km || km <= 0){ toast("Inserisci un numero di km valido"); return; }
+        nearMeRadiusKm = km; renderNearMeRow(); renderAll();
+      },
+      options: opts
+    });
+  });
+
+  function openFiltersScreen(){
+    renderFilterStatusRow();
+    renderFilterTypeRow();
+    renderNearMeRow();
+    elFiltersScreen.hidden = false;
+    requestAnimationFrame(function(){ elFiltersScreen.classList.add("in"); });
+  }
+  function closeFiltersScreen(){
+    elFiltersScreen.classList.remove("in");
+    setTimeout(function(){ elFiltersScreen.hidden = true; }, 320);
+  }
+  document.getElementById("btnFilters").addEventListener("click", openFiltersScreen);
+  document.getElementById("btnFiltersBack").addEventListener("click", closeFiltersScreen);
+  document.getElementById("btnFiltersReset").addEventListener("click", function(){
+    filterStatus = "all"; filterType = "all";
+    nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
+    renderFilterStatusRow(); renderFilterTypeRow(); renderNearMeRow(); renderAll();
+    toast("Filtri azzerati");
+  });
+
+  function haversineKm(lat1, lon1, lat2, lon2){
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+      Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function matchesFilter(v){
+    if(filterStatus !== "all" && v.status !== filterStatus) return false;
+    if(filterType !== "all" && v.type !== filterType) return false;
+    if(nearMeEnabled && nearMeCoords){
+      if(v.lat == null || v.lng == null) return false;
+      var dist = haversineKm(nearMeCoords.lat, nearMeCoords.lng, v.lat, v.lng);
+      if(dist > nearMeRadiusKm) return false;
+    }
+    if(searchText){
+      var hay = ((v.name||"") + " " + (v.city||"") + " " + (v.type||"")).toLowerCase();
+      if(hay.indexOf(searchText.toLowerCase()) === -1) return false;
+    }
+    return true;
+  }
+
+  function venueRowHtml(v){
+    var st = statusInfo(v.status);
+    var subParts = [];
+    if(v.type) subParts.push('<span class="type-tag">'+esc(v.type)+'</span>');
+    if(v.city) subParts.push(esc(v.city));
+    if(v.contact_name) subParts.push('👤 '+esc(v.contact_name));
+    if(v.art_director_name) subParts.push('🎨 '+esc(v.art_director_name));
+    var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
+    var leadingHtml = cover
+      ? '<img class="row-cover" src="/photos/'+encodeURIComponent(cover.filename)+'" loading="lazy" alt="">'
+      : '<span class="row-dot" style="background:'+st.color+'"></span>';
+    return '<div class="swipe-row" data-id="'+v.id+'">'+
+      '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
+        leadingHtml+
+        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+        (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
+        '<div class="row-trail">'+
+          '<span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span>'+
+          '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
+        '</div>'+
+      '</div></div>'+
+      '<div class="row-actions"><button data-del-id="'+v.id+'">Elimina</button></div>'+
+    '</div>';
+  }
+
+  function renderList(){
+    var filtered = venues.filter(matchesFilter);
+    elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
+    var sorted = filtered.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
+    if(sorted.length === 0){
+      var noFilters = filterStatus === "all" && !searchText;
+      elList.innerHTML = '<div class="empty-state">'+
+        (noFilters
+          ? '<div class="glyph">🎤</div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
+          : '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare filtro o termine di ricerca.</p>')+
+        '</div>';
+      return;
+    }
+    elList.innerHTML = '<div class="grouped-list">' + sorted.map(venueRowHtml).join("") + '</div>';
+  }
+  elList.addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-id]");
+    if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
+  });
+  function deleteVenueRow(id){
+    api("DELETE", "/api/locations/" + id).then(function(){
+      venues = venues.filter(function(x){ return String(x.id) !== String(id); });
+      renderAll();
+      toast("Palcoscenico eliminato");
+    });
+  }
+
+  /* ---------------- RICONTATTA tab ---------------- */
+  var elRecontactList = document.getElementById("recontactList");
+  var elRecontactSub = document.getElementById("recontactSub");
+
+  function renderRecontact(){
+    var withDate = venues.filter(function(v){ return v.next_contact_date; })
+      .slice().sort(function(a,b){ return a.next_contact_date < b.next_contact_date ? -1 : 1; });
+    elRecontactSub.textContent = withDate.length + (withDate.length===1 ? " palcoscenico in programma" : " palcoscenici in programma");
+    if(!withDate.length){
+      elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div><h2>Niente da ricontattare</h2>'+
+        '<p>Apri un palcoscenico e imposta "Prossimo contatto" per ricordarti quando richiamarlo — utile per chi pianifica presto, come i bagni al mare a febbraio/marzo.</p></div>';
+      return;
+    }
+    elRecontactList.innerHTML = '<div class="grouped-list">' + withDate.map(function(v){
+      var d = daysUntil(v.next_contact_date);
+      var tag = d < 0 ? ("scaduto · "+Math.abs(d)+"g") : (d === 0 ? "oggi" : ("tra "+d+"g"));
+      var color = d < 0 ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
+      return '<div class="row" data-open-id="'+v.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+esc(v.planning_note) : "")+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div>';
+    }).join("") + '</div>';
+  }
+  elRecontactList.addEventListener("click", function(e){
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
+  });
+  function updateRecontactBadge(){
+    var overdueOrSoon = venues.filter(function(v){ return v.next_contact_date && daysUntil(v.next_contact_date) <= 7; }).length;
+    document.getElementById("tabRecontactDot").hidden = overdueOrSoon === 0;
+  }
+
+  /* ---------------- PUSHED SCREEN: palcoscenico detail ---------------- */
+  var elDetail = document.getElementById("detail");
+  var elSaveIndicatorTitle = document.getElementById("detailInlineTitle");
+  var fName = document.getElementById("fName"),
+      fCity = document.getElementById("fCity"),
+      fAddress = document.getElementById("fAddress"),
+      fLat = document.getElementById("fLat"),
+      fLng = document.getElementById("fLng"),
+      fCapacity = document.getElementById("fCapacity"),
+      fGenre = document.getElementById("fGenre"),
+      fContactName = document.getElementById("fContactName"),
+      fPhone = document.getElementById("fPhone"),
+      fEmail = document.getElementById("fEmail"),
+      fWebsite = document.getElementById("fWebsite"),
+      fNextContact = document.getElementById("fNextContact"),
+      fPlanningNote = document.getElementById("fPlanningNote"),
+      fNewNote = document.getElementById("fNewNote"),
+      notesList = document.getElementById("notesList"),
+      quickActions = document.getElementById("quickActions");
+
+  function currentVenue(){ return venues.find(function(v){ return String(v.id) === String(currentId); }); }
+
+  function patchVenue(field, value){
+    var body = {}; body[field] = value;
+    return api("PUT", "/api/locations/" + currentId, body);
+  }
+  function scheduleSave(field, value){
+    clearTimeout(saveTimers[field]);
+    saveTimers[field] = setTimeout(function(){
+      patchVenue(field, value).then(applyUpdatedVenue);
+    }, 350);
+  }
+  function applyUpdatedVenue(updated){
+    var i = venues.findIndex(function(v){ return v.id === updated.id; });
+    if(i > -1) venues[i] = updated; else venues.push(updated);
+    if(String(updated.id) === String(currentId)){
+      elSaveIndicatorTitle.textContent = updated.name || "Nuovo palcoscenico";
+    }
+  }
+  function bindField(el, field, transform){
+    el.addEventListener("input", function(){
+      scheduleSave(field, transform ? transform(el.value) : el.value);
+    });
+  }
+  bindField(fName, "name");
+  bindField(fCity, "city");
+  bindField(fAddress, "address");
+  bindField(fLat, "lat");
+  bindField(fLng, "lng");
+  bindField(fCapacity, "capacity", function(v){ return v ? Number(v) : ""; });
+  bindField(fGenre, "genre");
+  bindField(fContactName, "contact_name");
+  bindField(fPhone, "phone");
+  bindField(fEmail, "email");
+  bindField(fWebsite, "website");
+  bindField(fNextContact, "next_contact_date");
+  bindField(fPlanningNote, "planning_note");
+
+  function renderPhotosStrip(v){
+    var photos = v.photos || [];
+    var html = photos.map(function(p, i){
+      return '<div class="photo-thumb">'+
+        '<img src="/photos/'+encodeURIComponent(p.filename)+'" loading="lazy" data-view-photo="'+p.id+'" alt="">'+
+        '<button class="photo-del" data-del-photo="'+p.id+'" aria-label="Elimina foto">✕</button>'+
+        (i===0 ? '<span class="photo-cover-badge">Copertina</span>' : '')+
+      '</div>';
+    }).join("");
+    html += '<button class="photo-add-tile" id="btnAddPhoto" aria-label="Aggiungi foto" type="button">+</button>';
+    document.getElementById("photosStrip").innerHTML = html;
+  }
+  var elLightbox = document.getElementById("photoLightbox");
+  var elLightboxTrack = document.getElementById("lightboxTrack");
+  function updateLightboxCounter(idx, total){
+    document.getElementById("lightboxCounter").textContent = total > 1 ? ((idx+1) + " / " + total) : "";
+  }
+  function openLightbox(photos, startIndex){
+    elLightboxTrack.innerHTML = photos.map(function(p){
+      return '<div class="lightbox-slide"><img src="/photos/'+encodeURIComponent(p.filename)+'" alt=""></div>';
+    }).join("");
+    updateLightboxCounter(startIndex, photos.length);
+    elLightbox.hidden = false;
+    elLightboxTrack.scrollLeft = elLightboxTrack.clientWidth * startIndex;
+    elLightboxTrack.onscroll = function(){
+      var idx = Math.round(elLightboxTrack.scrollLeft / Math.max(1, elLightboxTrack.clientWidth));
+      updateLightboxCounter(idx, photos.length);
+    };
+  }
+  function closeLightbox(){
+    elLightbox.hidden = true;
+    elLightboxTrack.onscroll = null;
+    elLightboxTrack.innerHTML = "";
+  }
+  document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  elLightboxTrack.addEventListener("click", function(e){
+    if(e.target === e.currentTarget || e.target.classList.contains("lightbox-slide")) closeLightbox();
+  });
+  document.getElementById("photosStrip").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-photo]");
+    if(del){
+      var pid = del.getAttribute("data-del-photo");
+      api("DELETE", "/api/photos/" + pid).then(function(){
+        var v = currentVenue(); if(!v) return;
+        v.photos = (v.photos||[]).filter(function(p){ return String(p.id) !== String(pid); });
+        renderPhotosStrip(v);
+        renderList();
+        toast("Foto eliminata");
+      });
+      return;
+    }
+    var view = e.target.closest("[data-view-photo]");
+    if(view){
+      var v2 = currentVenue(); if(!v2) return;
+      var photos2 = v2.photos || [];
+      var startIndex = photos2.findIndex(function(p){ return String(p.id) === view.getAttribute("data-view-photo"); });
+      if(startIndex > -1) openLightbox(photos2, startIndex);
+      return;
+    }
+    if(e.target.closest("#btnAddPhoto")){
+      openSheet({options:[
+        {label:"📷 Scatta foto", onSelect:function(){ document.getElementById("photoFileInputCamera").click(); }},
+        {label:"🖼️ Scegli dalla libreria", onSelect:function(){ document.getElementById("photoFileInputLibrary").click(); }}
+      ]});
+    }
+  });
+  function resizeImageFile(file, maxDim, quality){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var img = new Image();
+        img.onload = function(){
+          var w = img.width, h = img.height;
+          if(w > maxDim || h > maxDim){
+            if(w >= h){ h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          var canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = function(){ reject(new Error("Immagine non leggibile")); };
+        img.src = reader.result;
+      };
+      reader.onerror = function(){ reject(new Error("File non leggibile")); };
+      reader.readAsDataURL(file);
+    });
+  }
+  function handlePhotoFileSelected(e){
+    var file = e.target.files[0];
+    e.target.value = "";
+    if(!file || !currentId) return;
+    var loadingId = currentId;
+    toast("Caricamento foto…");
+    resizeImageFile(file, 1600, 0.82).then(function(dataUrl){
+      return api("POST", "/api/locations/" + loadingId + "/photos", {image_base64: dataUrl});
+    }).then(function(photo){
+      var v = venues.find(function(x){ return String(x.id) === String(loadingId); });
+      if(v){
+        v.photos = (v.photos||[]).concat([photo]);
+        if(String(currentId) === String(loadingId)) renderPhotosStrip(v);
+        renderList();
+      }
+      toast("Foto aggiunta");
+    }).catch(function(err){ toast(err.message || "Errore nel caricamento della foto"); });
+  }
+  document.getElementById("photoFileInputCamera").addEventListener("change", handlePhotoFileSelected);
+  document.getElementById("photoFileInputLibrary").addEventListener("change", handlePhotoFileSelected);
+
+  function renderQuickActions(v){
+    var actions = [];
+    if(v.phone) actions.push({icon:"📞", label:"Chiama", href:"tel:"+v.phone.replace(/\s+/g,"")});
+    if(v.email) actions.push({icon:"✉️", label:"Email", href:"mailto:"+v.email});
+    if(v.website) actions.push({icon:"🔗", label:"Sito", href:/^https?:\/\//i.test(v.website)?v.website:("https://"+v.website)});
+    if(v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "") actions.push({icon:"📍", label:"Mappa", href:"https://www.google.com/maps?q="+v.lat+","+v.lng});
+    quickActions.innerHTML = actions.map(function(a){
+      return '<a class="qa" target="_blank" rel="noopener" href="'+esc(a.href)+'"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></a>';
+    }).join("");
+  }
+
+  function renderTypeRow(v){
+    document.getElementById("typeValue").textContent = v.type || "— nessuno —";
+  }
+  document.getElementById("rowType").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    var opts = [{label:"— nessuno —", checkmark: !v.type, onSelect:function(){
+      patchVenue("type", "").then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo rimosso"); });
+    }}];
+    venueTypes.forEach(function(vt){
+      var t = vt.name;
+      opts.push({label:t, checkmark: v.type===t, onSelect:function(){
+        patchVenue("type", t).then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo: "+t); });
+      }});
+    });
+    openSheet({
+      title:"Tipo di palcoscenico",
+      searchable:true,
+      searchPlaceholder:"Cerca o scrivi un tipo personalizzato…",
+      freeText:true,
+      onFreeText:function(value){
+        patchVenue("type", value).then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo: "+value); });
+      },
+      options: opts
+    });
+  });
+
+  function renderStatusRow(v){
+    var st = statusInfo(v.status);
+    document.getElementById("statusDot").style.background = st.color;
+    document.getElementById("statusValue").textContent = st.label;
+  }
+  document.getElementById("rowStatus").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    openSheet({options: STATUSES.map(function(s){
+      return {label:s.label, color:s.color, checkmark: v.status===s.key, onSelect:function(){
+        patchVenue("status", s.key).then(function(updated){ applyUpdatedVenue(updated); renderStatusRow(updated); renderAll(); toast("Stato: "+s.label); });
+      }};
+    })});
+  });
+
+  function renderArtDirectorRow(v){
+    var ad = artDirectors.find(function(a){ return a.id === v.art_director_id; });
+    document.getElementById("artDirectorValue").textContent = ad ? ad.name : "— nessuno —";
+  }
+  document.getElementById("rowArtDirector").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    var opts = [{label:"— nessuno —", checkmark: v.art_director_id == null, onSelect:function(){
+      patchVenue("art_director_id", null).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); renderList(); });
+    }}];
+    artDirectors.forEach(function(ad){
+      opts.push({label:ad.name, checkmark: v.art_director_id===ad.id, onSelect:function(){
+        patchVenue("art_director_id", ad.id).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); renderList(); toast("Art director: "+ad.name); });
+      }});
+    });
+    opts.push({label:"+ Nuovo art director", onSelect:function(){
+      returnToPalcoscenicoAfterAd = currentId;
+      api("POST", "/api/art_directors", {name:""}).then(function(created){
+        artDirectors.push(created);
+        openAdDetail(created.id);
+      });
+    }});
+    openSheet({title:"Referente booking", options:opts});
+  });
+
+  function renderNotes(v){
+    var notes = (v.notes || []).slice().reverse();
+    if(!notes.length){
+      notesList.innerHTML = '<div class="note-row" style="color:var(--text-secondary);font-size:14px;">Nessuna nota ancora.</div>';
+      return;
+    }
+    notesList.innerHTML = notes.map(function(n){
+      return '<div class="swipe-row"><div class="row-content"><div class="note-row">'+
+        '<div class="note-meta">'+fmtDateTime(n.created_at)+'</div><div class="note-text">'+esc(n.text)+'</div>'+
+        '</div></div><div class="row-actions"><button data-del-note="'+n.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+  notesList.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-del-note]");
+    if(!btn) return;
+    api("DELETE", "/api/notes/" + btn.getAttribute("data-del-note")).then(function(updated){ applyUpdatedVenue(updated); renderNotes(updated); renderList(); });
+  });
+  document.getElementById("btnAddNote").addEventListener("click", function(){
+    var text = fNewNote.value.trim();
+    if(!text) return;
+    api("POST", "/api/locations/" + currentId + "/notes", {text:text}).then(function(updated){
+      applyUpdatedVenue(updated); renderNotes(updated); renderList();
+      fNewNote.value = ""; toast("Nota aggiunta");
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  function fillVenueForm(v){
+    fName.value = v.name || "";
+    renderTypeRow(v);
+    fCity.value = v.city || "";
+    fAddress.value = v.address || "";
+    fLat.value = v.lat != null ? v.lat : "";
+    fLng.value = v.lng != null ? v.lng : "";
+    fCapacity.value = v.capacity || "";
+    fGenre.value = v.genre || "";
+    fContactName.value = v.contact_name || "";
+    fPhone.value = v.phone || "";
+    fEmail.value = v.email || "";
+    fWebsite.value = v.website || "";
+    fNextContact.value = v.next_contact_date || "";
+    fPlanningNote.value = v.planning_note || "";
+    elSaveIndicatorTitle.textContent = v.name || "Nuovo palcoscenico";
+    renderPhotosStrip(v);
+    renderQuickActions(v);
+    renderStatusRow(v);
+    renderArtDirectorRow(v);
+    renderNotes(v);
+  }
+
+  function collectVenuePayload(){
+    return {
+      name: fName.value,
+      city: fCity.value,
+      address: fAddress.value,
+      lat: fLat.value,
+      lng: fLng.value,
+      capacity: fCapacity.value ? Number(fCapacity.value) : "",
+      genre: fGenre.value,
+      contact_name: fContactName.value,
+      phone: fPhone.value,
+      email: fEmail.value,
+      website: fWebsite.value,
+      next_contact_date: fNextContact.value,
+      planning_note: fPlanningNote.value
+    };
+  }
+  function saveVenueNow(){
+    Object.keys(saveTimers).forEach(function(k){ if(k.indexOf("ad_")!==0 && k.indexOf("band_")!==0) clearTimeout(saveTimers[k]); });
+    return api("PUT", "/api/locations/" + currentId, collectVenuePayload()).then(applyUpdatedVenue);
+  }
+  document.getElementById("btnSave").addEventListener("click", function(){
+    if(!currentId) return;
+    withButtonBusy(this, saveVenueNow).then(function(){
+      toast("Palcoscenico salvato");
+      closeDetail();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  function openDetail(id){
+    currentId = id;
+    var v = currentVenue();
+    if(!v) return;
+    fillVenueForm(v);
+    elDetail.hidden = false;
+    requestAnimationFrame(function(){ elDetail.classList.add("in"); });
+    if(!v.name){ setTimeout(function(){ fName.focus(); }, 260); }
+  }
+  function closeDetail(){
+    var v = currentVenue();
+    elDetail.classList.remove("in");
+    setTimeout(function(){ elDetail.hidden = true; }, 320);
+    if(v && !v.name && !v.city && !v.phone && !v.email && (!v.notes || !v.notes.length)){
+      api("DELETE", "/api/locations/" + v.id).then(function(){
+        venues = venues.filter(function(x){ return x.id !== v.id; });
+        renderAll();
+      });
+    }
+    currentId = null;
+  }
+  document.getElementById("btnBack").addEventListener("click", closeDetail);
+  document.getElementById("btnMore").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    confirmDestructive(v.name || "Questo palcoscenico", "Elimina palcoscenico", function(){
+      api("DELETE", "/api/locations/" + v.id).then(function(){
+        venues = venues.filter(function(x){ return x.id !== v.id; });
+        elDetail.classList.remove("in");
+        setTimeout(function(){ elDetail.hidden = true; }, 320);
+        currentId = null;
+        renderAll();
+        toast("Palcoscenico eliminato");
+      });
+    });
+  });
+  document.getElementById("fabAdd").addEventListener("click", function(){
+    api("POST", "/api/locations", {name:"", status:"da_contattare"}).then(function(created){
+      venues.push(created);
+      openDetail(created.id);
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  /* ---------------- PUSHED SCREEN: art director detail ---------------- */
+  var elAdDetail = document.getElementById("adDetail");
+  var adName = document.getElementById("adName"),
+      adPhone = document.getElementById("adPhone"),
+      adEmail = document.getElementById("adEmail"),
+      adNotes = document.getElementById("adNotes");
+  var elAdInlineTitle = document.getElementById("adDetailInlineTitle");
+
+  function currentAd(){ return artDirectors.find(function(a){ return a.id === currentAdId; }); }
+  function patchAd(field, value){
+    var body = {}; body[field] = value;
+    return api("PUT", "/api/art_directors/" + currentAdId, body);
+  }
+  function scheduleSaveAd(field, value){
+    clearTimeout(saveTimers["ad_"+field]);
+    saveTimers["ad_"+field] = setTimeout(function(){
+      patchAd(field, value).then(function(updated){
+        var i = artDirectors.findIndex(function(a){ return a.id === updated.id; });
+        if(i>-1) artDirectors[i] = updated;
+        if(currentAdId === updated.id) elAdInlineTitle.textContent = updated.name || "Nuovo art director";
+      });
+    }, 350);
+  }
+  adName.addEventListener("input", function(){ scheduleSaveAd("name", adName.value); });
+  adPhone.addEventListener("input", function(){ scheduleSaveAd("phone", adPhone.value); renderAdQuickActions(currentAd()||{phone:adPhone.value,email:adEmail.value}); });
+  adEmail.addEventListener("input", function(){ scheduleSaveAd("email", adEmail.value); renderAdQuickActions(currentAd()||{phone:adPhone.value,email:adEmail.value}); });
+  adNotes.addEventListener("input", function(){ scheduleSaveAd("notes", adNotes.value); });
+
+  function renderAdQuickActions(ad){
+    var actions = [];
+    if(ad.phone) actions.push({icon:"📞", label:"Chiama", href:"tel:"+ad.phone.replace(/\s+/g,"")});
+    if(ad.email) actions.push({icon:"✉️", label:"Email", href:"mailto:"+ad.email});
+    document.getElementById("adQuickActions").innerHTML = actions.map(function(a){
+      return '<a class="qa" target="_blank" rel="noopener" href="'+esc(a.href)+'"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></a>';
+    }).join("");
+  }
+
+  function renderAdVenues(ad){
+    var elAdVenues = document.getElementById("adVenuesList");
+    var assigned = venues.filter(function(v){ return v.art_director_id === ad.id; })
+      .slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
+    if(!assigned.length){
+      elAdVenues.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun palcoscenico associato ancora.</div>';
+      return;
+    }
+    elAdVenues.innerHTML = assigned.map(function(v){
+      return '<div class="swipe-row"><div class="row-content"><div class="row" style="cursor:default;">'+
+        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+        (v.city ? '<div class="row-sub">'+esc(v.city)+'</div>' : '')+'</div>'+
+      '</div></div><div class="row-actions"><button data-unassign-venue="'+v.id+'">Rimuovi</button></div></div>';
+    }).join("");
+  }
+  document.getElementById("adVenuesList").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-unassign-venue]");
+    if(!btn) return;
+    var vid = btn.getAttribute("data-unassign-venue");
+    api("PUT", "/api/locations/" + vid, {art_director_id: null}).then(function(updated){
+      applyUpdatedVenue(updated);
+      var ad = currentAd();
+      if(ad) renderAdVenues(ad);
+      toast("Palcoscenico rimosso");
+    });
+  });
+  document.getElementById("btnAdAddVenue").addEventListener("click", function(){
+    var ad = currentAd(); if(!ad) return;
+    var options = venues.filter(function(v){ return v.art_director_id !== ad.id; })
+      .slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); })
+      .map(function(v){
+        return {label: v.name + (v.city ? " — " + v.city : ""), onSelect:function(){
+          api("PUT", "/api/locations/" + v.id, {art_director_id: ad.id}).then(function(updated){
+            applyUpdatedVenue(updated);
+            renderAdVenues(ad);
+            toast("Palcoscenico aggiunto");
+          });
+        }};
+      });
+    if(!options.length){ toast("Nessun altro palcoscenico disponibile"); return; }
+    openSheet({title:"Aggiungi palcoscenico", searchable:true, searchPlaceholder:"Cerca per nome o città…", options:options});
+  });
+
+  function openAdDetail(id){
+    currentAdId = id;
+    var ad = currentAd();
+    if(!ad) return;
+    adName.value = ad.name || "";
+    adPhone.value = ad.phone || "";
+    adEmail.value = ad.email || "";
+    adNotes.value = ad.notes || "";
+    elAdInlineTitle.textContent = ad.name || "Nuovo art director";
+    renderAdQuickActions(ad);
+    renderAdVenues(ad);
+    elAdDetail.hidden = false;
+    requestAnimationFrame(function(){ elAdDetail.classList.add("in"); });
+    if(!ad.name){ setTimeout(function(){ adName.focus(); }, 260); }
+  }
+  function collectAdPayload(){
+    return { name: adName.value, phone: adPhone.value, email: adEmail.value, notes: adNotes.value };
+  }
+  function saveAdNow(){
+    Object.keys(saveTimers).forEach(function(k){ if(k.indexOf("ad_")===0) clearTimeout(saveTimers[k]); });
+    return api("PUT", "/api/art_directors/" + currentAdId, collectAdPayload()).then(function(updated){
+      var i = artDirectors.findIndex(function(a){ return a.id === updated.id; });
+      if(i>-1) artDirectors[i] = updated;
+    });
+  }
+  document.getElementById("btnAdSave").addEventListener("click", function(){
+    if(!currentAdId) return;
+    withButtonBusy(this, saveAdNow).then(function(){
+      toast("Art director salvato");
+      closeAdDetail();
+    }).catch(function(err){ toast(err.message); });
+  });
+  function closeAdDetail(){
+    var ad = currentAd();
+    elAdDetail.classList.remove("in");
+    setTimeout(function(){ elAdDetail.hidden = true; }, 320);
+    var wasEmpty = ad && !ad.name && !ad.phone && !ad.email && !ad.notes;
+    var goBackId = returnToPalcoscenicoAfterAd;
+    returnToPalcoscenicoAfterAd = null;
+    var finish = function(){
+      loadArtDirectors().then(function(){
+        if(goBackId != null){
+          if(String(currentId) !== String(goBackId)) openDetail(goBackId);
+          else { fillVenueForm(currentVenue()); }
+          if(ad && !wasEmpty){
+            patchVenue("art_director_id", ad.id).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); toast("Art director assegnato"); });
+          }
+        }
+      });
+    };
+    if(wasEmpty){
+      api("DELETE", "/api/art_directors/" + ad.id).then(finish);
+    } else {
+      finish();
+    }
+    currentAdId = null;
+  }
+  document.getElementById("btnAdBack").addEventListener("click", closeAdDetail);
+  document.getElementById("btnAdMore").addEventListener("click", function(){
+    var ad = currentAd(); if(!ad) return;
+    confirmDestructive(ad.name || "Questo art director", "Elimina art director", function(){
+      api("DELETE", "/api/art_directors/" + ad.id).then(function(){
+        elAdDetail.classList.remove("in");
+        setTimeout(function(){ elAdDetail.hidden = true; }, 320);
+        currentAdId = null;
+        loadArtDirectors(); loadVenues();
+        toast("Art director eliminato");
+      });
+    });
+  });
+  document.getElementById("btnAddAd").addEventListener("click", function(){
+    api("POST", "/api/art_directors", {name:""}).then(function(created){
+      artDirectors.push(created);
+      openAdDetail(created.id);
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  /* ---------------- ART DIRECTOR list ---------------- */
+  function renderAdList(){
+    var elAdList = document.getElementById("adList");
+    if(!artDirectors.length){
+      elAdList.innerHTML = '<div class="empty-state"><div class="glyph">🎨</div><h2>Nessun art director</h2><p>Tocca + in alto per aggiungere il primo referente booking, da associare poi ai palcoscenici.</p></div>';
+      return;
+    }
+    var sorted = artDirectors.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
+    elAdList.innerHTML = '<div class="grouped-list">' + sorted.map(function(ad){
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-ad="'+ad.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(ad.name||"Senza nome")+'</div>'+
+        '<div class="row-sub">'+(ad.phone?esc(ad.phone):"")+(ad.phone&&ad.email?" · ":"")+(ad.email?esc(ad.email):"")+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+ad.location_count+'</span>'+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-ad="'+ad.id+'">Elimina</button></div></div>';
+    }).join("") + '</div>';
+  }
+  document.getElementById("adList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-ad]");
+    if(del){
+      api("DELETE", "/api/art_directors/" + del.getAttribute("data-del-ad")).then(function(){
+        loadArtDirectors(); loadVenues();
+        toast("Art director eliminato");
+      });
+      return;
+    }
+    var row = e.target.closest("[data-open-ad]");
+    if(row) openAdDetail(Number(row.getAttribute("data-open-ad")));
+  });
+
+  /* ---------------- BAND tab ---------------- */
+  var bands = [];
+  var currentBandId = null;
+  var elBandDetail = document.getElementById("bandDetail");
+  var elBandInlineTitle = document.getElementById("bandDetailInlineTitle");
+  var bandName = document.getElementById("bandName"),
+      bandFacebook = document.getElementById("bandFacebook"),
+      bandFollowers = document.getElementById("bandFollowers"),
+      bandBase = document.getElementById("bandBase"),
+      bandContact = document.getElementById("bandContact"),
+      bandGigs = document.getElementById("bandGigs"),
+      bandNotes = document.getElementById("bandNotes");
+
+  function loadBands(){
+    return api("GET", "/api/bands").then(function(data){
+      bands = data;
+      renderBandList();
+    });
+  }
+  function currentBand(){ return bands.find(function(b){ return b.id === currentBandId; }); }
+  function patchBand(field, value){
+    var body = {}; body[field] = value;
+    return api("PUT", "/api/bands/" + currentBandId, body);
+  }
+  function scheduleSaveBand(field, value){
+    clearTimeout(saveTimers["band_"+field]);
+    saveTimers["band_"+field] = setTimeout(function(){
+      patchBand(field, value).then(function(updated){
+        var i = bands.findIndex(function(b){ return b.id === updated.id; });
+        if(i>-1) bands[i] = updated;
+        if(currentBandId === updated.id) elBandInlineTitle.textContent = updated.name || "Nuova band";
+      });
+    }, 350);
+  }
+  bandName.addEventListener("input", function(){ scheduleSaveBand("name", bandName.value); });
+  bandFacebook.addEventListener("input", function(){ scheduleSaveBand("facebook", bandFacebook.value); renderBandQuickActions(currentBand()||{facebook:bandFacebook.value}); });
+  bandFollowers.addEventListener("input", function(){ scheduleSaveBand("followers", bandFollowers.value ? Number(bandFollowers.value) : ""); });
+  bandBase.addEventListener("input", function(){ scheduleSaveBand("base", bandBase.value); });
+  bandContact.addEventListener("input", function(){ scheduleSaveBand("contact", bandContact.value); });
+  bandGigs.addEventListener("input", function(){ scheduleSaveBand("gigs_count", bandGigs.value ? Number(bandGigs.value) : ""); });
+  bandNotes.addEventListener("input", function(){ scheduleSaveBand("notes", bandNotes.value); });
+
+  function renderBandQuickActions(band){
+    var actions = [];
+    if(band.facebook){
+      var url = /^https?:\/\//i.test(band.facebook) ? band.facebook : ("https://" + band.facebook);
+      actions.push({icon:"🔗", label:"Pagina FB", href:url});
+    }
+    if(band.contact && band.contact.indexOf("@") > -1) actions.push({icon:"✉️", label:"Email", href:"mailto:"+band.contact});
+    document.getElementById("bandQuickActions").innerHTML = actions.map(function(a){
+      return '<a class="qa" target="_blank" rel="noopener" href="'+esc(a.href)+'"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></a>';
+    }).join("");
+  }
+
+  function openBandDetail(id){
+    currentBandId = id;
+    var band = currentBand();
+    if(!band) return;
+    bandName.value = band.name || "";
+    bandFacebook.value = band.facebook || "";
+    bandFollowers.value = band.followers != null ? band.followers : "";
+    bandBase.value = band.base || "";
+    bandContact.value = band.contact || "";
+    bandGigs.value = band.gigs_count != null ? band.gigs_count : "";
+    bandNotes.value = band.notes || "";
+    elBandInlineTitle.textContent = band.name || "Nuova band";
+    renderBandQuickActions(band);
+    elBandDetail.hidden = false;
+    requestAnimationFrame(function(){ elBandDetail.classList.add("in"); });
+    if(!band.name){ setTimeout(function(){ bandName.focus(); }, 260); }
+  }
+  function closeBandDetail(){
+    var band = currentBand();
+    elBandDetail.classList.remove("in");
+    setTimeout(function(){ elBandDetail.hidden = true; }, 320);
+    var wasEmpty = band && !band.name && !band.facebook && !band.base && !band.contact && !band.notes;
+    if(wasEmpty){
+      api("DELETE", "/api/bands/" + band.id).then(loadBands);
+    } else {
+      loadBands();
+    }
+    currentBandId = null;
+  }
+  function collectBandPayload(){
+    return {
+      name: bandName.value,
+      facebook: bandFacebook.value,
+      followers: bandFollowers.value ? Number(bandFollowers.value) : "",
+      base: bandBase.value,
+      contact: bandContact.value,
+      gigs_count: bandGigs.value ? Number(bandGigs.value) : "",
+      notes: bandNotes.value
+    };
+  }
+  function saveBandNow(){
+    Object.keys(saveTimers).forEach(function(k){ if(k.indexOf("band_")===0) clearTimeout(saveTimers[k]); });
+    return api("PUT", "/api/bands/" + currentBandId, collectBandPayload()).then(function(updated){
+      var i = bands.findIndex(function(b){ return b.id === updated.id; });
+      if(i>-1) bands[i] = updated;
+    });
+  }
+  document.getElementById("btnBandSave").addEventListener("click", function(){
+    if(!currentBandId) return;
+    withButtonBusy(this, saveBandNow).then(function(){
+      toast("Band salvata");
+      closeBandDetail();
+    }).catch(function(err){ toast(err.message); });
+  });
+  document.getElementById("btnBandBack").addEventListener("click", closeBandDetail);
+  document.getElementById("btnBandMore").addEventListener("click", function(){
+    var band = currentBand(); if(!band) return;
+    confirmDestructive(band.name || "Questa band", "Elimina band", function(){
+      api("DELETE", "/api/bands/" + band.id).then(function(){
+        elBandDetail.classList.remove("in");
+        setTimeout(function(){ elBandDetail.hidden = true; }, 320);
+        currentBandId = null;
+        loadBands();
+        toast("Band eliminata");
+      });
+    });
+  });
+  document.getElementById("btnAddBand").addEventListener("click", function(){
+    api("POST", "/api/bands", {name:""}).then(function(created){
+      bands.push(created);
+      openBandDetail(created.id);
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  function renderBandList(){
+    var elBandList = document.getElementById("bandList");
+    if(!bands.length){
+      elBandList.innerHTML = '<div class="empty-state"><div class="glyph">🎸</div><h2>Nessuna band</h2><p>Tocca + in alto per aggiungere la prima band — utile per tenere traccia di chi gira negli stessi giri e negli stessi palcoscenici.</p></div>';
+      return;
+    }
+    var sorted = bands.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
+    elBandList.innerHTML = '<div class="grouped-list">' + sorted.map(function(band){
+      var subParts = [];
+      if(band.base) subParts.push(esc(band.base));
+      if(band.followers != null) subParts.push(band.followers.toLocaleString("it-IT") + " follower");
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-band="'+band.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(band.name||"Senza nome")+'</div>'+
+        (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
+        '<div class="row-trail">'+(band.gigs_count ? '<span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+band.gigs_count+' date</span>' : '')+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-band="'+band.id+'">Elimina</button></div></div>';
+    }).join("") + '</div>';
+  }
+  document.getElementById("bandList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-band]");
+    if(del){
+      api("DELETE", "/api/bands/" + del.getAttribute("data-del-band")).then(function(){
+        loadBands();
+        toast("Band eliminata");
+      });
+      return;
+    }
+    var row = e.target.closest("[data-open-band]");
+    if(row) openBandDetail(Number(row.getAttribute("data-open-band")));
+  });
+
+  /* ---------------- IMPOSTAZIONI tab ---------------- */
+  function updateSettingsTypesCount(){
+    document.getElementById("settingsTypesCount").textContent = venueTypes.length;
+  }
+  function typeUsageCount(name){
+    return venues.filter(function(v){ return v.type === name; }).length;
+  }
+  function renderTypesList(){
+    var elTypesList = document.getElementById("typesList");
+    if(!venueTypes.length){
+      elTypesList.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna tipologia configurata.</div>';
+      return;
+    }
+    elTypesList.innerHTML = venueTypes.map(function(t){
+      var count = typeUsageCount(t.name);
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-type="'+t.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+count+'</span>'+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-type="'+t.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+  document.getElementById("typesList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-type]");
+    if(del){
+      var id = del.getAttribute("data-del-type");
+      api("DELETE", "/api/venue_types/" + id).then(function(){
+        venueTypes = venueTypes.filter(function(t){ return String(t.id) !== String(id); });
+        if(venueTypes.every(function(t){ return t.name !== filterType; })) filterType = "all";
+        renderTypesList();
+        updateSettingsTypesCount();
+        renderFilterTypeRow();
+        toast("Tipologia eliminata");
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-type]");
+    if(row) openTypeEditScreen(Number(row.getAttribute("data-open-type")));
+  });
+
+  var currentTypeEditId = null;
+  var elTypeEditScreen = document.getElementById("typeEditScreen");
+  function openTypeEditScreen(id){
+    var t = venueTypes.find(function(x){ return x.id === id; });
+    if(!t) return;
+    currentTypeEditId = id;
+    document.getElementById("typeEditName").value = t.name;
+    var count = typeUsageCount(t.name);
+    document.getElementById("typeEditUsage").textContent = count
+      ? ("Usata da " + count + (count===1 ? " palcoscenico. Rinominandola si aggiorna anche lui." : " palcoscenici. Rinominandola si aggiornano anche loro."))
+      : "Non ancora usata da nessun palcoscenico.";
+    elTypeEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elTypeEditScreen.classList.add("in"); });
+    setTimeout(function(){ document.getElementById("typeEditName").focus(); }, 260);
+  }
+  function closeTypeEditScreen(){
+    elTypeEditScreen.classList.remove("in");
+    setTimeout(function(){ elTypeEditScreen.hidden = true; }, 320);
+    currentTypeEditId = null;
+  }
+  document.getElementById("btnTypeEditBack").addEventListener("click", closeTypeEditScreen);
+  document.getElementById("btnTypeEditSave").addEventListener("click", function(){
+    if(currentTypeEditId == null) return;
+    var name = document.getElementById("typeEditName").value.trim();
+    if(!name){ toast("Il nome è obbligatorio"); return; }
+    var btn = this;
+    withButtonBusy(btn, function(){
+      return api("PUT", "/api/venue_types/" + currentTypeEditId, {name:name}).then(function(updated){
+        var i = venueTypes.findIndex(function(t){ return t.id === updated.id; });
+        if(i > -1) venueTypes[i] = updated;
+        return updated.affected_locations ? loadVenues().then(function(){ return updated; }) : updated;
+      });
+    }).then(function(updated){
+      renderTypesList();
+      renderFilterTypeRow();
+      toast(updated.affected_locations
+        ? ("Tipologia rinominata (" + updated.affected_locations + " palcoscenici aggiornati)")
+        : "Tipologia rinominata");
+      closeTypeEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  document.getElementById("btnAddType").addEventListener("click", function(){
+    var input = document.getElementById("newTypeInput");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/venue_types", {name:name}).then(function(created){
+      venueTypes.push(created);
+      input.value = "";
+      renderTypesList();
+      updateSettingsTypesCount();
+      toast("Tipologia aggiunta");
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  var elTypesScreen = document.getElementById("typesScreen");
+  function openTypesScreen(){
+    elTypesScreen.hidden = false;
+    requestAnimationFrame(function(){ elTypesScreen.classList.add("in"); });
+  }
+  function closeTypesScreen(){
+    elTypesScreen.classList.remove("in");
+    setTimeout(function(){ elTypesScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsTypes").addEventListener("click", openTypesScreen);
+  document.getElementById("btnTypesBack").addEventListener("click", closeTypesScreen);
+
+  var elAboutScreen = document.getElementById("aboutScreen");
+  function openAboutScreen(){
+    document.getElementById("aboutCountVenues").textContent = venues.length;
+    document.getElementById("aboutCountAd").textContent = artDirectors.length;
+    document.getElementById("aboutCountBands").textContent = bands.length;
+    elAboutScreen.hidden = false;
+    requestAnimationFrame(function(){ elAboutScreen.classList.add("in"); });
+  }
+  function closeAboutScreen(){
+    elAboutScreen.classList.remove("in");
+    setTimeout(function(){ elAboutScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsAbout").addEventListener("click", openAboutScreen);
+  document.getElementById("btnAboutBack").addEventListener("click", closeAboutScreen);
+
+  /* ---------------- swipe da bordo sinistro per tornare indietro ---------------- */
+  function addEdgeSwipeBack(screenEl, closeFn){
+    var startX = 0, startY = 0, tracking = false;
+    var EDGE = 24, THRESHOLD = 70;
+    screenEl.addEventListener("touchstart", function(e){
+      var t = e.touches[0];
+      tracking = t.clientX <= EDGE;
+      startX = t.clientX; startY = t.clientY;
+    }, {passive:true});
+    screenEl.addEventListener("touchend", function(e){
+      if(!tracking) return;
+      tracking = false;
+      var t = e.changedTouches[0];
+      var dx = t.clientX - startX;
+      var dy = Math.abs(t.clientY - startY);
+      if(dx > THRESHOLD && dx > dy * 1.5) closeFn();
+    }, {passive:true});
+  }
+  addEdgeSwipeBack(elDetail, closeDetail);
+  addEdgeSwipeBack(elAdDetail, closeAdDetail);
+  addEdgeSwipeBack(elBandDetail, closeBandDetail);
+  addEdgeSwipeBack(elTypesScreen, closeTypesScreen);
+  addEdgeSwipeBack(elAboutScreen, closeAboutScreen);
+  addEdgeSwipeBack(elFiltersScreen, closeFiltersScreen);
+  addEdgeSwipeBack(elTypeEditScreen, closeTypeEditScreen);
+
+  /* ---------------- boot ---------------- */
+  Promise.all([loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes()]);
+})();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("/sw.js").catch(function(){
+      // contesto non sicuro (es. http:// su IP di rete locale) o altro errore:
+      // l'app funziona comunque, solo senza i vantaggi del service worker.
+    });
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+services:
+  gigflow:
+    build: .
+    image: gigflow:latest
+    container_name: gigflow
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    env_file:
+      # Facoltativo: se il file non esiste, il login resta disattivato e
+      # l'app funziona come sempre, senza richiedere accesso.
+      - path: .env
+        required: false
+    volumes:
+      # Bind mount sulla cartella data/ già esistente sul computer, così i
+      # palcoscenici, le band e le foto già presenti restano al loro posto
+      # anche passando a Docker: nessuna migrazione dei dati necessaria.
+      - ./data:/app/data

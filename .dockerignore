@@ -1,0 +1,16 @@
+# Dati e stato locale: vivono nel volume montato, non nell'immagine.
+data/
+
+# File Excel di importazione: pesano nell'immagine e non servono a runtime.
+# Se ti serve rilanciare un import dentro il container, copiali con
+# `docker compose cp file.xlsx palcoscenici:/app/` prima di eseguirlo.
+*.xlsx
+
+__pycache__/
+*.pyc
+.git
+.gitignore
+
+# Segreti: passati al container via env_file da compose.yaml, mai da
+# includere nell'immagine.
+.env

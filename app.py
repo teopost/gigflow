@@ -1,0 +1,1216 @@
+#!/usr/bin/env python3
+"""GigFlow — gestionale locale per i posti dove far suonare la band.
+
+Server autonomo (solo libreria standard) con database SQLite.
+Avvio:  python3 app.py [porta]
+"""
+
+import base64
+import html
+import http.cookies
+import json
+import os
+import re
+import secrets
+import sqlite3
+import socket
+import urllib.error
+import urllib.request
+import uuid
+from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs, urlencode
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "data", "crm.db")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+PHOTOS_DIR = os.path.join(BASE_DIR, "data", "photos")
+MAX_PHOTO_BYTES = 8 * 1024 * 1024
+PHOTO_EXT_CONTENT_TYPE = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg",
+    "png": "image/png", "webp": "image/webp", "gif": "image/gif",
+}
+
+# --- login con Google (opzionale) -------------------------------------
+# Se GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET non sono impostate, il login è
+# disattivato e l'app si comporta come prima (nessuna autenticazione).
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+ALLOWED_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("ALLOWED_EMAILS", "").split(",")
+    if e.strip()
+}
+SESSION_COOKIE = "session_id"
+STATE_COOKIE = "oauth_state"
+SESSION_TTL_DAYS = 30
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+PUBLIC_PATHS = {"/login", "/auth/google", "/auth/google/callback", "/logout"}
+
+
+def auth_enabled():
+    return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+LOCATION_FIELDS = [
+    "name", "type", "address", "city", "lat", "lng",
+    "contact_name", "phone", "email", "website", "capacity", "genre",
+    "art_director_id", "status", "next_contact_date", "planning_note",
+]
+ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
+BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
+
+STATUS_VALUES = {
+    "da_contattare", "contattato", "trattativa",
+    "confermato", "suonato", "rifiutato",
+}
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def init_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    conn = get_conn()
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS art_directors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            email TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS locations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT,
+            address TEXT,
+            city TEXT,
+            lat REAL,
+            lng REAL,
+            phone TEXT,
+            email TEXT,
+            website TEXT,
+            capacity INTEGER,
+            genre TEXT,
+            art_director_id INTEGER REFERENCES art_directors(id) ON DELETE SET NULL,
+            status TEXT NOT NULL DEFAULT 'da_contattare',
+            next_contact_date TEXT,
+            planning_note TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS bands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            facebook TEXT,
+            followers INTEGER,
+            base TEXT,
+            contact TEXT,
+            gigs_count INTEGER,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS venue_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_locations_status ON locations(status);
+        CREATE INDEX IF NOT EXISTS idx_photos_location ON photos(location_id);
+        CREATE INDEX IF NOT EXISTS idx_locations_next_contact ON locations(next_contact_date);
+        CREATE INDEX IF NOT EXISTS idx_notes_location ON notes(location_id);
+        """
+    )
+    migrate_schema(conn)
+    seed_default_venue_types(conn)
+    conn.commit()
+    conn.close()
+
+
+def migrate_schema(conn):
+    """Aggiunge colonne introdotte dopo la creazione iniziale del DB, se mancanti."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(locations)").fetchall()}
+    if "contact_name" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN contact_name TEXT")
+
+
+# --- sessioni di login ---------------------------------------------------
+
+def is_email_allowed(email):
+    email = (email or "").strip().lower()
+    return bool(email) and email in ALLOWED_EMAILS
+
+
+def create_session(conn, email):
+    session_id = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(days=SESSION_TTL_DAYS)
+    conn.execute(
+        "INSERT INTO sessions (id, email, created_at, expires_at) VALUES (?, ?, ?, ?)",
+        (session_id, email, now.isoformat(), expires.isoformat()),
+    )
+    conn.commit()
+    return session_id
+
+
+def get_session_email(conn, session_id):
+    if not session_id:
+        return None
+    row = conn.execute("SELECT email, expires_at FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        return None
+    expires = datetime.fromisoformat(row["expires_at"])
+    if expires < datetime.now(timezone.utc):
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.commit()
+        return None
+    return row["email"]
+
+
+def delete_session(conn, session_id):
+    if session_id:
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.commit()
+
+
+def google_auth_url(redirect_uri, state):
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email",
+        "state": state,
+        "prompt": "select_account",
+    }
+    return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+
+
+def google_exchange_code(code, redirect_uri):
+    data = urlencode({
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }).encode()
+    req = urllib.request.Request(GOOGLE_TOKEN_URL, data=data, method="POST")
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.load(resp)
+
+
+def google_fetch_userinfo(access_token):
+    req = urllib.request.Request(
+        GOOGLE_USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"}
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.load(resp)
+
+
+DEFAULT_VENUE_TYPES = [
+    "Locale / club", "Festa di paese", "Sagra",
+    "Bagno / stabilimento balneare", "Villaggio / resort",
+    "Evento privato", "Spazio pubblico", "Da verificare",
+]
+
+
+def seed_default_venue_types(conn):
+    count = conn.execute("SELECT COUNT(*) AS n FROM venue_types").fetchone()["n"]
+    if count > 0:
+        return
+    ts = now_iso()
+    conn.executemany(
+        "INSERT INTO venue_types (name, created_at) VALUES (?, ?)",
+        [(name, ts) for name in DEFAULT_VENUE_TYPES],
+    )
+
+
+class ApiError(Exception):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+def to_number_or_none(value, kind=float):
+    if value is None or value == "":
+        return None
+    try:
+        return kind(value)
+    except (TypeError, ValueError):
+        raise ApiError(400, "Valore numerico non valido")
+
+
+def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None):
+    d = dict(row)
+    ad = ad_by_id.get(d.get("art_director_id"))
+    d["art_director_name"] = ad["name"] if ad else None
+    d["notes"] = notes_by_location.get(d["id"], [])
+    d["photos"] = (photos_by_location or {}).get(d["id"], [])
+    return d
+
+
+def fetch_locations(conn, status=None, search=None):
+    query = "SELECT * FROM locations"
+    clauses = []
+    params = []
+    if status and status != "all":
+        clauses.append("status = ?")
+        params.append(status)
+    if search:
+        clauses.append("(LOWER(name) LIKE ? OR LOWER(city) LIKE ? OR LOWER(type) LIKE ?)")
+        like = f"%{search.lower()}%"
+        params.extend([like, like, like])
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY name COLLATE NOCASE ASC"
+    rows = conn.execute(query, params).fetchall()
+
+    ad_rows = conn.execute("SELECT * FROM art_directors").fetchall()
+    ad_by_id = {r["id"]: dict(r) for r in ad_rows}
+
+    note_rows = conn.execute("SELECT * FROM notes ORDER BY created_at ASC").fetchall()
+    notes_by_location = {}
+    for n in note_rows:
+        notes_by_location.setdefault(n["location_id"], []).append(dict(n))
+
+    photo_rows = conn.execute("SELECT * FROM photos ORDER BY created_at ASC").fetchall()
+    photos_by_location = {}
+    for p in photo_rows:
+        photos_by_location.setdefault(p["location_id"], []).append(dict(p))
+
+    return [location_to_dict(r, notes_by_location, ad_by_id, photos_by_location) for r in rows]
+
+
+def fetch_location(conn, loc_id):
+    row = conn.execute("SELECT * FROM locations WHERE id = ?", (loc_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+    ad_rows = conn.execute("SELECT * FROM art_directors").fetchall()
+    ad_by_id = {r["id"]: dict(r) for r in ad_rows}
+    note_rows = conn.execute(
+        "SELECT * FROM notes WHERE location_id = ? ORDER BY created_at ASC", (loc_id,)
+    ).fetchall()
+    notes_by_location = {loc_id: [dict(n) for n in note_rows]}
+    photo_rows = conn.execute(
+        "SELECT * FROM photos WHERE location_id = ? ORDER BY created_at ASC", (loc_id,)
+    ).fetchall()
+    photos_by_location = {loc_id: [dict(p) for p in photo_rows]}
+    return location_to_dict(row, notes_by_location, ad_by_id, photos_by_location)
+
+
+def clean_location_payload(body, partial):
+    data = {}
+    for field in LOCATION_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if field == "lat" or field == "lng":
+            value = to_number_or_none(value, float)
+        elif field == "capacity" or field == "art_director_id":
+            value = to_number_or_none(value, int)
+        elif field == "status":
+            if value and value not in STATUS_VALUES:
+                raise ApiError(400, "Stato non valido")
+            value = value or "da_contattare"
+        elif isinstance(value, str):
+            value = value.strip()
+        data[field] = value
+    return data
+
+
+def create_location(conn, body):
+    data = clean_location_payload(body, partial=False)
+    data.setdefault("name", "")
+    data.setdefault("status", "da_contattare")
+    ts = now_iso()
+    fields = list(data.keys()) + ["created_at", "updated_at"]
+    values = list(data.values()) + [ts, ts]
+    placeholders = ",".join("?" for _ in fields)
+    cur = conn.execute(
+        f"INSERT INTO locations ({','.join(fields)}) VALUES ({placeholders})", values
+    )
+    conn.commit()
+    return fetch_location(conn, cur.lastrowid)
+
+
+def update_location(conn, loc_id, body):
+    existing = conn.execute("SELECT id FROM locations WHERE id = ?", (loc_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Palcoscenico non trovato")
+    data = clean_location_payload(body, partial=True)
+    if not data:
+        return fetch_location(conn, loc_id)
+    data["updated_at"] = now_iso()
+    set_clause = ",".join(f"{k} = ?" for k in data.keys())
+    conn.execute(
+        f"UPDATE locations SET {set_clause} WHERE id = ?", list(data.values()) + [loc_id]
+    )
+    conn.commit()
+    return fetch_location(conn, loc_id)
+
+
+def delete_location(conn, loc_id):
+    cur = conn.execute("DELETE FROM locations WHERE id = ?", (loc_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Palcoscenico non trovato")
+
+
+def add_note(conn, loc_id, body):
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise ApiError(400, "Il testo della nota è obbligatorio")
+    existing = conn.execute("SELECT id FROM locations WHERE id = ?", (loc_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Palcoscenico non trovato")
+    ts = now_iso()
+    conn.execute(
+        "INSERT INTO notes (location_id, text, created_at) VALUES (?, ?, ?)",
+        (loc_id, text, ts),
+    )
+    conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
+    conn.commit()
+    return fetch_location(conn, loc_id)
+
+
+def delete_note(conn, note_id):
+    row = conn.execute("SELECT location_id FROM notes WHERE id = ?", (note_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Nota non trovata")
+    loc_id = row["location_id"]
+    conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    conn.commit()
+    return fetch_location(conn, loc_id)
+
+
+DATA_URL_RE = re.compile(r"^data:image/(\w+);base64,(.+)$", re.S)
+
+
+def add_photo(conn, loc_id, body):
+    existing = conn.execute("SELECT id FROM locations WHERE id = ?", (loc_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Palcoscenico non trovato")
+
+    data_url = body.get("image_base64") or ""
+    m = DATA_URL_RE.match(data_url)
+    if not m:
+        raise ApiError(400, "Immagine non valida")
+    ext = m.group(1).lower()
+    if ext not in PHOTO_EXT_CONTENT_TYPE:
+        ext = "jpg"
+    try:
+        raw = base64.b64decode(m.group(2))
+    except (ValueError, TypeError):
+        raise ApiError(400, "Immagine non valida")
+    if not raw:
+        raise ApiError(400, "Immagine non valida")
+    if len(raw) > MAX_PHOTO_BYTES:
+        raise ApiError(400, "Immagine troppo grande (massimo 8 MB)")
+
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    filename = f"{loc_id}_{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(PHOTOS_DIR, filename), "wb") as f:
+        f.write(raw)
+
+    ts = now_iso()
+    cur = conn.execute(
+        "INSERT INTO photos (location_id, filename, created_at) VALUES (?, ?, ?)",
+        (loc_id, filename, ts),
+    )
+    conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
+    conn.commit()
+    row = conn.execute("SELECT * FROM photos WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def delete_photo(conn, photo_id):
+    row = conn.execute("SELECT filename FROM photos WHERE id = ?", (photo_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Foto non trovata")
+    conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
+    conn.commit()
+    try:
+        os.remove(os.path.join(PHOTOS_DIR, row["filename"]))
+    except OSError:
+        pass
+
+
+def art_director_to_dict(row, counts):
+    d = dict(row)
+    d["location_count"] = counts.get(d["id"], 0)
+    return d
+
+
+def fetch_art_directors(conn):
+    rows = conn.execute("SELECT * FROM art_directors ORDER BY name COLLATE NOCASE ASC").fetchall()
+    count_rows = conn.execute(
+        "SELECT art_director_id, COUNT(*) AS n FROM locations "
+        "WHERE art_director_id IS NOT NULL GROUP BY art_director_id"
+    ).fetchall()
+    counts = {r["art_director_id"]: r["n"] for r in count_rows}
+    return [art_director_to_dict(r, counts) for r in rows]
+
+
+def clean_art_director_payload(body, partial):
+    data = {}
+    for field in ART_DIRECTOR_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if isinstance(value, str):
+            value = value.strip()
+        data[field] = value
+    return data
+
+
+def create_art_director(conn, body):
+    data = clean_art_director_payload(body, partial=False)
+    data.setdefault("name", "")
+    ts = now_iso()
+    fields = list(data.keys()) + ["created_at"]
+    values = list(data.values()) + [ts]
+    placeholders = ",".join("?" for _ in fields)
+    cur = conn.execute(
+        f"INSERT INTO art_directors ({','.join(fields)}) VALUES ({placeholders})", values
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM art_directors WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return art_director_to_dict(row, {})
+
+
+def update_art_director(conn, ad_id, body):
+    existing = conn.execute("SELECT id FROM art_directors WHERE id = ?", (ad_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Art director non trovato")
+    data = clean_art_director_payload(body, partial=True)
+    if data:
+        set_clause = ",".join(f"{k} = ?" for k in data.keys())
+        conn.execute(
+            f"UPDATE art_directors SET {set_clause} WHERE id = ?",
+            list(data.values()) + [ad_id],
+        )
+        conn.commit()
+    counts_row = conn.execute(
+        "SELECT COUNT(*) AS n FROM locations WHERE art_director_id = ?", (ad_id,)
+    ).fetchone()
+    row = conn.execute("SELECT * FROM art_directors WHERE id = ?", (ad_id,)).fetchone()
+    return art_director_to_dict(row, {ad_id: counts_row["n"]})
+
+
+def delete_art_director(conn, ad_id):
+    cur = conn.execute("DELETE FROM art_directors WHERE id = ?", (ad_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Art director non trovato")
+
+
+def clean_band_payload(body, partial):
+    data = {}
+    for field in BAND_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if field in ("followers", "gigs_count"):
+            value = to_number_or_none(value, int)
+        elif isinstance(value, str):
+            value = value.strip()
+        data[field] = value
+    return data
+
+
+def fetch_bands(conn):
+    rows = conn.execute("SELECT * FROM bands ORDER BY name COLLATE NOCASE ASC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def fetch_band(conn, band_id):
+    row = conn.execute("SELECT * FROM bands WHERE id = ?", (band_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Band non trovata")
+    return dict(row)
+
+
+def create_band(conn, body):
+    data = clean_band_payload(body, partial=False)
+    data.setdefault("name", "")
+    ts = now_iso()
+    fields = list(data.keys()) + ["created_at", "updated_at"]
+    values = list(data.values()) + [ts, ts]
+    placeholders = ",".join("?" for _ in fields)
+    cur = conn.execute(
+        f"INSERT INTO bands ({','.join(fields)}) VALUES ({placeholders})", values
+    )
+    conn.commit()
+    return fetch_band(conn, cur.lastrowid)
+
+
+def update_band(conn, band_id, body):
+    existing = conn.execute("SELECT id FROM bands WHERE id = ?", (band_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Band non trovata")
+    data = clean_band_payload(body, partial=True)
+    if data:
+        data["updated_at"] = now_iso()
+        set_clause = ",".join(f"{k} = ?" for k in data.keys())
+        conn.execute(
+            f"UPDATE bands SET {set_clause} WHERE id = ?", list(data.values()) + [band_id]
+        )
+        conn.commit()
+    return fetch_band(conn, band_id)
+
+
+def delete_band(conn, band_id):
+    cur = conn.execute("DELETE FROM bands WHERE id = ?", (band_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Band non trovata")
+
+
+def fetch_venue_types(conn):
+    rows = conn.execute("SELECT * FROM venue_types ORDER BY id ASC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_venue_type(conn, body):
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome della tipologia è obbligatorio")
+    existing = conn.execute(
+        "SELECT id FROM venue_types WHERE LOWER(name) = LOWER(?)", (name,)
+    ).fetchone()
+    if existing:
+        raise ApiError(400, "Questa tipologia esiste già")
+    cur = conn.execute(
+        "INSERT INTO venue_types (name, created_at) VALUES (?, ?)", (name, now_iso())
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM venue_types WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_venue_type(conn, type_id, body):
+    row = conn.execute("SELECT name FROM venue_types WHERE id = ?", (type_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Tipologia non trovata")
+    new_name = (body.get("name") or "").strip()
+    if not new_name:
+        raise ApiError(400, "Il nome della tipologia è obbligatorio")
+    old_name = row["name"]
+
+    if new_name.lower() != old_name.lower():
+        dup = conn.execute(
+            "SELECT id FROM venue_types WHERE LOWER(name) = LOWER(?) AND id != ?",
+            (new_name, type_id),
+        ).fetchone()
+        if dup:
+            raise ApiError(400, "Questa tipologia esiste già")
+
+    conn.execute("UPDATE venue_types SET name = ? WHERE id = ?", (new_name, type_id))
+
+    affected = 0
+    if new_name != old_name:
+        ts = now_iso()
+        cur = conn.execute(
+            "UPDATE locations SET type = ?, updated_at = ? WHERE type = ?",
+            (new_name, ts, old_name),
+        )
+        affected = cur.rowcount
+
+    conn.commit()
+    updated = dict(conn.execute("SELECT * FROM venue_types WHERE id = ?", (type_id,)).fetchone())
+    updated["affected_locations"] = affected
+    return updated
+
+
+def delete_venue_type(conn, type_id):
+    row = conn.execute("SELECT name FROM venue_types WHERE id = ?", (type_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Tipologia non trovata")
+    count = conn.execute(
+        "SELECT COUNT(*) AS n FROM locations WHERE type = ?", (row["name"],)
+    ).fetchone()["n"]
+    if count > 0:
+        noun = "palcoscenico" if count == 1 else "palcoscenici"
+        verb = "usa" if count == 1 else "usano"
+        raise ApiError(400, f"Impossibile eliminare: {count} {noun} {verb} ancora questa tipologia")
+    conn.execute("DELETE FROM venue_types WHERE id = ?", (type_id,))
+    conn.commit()
+
+
+
+def _h_list_locations(conn, match, query, body):
+    status = (query.get("status") or [None])[0]
+    search = (query.get("search") or [None])[0]
+    return 200, fetch_locations(conn, status, search)
+
+
+def _h_create_location(conn, match, query, body):
+    return 201, create_location(conn, body)
+
+
+def _h_get_location(conn, match, query, body):
+    return 200, fetch_location(conn, int(match.group(1)))
+
+
+def _h_update_location(conn, match, query, body):
+    return 200, update_location(conn, int(match.group(1)), body)
+
+
+def _h_delete_location(conn, match, query, body):
+    delete_location(conn, int(match.group(1)))
+    return 204, {}
+
+
+def _h_add_note(conn, match, query, body):
+    return 201, add_note(conn, int(match.group(1)), body)
+
+
+def _h_delete_note(conn, match, query, body):
+    return 200, delete_note(conn, int(match.group(1)))
+
+
+def _h_add_photo(conn, match, query, body):
+    return 201, add_photo(conn, int(match.group(1)), body)
+
+
+def _h_delete_photo(conn, match, query, body):
+    delete_photo(conn, int(match.group(1)))
+    return 204, {}
+
+
+def _h_list_art_directors(conn, match, query, body):
+    return 200, fetch_art_directors(conn)
+
+
+def _h_create_art_director(conn, match, query, body):
+    return 201, create_art_director(conn, body)
+
+
+def _h_update_art_director(conn, match, query, body):
+    return 200, update_art_director(conn, int(match.group(1)), body)
+
+
+def _h_delete_art_director(conn, match, query, body):
+    delete_art_director(conn, int(match.group(1)))
+    return 204, {}
+
+
+def _h_list_bands(conn, match, query, body):
+    return 200, fetch_bands(conn)
+
+
+def _h_create_band(conn, match, query, body):
+    return 201, create_band(conn, body)
+
+
+def _h_update_band(conn, match, query, body):
+    return 200, update_band(conn, int(match.group(1)), body)
+
+
+def _h_delete_band(conn, match, query, body):
+    delete_band(conn, int(match.group(1)))
+    return 204, {}
+
+
+def _h_list_venue_types(conn, match, query, body):
+    return 200, fetch_venue_types(conn)
+
+
+def _h_create_venue_type(conn, match, query, body):
+    return 201, create_venue_type(conn, body)
+
+
+def _h_update_venue_type(conn, match, query, body):
+    return 200, update_venue_type(conn, int(match.group(1)), body)
+
+
+def _h_delete_venue_type(conn, match, query, body):
+    delete_venue_type(conn, int(match.group(1)))
+    return 204, {}
+
+
+ROUTES = [
+    ("GET", re.compile(r"^/api/locations$"), _h_list_locations),
+    ("POST", re.compile(r"^/api/locations$"), _h_create_location),
+    ("GET", re.compile(r"^/api/locations/(\d+)$"), _h_get_location),
+    ("PUT", re.compile(r"^/api/locations/(\d+)$"), _h_update_location),
+    ("DELETE", re.compile(r"^/api/locations/(\d+)$"), _h_delete_location),
+    ("POST", re.compile(r"^/api/locations/(\d+)/notes$"), _h_add_note),
+    ("DELETE", re.compile(r"^/api/notes/(\d+)$"), _h_delete_note),
+    ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
+    ("DELETE", re.compile(r"^/api/photos/(\d+)$"), _h_delete_photo),
+    ("GET", re.compile(r"^/api/art_directors$"), _h_list_art_directors),
+    ("POST", re.compile(r"^/api/art_directors$"), _h_create_art_director),
+    ("PUT", re.compile(r"^/api/art_directors/(\d+)$"), _h_update_art_director),
+    ("DELETE", re.compile(r"^/api/art_directors/(\d+)$"), _h_delete_art_director),
+    ("GET", re.compile(r"^/api/bands$"), _h_list_bands),
+    ("POST", re.compile(r"^/api/bands$"), _h_create_band),
+    ("PUT", re.compile(r"^/api/bands/(\d+)$"), _h_update_band),
+    ("DELETE", re.compile(r"^/api/bands/(\d+)$"), _h_delete_band),
+    ("GET", re.compile(r"^/api/venue_types$"), _h_list_venue_types),
+    ("POST", re.compile(r"^/api/venue_types$"), _h_create_venue_type),
+    ("PUT", re.compile(r"^/api/venue_types/(\d+)$"), _h_update_venue_type),
+    ("DELETE", re.compile(r"^/api/venue_types/(\d+)$"), _h_delete_venue_type),
+]
+
+
+LOGIN_PAGE_TEMPLATE = """<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accedi — GigFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --stage-1:#141225; --stage-2:#0a0e17; --stage-3:#050710;
+    --amber:#ffb347; --magenta:#ff3cac; --cyan:#28e0ff;
+    --ink:#f4f1ea; --ink-dim:#9aa3b4;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; overflow:hidden; position:relative; min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(120% 90% at 50% 0%, var(--stage-1) 0%, var(--stage-2) 55%, var(--stage-3) 100%);
+    color:var(--ink);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+
+  .beam{position:absolute;top:-15%;left:50%;width:40vmax;height:150vmax;
+    transform-origin:top center;mix-blend-mode:screen;filter:blur(7px);
+    opacity:.5;pointer-events:none;}
+  .beam.b1{background:conic-gradient(from 0deg, transparent 0deg, var(--amber) 6deg, transparent 12deg);
+    animation:sweep1 9s ease-in-out infinite;}
+  .beam.b2{background:conic-gradient(from 0deg, transparent 0deg, var(--magenta) 5deg, transparent 10deg);
+    animation:sweep2 11s ease-in-out infinite;}
+  .beam.b3{background:conic-gradient(from 0deg, transparent 0deg, var(--cyan) 5deg, transparent 10deg);
+    animation:sweep3 13s ease-in-out infinite;}
+  @keyframes sweep1{0%,100%{transform:translateX(-50%) rotate(-34deg);}50%{transform:translateX(-50%) rotate(-6deg);}}
+  @keyframes sweep2{0%,100%{transform:translateX(-50%) rotate(2deg);}50%{transform:translateX(-50%) rotate(30deg);}}
+  @keyframes sweep3{0%,100%{transform:translateX(-50%) rotate(-20deg);}50%{transform:translateX(-50%) rotate(16deg);}}
+
+  .spark{position:absolute;bottom:16%;width:3px;height:3px;border-radius:50%;
+    background:var(--amber);box-shadow:0 0 6px 2px rgba(255,179,71,.65);
+    opacity:0;animation-name:rise;animation-timing-function:linear;animation-iteration-count:infinite;
+    pointer-events:none;}
+  @keyframes rise{
+    0%{opacity:0;transform:translateY(0) scale(1);}
+    10%{opacity:.9;} 85%{opacity:.35;}
+    100%{opacity:0;transform:translateY(-65vh) scale(.4);}
+  }
+
+  .stage-glow{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+    width:95vmax;height:48vh;pointer-events:none;filter:blur(18px);
+    background:radial-gradient(ellipse 60% 100% at 50% 100%,
+      rgba(255,183,71,.55) 0%, rgba(255,60,172,.28) 40%, transparent 72%);}
+  .stage{position:absolute;left:0;right:0;bottom:4vh;height:44vh;pointer-events:none;}
+  .stage svg{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:min(680px,100vw);height:auto;}
+  .band-figures{animation:bob 4s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+  .drumstick{animation:tap .5s ease-in-out infinite;}
+  @keyframes tap{0%,100%{transform:rotate(0deg);}50%{transform:rotate(-22deg);}}
+  .guitar-neck{animation:strum 2.4s ease-in-out infinite;}
+  @keyframes strum{0%,100%{transform:rotate(-25deg);}50%{transform:rotate(-19deg);}}
+  .mic-arm{animation:wave 3.2s ease-in-out infinite;}
+  @keyframes wave{0%,100%{transform:rotate(0deg);}50%{transform:rotate(-6deg);}}
+
+  .eq{position:absolute;left:0;right:0;bottom:0;height:4.5vh;display:flex;align-items:flex-end;
+    gap:3px;padding:0 4px;opacity:.45;pointer-events:none;}
+  .eq span{flex:1;background:linear-gradient(to top, var(--amber), transparent);
+    animation:eqbar 1.1s ease-in-out infinite;}
+  .eq span:nth-child(2n){animation-duration:.8s;background:linear-gradient(to top, var(--magenta), transparent);}
+  .eq span:nth-child(3n){animation-duration:1.4s;background:linear-gradient(to top, var(--cyan), transparent);}
+  @keyframes eqbar{0%,100%{height:8%;}50%{height:85%;}}
+
+  .vignette{position:absolute;inset:0;
+    background:radial-gradient(120% 80% at 50% 100%, transparent 35%, rgba(0,0,0,.7) 100%);
+    pointer-events:none;}
+
+  .card{
+    position:relative;z-index:2;
+    background:rgba(15,17,28,.6);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:20px;padding:40px 30px 32px;max-width:320px;width:calc(100vw - 48px);
+    text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.55);
+  }
+  .card .brand{font-family:"Bebas Neue",sans-serif;font-size:42px;letter-spacing:.05em;margin:0 0 2px;
+    background:linear-gradient(90deg,var(--amber),var(--magenta));
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .card .tagline{color:var(--ink-dim);font-size:13px;margin:0 0 24px;letter-spacing:.02em;}
+  .err{color:#ff8a73;font-size:13px;margin:0 0 14px;}
+  a.btn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1c1c1e;
+    text-decoration:none;font-weight:600;font-size:15px;padding:13px 18px;border-radius:12px;
+    transition:transform .15s;}
+  a.btn:active{transform:scale(.97);}
+  a.btn svg{flex:none;}
+  @media (prefers-reduced-motion:reduce){
+    .beam,.spark,.band-figures,.drumstick,.guitar-neck,.mic-arm,.eq span{animation:none !important;}
+  }
+</style>
+</head>
+<body>
+  <div class="beam b1"></div>
+  <div class="beam b2"></div>
+  <div class="beam b3"></div>
+
+  __SPARKS__
+
+  <div class="stage-glow"></div>
+  <div class="stage">
+    <svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g class="band-figures" fill="#0b0710">
+        <g>
+          <ellipse cx="95" cy="185" rx="30" ry="26"/>
+          <circle cx="58" cy="150" r="12"/>
+          <rect x="9" y="118" width="3" height="47" rx="1.5"/>
+          <ellipse cx="8" cy="116" rx="22" ry="4"/>
+          <rect x="80" y="150" width="34" height="50" rx="14"/>
+          <circle cx="97" cy="138" r="13"/>
+          <g class="drumstick" style="transform-box:fill-box;transform-origin:0% 100%;">
+            <line x1="108" y1="152" x2="140" y2="112" stroke="#05070b" stroke-width="4" stroke-linecap="round"/>
+          </g>
+        </g>
+        <g>
+          <line x1="230" y1="205" x2="230" y2="118" stroke="#05070b" stroke-width="3"/>
+          <line x1="219" y1="127" x2="241" y2="127" stroke="#05070b" stroke-width="3" stroke-linecap="round"/>
+          <rect x="255" y="140" width="32" height="55" rx="14"/>
+          <circle cx="271" cy="128" r="13"/>
+          <g class="mic-arm" style="transform-box:fill-box;transform-origin:100% 100%;">
+            <line x1="283" y1="150" x2="258" y2="113" stroke="#05070b" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="256" cy="110" r="6.5"/>
+          </g>
+        </g>
+        <g>
+          <rect x="420" y="145" width="32" height="55" rx="14"/>
+          <circle cx="436" cy="133" r="13"/>
+          <ellipse cx="452" cy="186" rx="27" ry="19"/>
+          <g class="guitar-neck" style="transform-box:fill-box;transform-origin:0% 100%;">
+            <rect x="468" y="150" width="62" height="6" rx="3"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="eq">__EQBARS__</div>
+  <div class="vignette"></div>
+
+  <div class="card">
+    <div class="brand">GIGFLOW</div>
+    <p class="tagline">Il gestionale live della tua band</p>
+    __MSG__
+    <a class="btn" href="/auth/google">
+      <svg width="18" height="18" viewBox="0 0 48 48">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.3l-6.3-5.3C29.4 35.1 26.8 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.3 5.3C39.9 37 44 31 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+      </svg>
+      Accedi con Google
+    </a>
+  </div>
+</body>
+</html>"""
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "GigFlowCRM/1.0"
+
+    def log_message(self, fmt, *args):
+        pass  # niente log rumoroso in console
+
+    def _send_json(self, status, payload):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_file(self, path, content_type):
+        try:
+            with open(path, "rb") as f:
+                body = f.read()
+        except OSError:
+            self._send_json(404, {"error": "Non trovato"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        if length == 0:
+            return {}
+        raw = self.rfile.read(length)
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise ApiError(400, "JSON non valido")
+
+    def _cookie(self, name):
+        raw = self.headers.get("Cookie")
+        if not raw:
+            return None
+        jar = http.cookies.SimpleCookie()
+        jar.load(raw)
+        morsel = jar.get(name)
+        return morsel.value if morsel else None
+
+    def _request_origin(self):
+        scheme = self.headers.get("X-Forwarded-Proto", "http")
+        host = self.headers.get("Host", "localhost")
+        return f"{scheme}://{host}"
+
+    def _send_redirect(self, location, set_cookie=None, clear_cookie=None, max_age=None):
+        self.send_response(302)
+        self.send_header("Location", location)
+        if set_cookie is not None:
+            self.send_header(
+                "Set-Cookie",
+                f"{set_cookie[0]}={set_cookie[1]}; Path=/; HttpOnly; SameSite=Lax"
+                + (f"; Max-Age={max_age}" if max_age else ""),
+            )
+        if clear_cookie is not None:
+            self.send_header("Set-Cookie", f"{clear_cookie}=deleted; Path=/; Max-Age=0")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _current_email(self, conn):
+        if not auth_enabled():
+            return None
+        return get_session_email(conn, self._cookie(SESSION_COOKIE))
+
+    def _send_login_page(self, error=None):
+        msg = f'<p class="err">{html.escape(error)}</p>' if error else ""
+        sparks = "".join(
+            f'<div class="spark" style="left:{left}%;animation-duration:{dur}s;animation-delay:{delay}s;"></div>'
+            for left, dur, delay in [
+                (6, 7, 0), (14, 9, 1.4), (23, 6.5, 3.1), (33, 8, .6), (44, 7.5, 2.4),
+                (55, 9.5, 4), (64, 6, 1.1), (74, 8.5, 3.6), (85, 7, .2), (93, 9, 2.8),
+            ]
+        )
+        eqbars = "".join(f'<span style="animation-delay:{i * 0.09}s"></span>' for i in range(28))
+        body = LOGIN_PAGE_TEMPLATE.replace("__MSG__", msg).replace("__SPARKS__", sparks).replace("__EQBARS__", eqbars)
+        body_bytes = body.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body_bytes)))
+        self.end_headers()
+        self.wfile.write(body_bytes)
+
+    def _handle_auth_route(self, method, path, parsed):
+        if method == "GET" and path == "/login":
+            self._send_login_page()
+            return True
+
+        if method == "GET" and path == "/auth/google":
+            if not auth_enabled():
+                self._send_json(503, {"error": "Login con Google non configurato"})
+                return True
+            state = secrets.token_urlsafe(24)
+            redirect_uri = self._request_origin() + "/auth/google/callback"
+            url = google_auth_url(redirect_uri, state)
+            self._send_redirect(url, set_cookie=(STATE_COOKIE, state), max_age=600)
+            return True
+
+        if method == "GET" and path == "/auth/google/callback":
+            query = parse_qs(parsed.query)
+            state = (query.get("state") or [None])[0]
+            code = (query.get("code") or [None])[0]
+            expected_state = self._cookie(STATE_COOKIE)
+            if not state or not expected_state or state != expected_state or not code:
+                self._send_login_page(error="Accesso annullato o non valido. Riprova.")
+                return True
+            try:
+                redirect_uri = self._request_origin() + "/auth/google/callback"
+                token_data = google_exchange_code(code, redirect_uri)
+                userinfo = google_fetch_userinfo(token_data["access_token"])
+            except (urllib.error.URLError, KeyError, json.JSONDecodeError):
+                self._send_login_page(error="Impossibile completare l'accesso con Google. Riprova.")
+                return True
+            email = (userinfo.get("email") or "").strip().lower()
+            if not userinfo.get("email_verified", True) or not is_email_allowed(email):
+                self._send_login_page(error=f"L'account {html.escape(email)} non è autorizzato.")
+                return True
+            conn = get_conn()
+            try:
+                session_id = create_session(conn, email)
+            finally:
+                conn.close()
+            self._send_redirect(
+                "/", set_cookie=(SESSION_COOKIE, session_id), max_age=SESSION_TTL_DAYS * 86400
+            )
+            return True
+
+        if method == "GET" and path == "/logout":
+            conn = get_conn()
+            try:
+                delete_session(conn, self._cookie(SESSION_COOKIE))
+            finally:
+                conn.close()
+            self._send_redirect("/login", clear_cookie=SESSION_COOKIE)
+            return True
+
+        return False
+
+    def _dispatch(self, method):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if self._handle_auth_route(method, path, parsed):
+            return
+
+        if auth_enabled() and path not in PUBLIC_PATHS and not path.startswith("/icons/") and path != "/favicon.ico":
+            conn = get_conn()
+            try:
+                email = self._current_email(conn)
+            finally:
+                conn.close()
+            if not email:
+                if path.startswith("/api/"):
+                    self._send_json(401, {"error": "Accesso richiesto"})
+                else:
+                    self._send_redirect("/login")
+                return
+
+        if method == "GET" and path in ("/", "/index.html"):
+            self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
+            return
+
+        if method == "GET" and path == "/manifest.json":
+            self._send_file(os.path.join(STATIC_DIR, "manifest.json"), "application/manifest+json; charset=utf-8")
+            return
+
+        if method == "GET" and path == "/sw.js":
+            self._send_file(os.path.join(STATIC_DIR, "sw.js"), "application/javascript; charset=utf-8")
+            return
+
+        if method == "GET" and (path.startswith("/icons/") or path == "/favicon.ico"):
+            rel = "icons/favicon-32.png" if path == "/favicon.ico" else path.lstrip("/")
+            full = os.path.normpath(os.path.join(STATIC_DIR, rel))
+            if not full.startswith(STATIC_DIR + os.sep) or not os.path.isfile(full):
+                self._send_json(404, {"error": "Non trovato"})
+                return
+            self._send_file(full, "image/png")
+            return
+
+        if method == "GET" and path.startswith("/photos/"):
+            filename = path[len("/photos/"):]
+            full = os.path.normpath(os.path.join(PHOTOS_DIR, filename))
+            if not full.startswith(os.path.normpath(PHOTOS_DIR) + os.sep) or not os.path.isfile(full):
+                self._send_json(404, {"error": "Non trovato"})
+                return
+            ext = full.rsplit(".", 1)[-1].lower()
+            content_type = PHOTO_EXT_CONTENT_TYPE.get(ext, "application/octet-stream")
+            self._send_file(full, content_type)
+            return
+
+        for route_method, pattern, fn in ROUTES:
+            if route_method != method:
+                continue
+            match = pattern.match(path)
+            if not match:
+                continue
+            try:
+                body = self._read_json_body() if method in ("POST", "PUT") else {}
+                conn = get_conn()
+                try:
+                    status, payload = fn(conn, match, parse_qs(parsed.query), body)
+                finally:
+                    conn.close()
+                self._send_json(status, payload)
+            except ApiError as e:
+                self._send_json(e.status, {"error": e.message})
+            except Exception as e:  # pragma: no cover - safety net
+                self._send_json(500, {"error": f"Errore interno: {e}"})
+            return
+
+        self._send_json(404, {"error": "Rotta non trovata"})
+
+    def do_GET(self):
+        self._dispatch("GET")
+
+    def do_POST(self):
+        self._dispatch("POST")
+
+    def do_PUT(self):
+        self._dispatch("PUT")
+
+    def do_DELETE(self):
+        self._dispatch("DELETE")
+
+
+def local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+def main():
+    import sys
+
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+    init_db()
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    print("Palcoscenici CRM avviato.")
+    print(f"  Su questo computer: http://localhost:{port}")
+    print(f"  Da smartphone (stessa Wi-Fi): http://{local_ip()}:{port}")
+    print("Premi Ctrl+C per fermare il server.")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServer arrestato.")
+
+
+if __name__ == "__main__":
+    main()
