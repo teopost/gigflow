@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <title>GigFlow</title>
 
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json?v=2">
+<link rel="icon" href="/icons/icon-192.png?v=2">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
 <meta name="theme-color" content="#10181f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GigFlow">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
 <style>
   :root{
@@ -26,8 +28,8 @@
     --text-tertiary:#a8a8ad;
     --separator:#dcdce0;
     --separator-opaque:#c6c6c8;
-    --tint:#a06a0e;
-    --tint-soft:#f1dfae;
+    --tint:#c81e3a;
+    --tint-soft:#fbdfe4;
     --destructive:#ff3b30;
     --destructive-soft:#ffe5e3;
     --fill:#e9e9eb;
@@ -41,8 +43,10 @@
     --purple:#af52de;  --purple-soft:#f1e0f9;
     --red:#ff3b30;     --red-soft:#ffe5e3;
   }
+  /* --- tema: "Automatico" segue il sistema; l'utente può forzare
+     Chiaro/Scuro/Grigio scuro dalle Impostazioni (attributo data-theme). --- */
   @media (prefers-color-scheme: dark){
-    :root{
+    :root:not([data-theme="light"]):not([data-theme="dim"]){
       --bg:#000000;
       --bg-elevated:#1c1c1e;
       --bg-navbar:rgba(22,22,24,.82);
@@ -52,8 +56,8 @@
       --text-tertiary:#68686d;
       --separator:#38383a;
       --separator-opaque:#38383a;
-      --tint:#e0ac47;
-      --tint-soft:#3a3115;
+      --tint:#ff6b81;
+      --tint-soft:#3a1620;
       --destructive:#ff453a;
       --destructive-soft:#3a221f;
       --fill:#2c2c2e;
@@ -67,6 +71,56 @@
       --purple:#bf5af2;  --purple-soft:#301b3d;
       --red:#ff453a;     --red-soft:#3a221f;
     }
+  }
+  :root[data-theme="dark"]{
+    --bg:#000000;
+    --bg-elevated:#1c1c1e;
+    --bg-navbar:rgba(22,22,24,.82);
+    --bg-tabbar:rgba(22,22,24,.86);
+    --text:#ffffff;
+    --text-secondary:#98989f;
+    --text-tertiary:#68686d;
+    --separator:#38383a;
+    --separator-opaque:#38383a;
+    --tint:#ff6b81;
+    --tint-soft:#3a1620;
+    --destructive:#ff453a;
+    --destructive-soft:#3a221f;
+    --fill:#2c2c2e;
+    --overlay-dim:rgba(0,0,0,.5);
+    --shadow:rgba(0,0,0,.5);
+
+    --slate:#98989f;   --slate-soft:#28282a;
+    --blue:#0a84ff;    --blue-soft:#122a42;
+    --orange:#ff9f0a;  --orange-soft:#3a2a10;
+    --green:#30d158;   --green-soft:#123a1e;
+    --purple:#bf5af2;  --purple-soft:#301b3d;
+    --red:#ff453a;     --red-soft:#3a221f;
+  }
+  :root[data-theme="dim"]{
+    --bg:#1c1c1e;
+    --bg-elevated:#2c2c2e;
+    --bg-navbar:rgba(28,28,30,.86);
+    --bg-tabbar:rgba(28,28,30,.9);
+    --text:#ffffff;
+    --text-secondary:#98989f;
+    --text-tertiary:#78787d;
+    --separator:#48484a;
+    --separator-opaque:#48484a;
+    --tint:#ff6b81;
+    --tint-soft:#3a1620;
+    --destructive:#ff453a;
+    --destructive-soft:#3a221f;
+    --fill:#3a3a3c;
+    --overlay-dim:rgba(0,0,0,.5);
+    --shadow:rgba(0,0,0,.5);
+
+    --slate:#98989f;   --slate-soft:#3a3a3c;
+    --blue:#0a84ff;    --blue-soft:#122a42;
+    --orange:#ff9f0a;  --orange-soft:#3a2a10;
+    --green:#30d158;   --green-soft:#123a1e;
+    --purple:#bf5af2;  --purple-soft:#301b3d;
+    --red:#ff453a;     --red-soft:#3a221f;
   }
 
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -86,6 +140,7 @@
   /* ---------- screens ---------- */
   .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);}
   .screen[hidden]{display:none !important;}
+  .tab[hidden]{display:none !important;}
   .screen.pushed{z-index:40;transform:translateX(100%);transition:transform .32s cubic-bezier(.32,.72,0,1);}
   .screen.pushed.in{transform:translateX(0);}
   @media (prefers-reduced-motion:reduce){.screen.pushed{transition:none;}}
@@ -115,6 +170,28 @@
   .large-title{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:0;}
   .subtitle-count{font-size:13px;color:var(--text-secondary);font-variant-numeric:tabular-nums;margin-top:2px;}
 
+  /* ---------- toggle Elenco/Mappa ---------- */
+  .view-toggle-wrap{padding:6px 16px 10px;}
+  .view-toggle{display:flex;background:var(--fill);border-radius:999px;padding:3px;gap:2px;}
+  .view-toggle-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:none;background:none;border-radius:999px;padding:9px 4px;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:inherit;}
+  .view-toggle-btn.active{background:var(--bg-elevated);color:var(--tint);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
+  #mapCanvas{position:absolute;inset:0;}
+  .map-pin-icon{background:none;border:none;}
+  .map-pin-icon path{fill:var(--tint);}
+  .map-pin-popup{font-family:inherit;}
+  .map-pin-popup .mp-name{font-weight:700;font-size:14px;margin-bottom:2px;}
+  .map-pin-popup .mp-sub{font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
+  .map-pin-popup button{border:none;background:var(--tint);color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .map-user-dot{background:none;border:none;}
+  .map-user-dot i{display:block;width:16px;height:16px;border-radius:50%;background:#0a84ff;border:2.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.35);}
+  /* la tabbar e' fixed sopra la mappa: alzo attribuzione e pulsante per non finirci sotto */
+  .map-view .leaflet-bottom{bottom:calc(53px + env(safe-area-inset-bottom));}
+  .map-locate-btn{position:absolute;z-index:400;right:12px;bottom:calc(82px + env(safe-area-inset-bottom));width:44px;height:44px;border-radius:12px;border:none;background:var(--bg-elevated);color:var(--tint);box-shadow:0 2px 8px rgba(0,0,0,.28);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit;}
+  .map-locate-btn:active{opacity:.7;}
+  .map-locate-btn.locating svg{animation:mapLocateSpin 1.1s linear infinite;}
+  @keyframes mapLocateSpin{to{transform:rotate(360deg);}}
+
   /* ---------- searchbar & scope chips ---------- */
   .searchbar-wrap{padding:0 16px 8px;}
   .searchbar{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;padding:8px 10px;}
@@ -122,6 +199,8 @@
   .searchbar input{border:0;background:transparent;flex:1;min-width:0;font-size:17px;color:var(--text);font-family:inherit;}
   .searchbar input:focus{outline:none;}
   .searchbar input::placeholder{color:var(--text-secondary);}
+  .clear-btn{flex:none;width:18px;height:18px;border-radius:50%;background:var(--text-tertiary);color:var(--bg-elevated);border:none;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .clear-btn[hidden]{display:none;}
 
   .scope-bar{display:flex;gap:6px;overflow-x:auto;padding:0 16px 12px;scrollbar-width:none;}
   .scope-bar::-webkit-scrollbar{display:none;}
@@ -144,15 +223,20 @@
 
   .row{display:flex;align-items:center;gap:10px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);cursor:pointer;}
   .row:active{background:var(--fill);}
+  .row-deleted{opacity:.5;}
   .row + .row, .swipe-row + .swipe-row .row, .grouped-list > .swipe-row:not(:first-child) .row{box-shadow:none;}
   .grouped-list > .swipe-row:not(:first-child) .row-content .row,
   .grouped-list > .row:not(:first-child){border-top:.5px solid var(--separator);margin-left:0;}
-  .row-dot{flex:none;width:10px;height:10px;border-radius:50%;}
+  .row-dot-wrap{flex:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
+  .row-dot{width:10px;height:10px;border-radius:50%;}
   .row-main{flex:1;min-width:0;}
   .row-title{font-size:16px;font-weight:590;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .row-sub{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
   .row-sub .type-tag{color:var(--tint);font-weight:600;}
   .row-trail{flex:none;display:flex;align-items:center;gap:6px;}
+  .fav-star{flex:none;display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;background:none;border:none;color:var(--text-tertiary);cursor:pointer;}
+  .fav-star.active{color:#f5a623;}
+  #btnFavorite.fav-active{color:#f5a623;}
   .row-chevron{flex:none;color:var(--text-tertiary);}
   .row-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
 
@@ -213,8 +297,10 @@
   .lightbox-close{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:2;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:15px;cursor:pointer;}
   .lightbox-close:active{background:rgba(255,255,255,.28);}
   .lightbox-counter{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:rgba(255,255,255,.85);font-size:13px;font-variant-numeric:tabular-nums;pointer-events:none;}
-  .row-cover{flex:none;width:40px;height:40px;border-radius:9px;object-fit:cover;background:var(--fill);}
-  .row-cover{flex:none;width:40px;height:40px;border-radius:9px;object-fit:cover;background:var(--fill);}
+  .row-cover{flex:none;width:36px;height:36px;border-radius:10px;object-fit:cover;background:var(--fill);}
+  .fav-star-lead{flex:none;width:36px;height:36px;border-radius:10px;background:var(--fill);}
+  .avatar{flex:none;width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--fill);margin-right:2px;}
+  .avatar-lg{width:84px;height:84px;border-radius:50%;object-fit:cover;background:var(--fill);margin:0 auto 14px;display:block;}
   .qa{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;color:var(--tint);cursor:pointer;text-decoration:none;}
   .qa .qa-circle{width:52px;height:52px;border-radius:50%;background:var(--tint-soft);display:flex;align-items:center;justify-content:center;font-size:21px;}
   .qa:active .qa-circle{opacity:.6;}
@@ -244,15 +330,16 @@
   /* ---------- sheets ---------- */
   .sheet-backdrop{position:fixed;inset:0;background:var(--overlay-dim);z-index:60;opacity:0;pointer-events:none;transition:opacity .22s;}
   .sheet-backdrop.show{opacity:1;pointer-events:auto;}
-  .sheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:61;transform:translateY(120%);transition:transform .28s cubic-bezier(.32,.72,0,1);}
-  .sheet.show{transform:translateY(0);}
+  .sheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:61;transform:translateY(120%);visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear .28s;}
+  .sheet.show{transform:translateY(0);visibility:visible;pointer-events:auto;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear 0s;}
   @media (prefers-reduced-motion:reduce){.sheet{transition:none;} .sheet-backdrop{transition:none;}}
   .sheet-title{text-align:center;font-size:13px;color:var(--text-secondary);padding:14px 16px 10px;background:var(--bg-elevated);border-radius:14px 14px 0 0;}
   .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;}
   .sheet-search{background:var(--bg-elevated);padding:8px 10px;border-bottom:.5px solid var(--separator);}
-  .sheet-search input{width:100%;border:none;background:var(--fill);border-radius:9px;padding:9px 12px;font-size:16px;color:var(--text);font-family:inherit;}
-  .sheet-search input:focus{outline:none;}
-  .sheet-search input::placeholder{color:var(--text-secondary);}
+  .sheet-search-field{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:9px;padding:9px 12px;}
+  .sheet-search-field input{flex:1;min-width:0;width:auto;border:none;background:transparent;padding:0;font-size:16px;color:var(--text);font-family:inherit;}
+  .sheet-search-field input:focus{outline:none;}
+  .sheet-search-field input::placeholder{color:var(--text-secondary);}
   .sheet-option{width:100%;display:flex;align-items:center;gap:10px;justify-content:center;padding:16px;border:none;background:none;font-size:17px;color:var(--tint);cursor:pointer;text-align:center;}
   .sheet-option + .sheet-option{border-top:.5px solid var(--separator);}
   .sheet-option.destructive{color:var(--destructive);}
@@ -260,11 +347,20 @@
   .sheet-option .check{margin-left:4px;}
   .sheet-option:active{background:var(--fill);}
   .sheet-cancel{width:100%;margin-top:8px;padding:16px;border:none;border-radius:14px;background:var(--bg-elevated);color:var(--tint);font-size:17px;font-weight:600;cursor:pointer;}
+  .sheet-done{width:100%;margin-top:8px;padding:16px;border:none;border-radius:14px;background:var(--tint);color:#fff;font-size:17px;font-weight:600;cursor:pointer;}
   .sheet-cancel:active{background:var(--fill);}
 
   .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:rgba(28,28,30,.92);color:#fff;padding:10px 18px;border-radius:14px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .18s, transform .18s;z-index:80;text-align:center;max-width:80vw;}
   .toast.show{opacity:1;transform:translate(-50%,0);}
 </style>
+<script>
+  (function(){
+    var t = localStorage.getItem("gigflow-theme");
+    if(t === "dark" || t === "dim" || t === "light"){
+      document.documentElement.setAttribute("data-theme", t);
+    }
+  })();
+</script>
 </head>
 <body>
 
@@ -287,15 +383,55 @@
         <h1 class="large-title">Palcoscenici</h1>
         <div class="subtitle-count" id="countSub">0 palcoscenici</div>
       </div>
+      <div class="view-toggle-wrap">
+        <div class="view-toggle" id="viewToggle">
+          <button class="view-toggle-btn active" data-view="list">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+            Elenco
+          </button>
+          <button class="view-toggle-btn" data-view="map">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            Mappa
+          </button>
+        </div>
+      </div>
     </header>
     <div class="screen-scroll" id="scrollList">
       <div class="searchbar-wrap">
         <div class="searchbar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input id="searchInput" type="text" placeholder="Cerca per nome, città o tipo…" autocomplete="off">
+          <button class="clear-btn" id="searchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
         </div>
       </div>
       <div id="list"></div>
+    </div>
+    <div class="map-view" id="mapView" hidden>
+      <div id="mapCanvas"></div>
+      <button class="map-locate-btn" id="mapLocateBtn" type="button" title="Vai alla mia posizione" aria-label="Vai alla mia posizione">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.5"/><line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ TAB: PREFERITI ============ -->
+  <section class="screen tab-screen" id="tabFavorites" data-tab="favorites" hidden>
+    <header class="navbar" id="navFavorites">
+      <div class="navbar-row"><span class="inline-title">Preferiti</span></div>
+      <div class="large-title-wrap">
+        <h1 class="large-title">Preferiti</h1>
+        <div class="subtitle-count" id="favoritesSub">0 preferiti</div>
+      </div>
+    </header>
+    <div class="screen-scroll" id="scrollFavorites">
+      <div class="searchbar-wrap">
+        <div class="searchbar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="favSearchInput" type="text" placeholder="Cerca per nome, città o tipo…" autocomplete="off">
+          <button class="clear-btn" id="favSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
+        </div>
+      </div>
+      <div id="favoritesList"></div>
     </div>
   </section>
 
@@ -354,11 +490,51 @@
       <div class="large-title-wrap"><h1 class="large-title">Impostazioni</h1></div>
     </header>
     <div class="screen-scroll" id="scrollSettings">
+      <div class="section-header" id="sectionAccount" hidden>ACCOUNT</div>
+      <div class="grouped-list" id="rowSettingsProfileWrap" hidden>
+        <div class="row" id="rowSettingsProfile">
+          <img id="settingsProfileAvatar" class="avatar" alt="" hidden>
+          <div class="row-main">
+            <div class="row-title" id="settingsProfileName">Profilo</div>
+            <div class="row-sub" id="settingsProfileEmail"></div>
+          </div>
+          <div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-header">ASPETTO</div>
+      <div class="grouped-list">
+        <div class="row" id="rowSettingsTheme">
+          <div class="row-main"><div class="row-title">Tema</div></div>
+          <div class="row-trail"><span id="settingsThemeValue" style="color:var(--text-secondary);font-size:15px;">Automatico</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
       <div class="section-header">PALCOSCENICI</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsTypes">
           <div class="row-main"><div class="row-title">Tipologie</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsTypesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsCategories">
+          <div class="row-main"><div class="row-title">Categorie</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-header">BAND</div>
+      <div class="grouped-list">
+        <div class="row" id="rowSettingsMyBands">
+          <div class="row-main"><div class="row-title">Le mie bands</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsMyBandsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-header">MESSAGGI</div>
+      <div class="grouped-list">
+        <div class="row" id="rowSettingsWaTemplates">
+          <div class="row-main"><div class="row-title">Modelli WhatsApp</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsWaTemplatesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
@@ -415,6 +591,150 @@
     </div>
   </section>
 
+  <!-- ============ PUSHED: CATEGORIE ============ -->
+  <section class="screen pushed" id="categoriesScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnCategoriesBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Categorie</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">CATEGORIE PALCOSCENICO</div>
+      <div class="grouped-list" id="categoriesList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="newCategoryInput" placeholder="Nuova categoria…" autocomplete="off">
+          <button id="btnAddCategory">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer">Tocca una categoria per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome indica quanti palcoscenici la usano — una categoria in uso non può essere eliminata, ma rinominandola si aggiornano automaticamente tutti i palcoscenici che la usano.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA CATEGORIA ============ -->
+  <section class="screen pushed" id="categoryEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnCategoryEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Categorie
+        </button>
+        <span class="inline-title">Categoria</span>
+        <button class="nav-btn primary" id="btnCategoryEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="categoryEditName" placeholder="Nome categoria" /></div>
+      <div class="section-footer" id="categoryEditUsage"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: LE MIE BANDS ============ -->
+  <section class="screen pushed" id="myBandsScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnMyBandsBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Le mie bands</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">LE MIE BANDS</div>
+      <div class="grouped-list" id="myBandsList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="newMyBandInput" placeholder="Nome band…" autocomplete="off">
+          <button id="btnAddMyBand">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer">Tocca una band per rinominarla, scorri a sinistra per eliminarla. La prima è quella indicata nel wizard di benvenuto.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA BAND ============ -->
+  <section class="screen pushed" id="myBandEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnMyBandEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Le mie bands
+        </button>
+        <span class="inline-title">Band</span>
+        <button class="nav-btn primary" id="btnMyBandEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="myBandEditName" placeholder="Nome band" /></div>
+      <div class="section-header">DETTAGLI</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowMyBandGenre">
+          <label>Genere musicale</label>
+          <div class="picker-value"><span id="myBandGenreValue" style="color:var(--text-tertiary);">Scegli uno o più generi</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowMyBandCity">
+          <label>Zona</label>
+          <div class="picker-value"><span id="myBandCityValue" style="color:var(--text-tertiary);">Scegli una città</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODELLI WHATSAPP ============ -->
+  <section class="screen pushed" id="waTemplatesScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnWaTemplatesBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Modelli WhatsApp</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">MODELLI</div>
+      <div class="grouped-list" id="waTemplatesList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="newWaTemplateInput" placeholder="Nome del modello…" autocomplete="off">
+          <button id="btnAddWaTemplate">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer">Tocca un modello per scrivere il testo del messaggio, scorri a sinistra per eliminarlo. Quando invii un messaggio dal dettaglio di un palcoscenico potrai scegliere quale modello usare.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA MODELLO WHATSAPP ============ -->
+  <section class="screen pushed" id="waTemplateEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnWaTemplateEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Modelli WhatsApp
+        </button>
+        <span class="inline-title">Modello</span>
+        <button class="nav-btn primary" id="btnWaTemplateEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="waTemplateEditName" placeholder="Nome del modello (es. Primo contatto)" /></div>
+      <div class="section-header">MESSAGGIO</div>
+      <div class="grouped-list">
+        <div class="field-row stacked"><textarea id="waTemplateEditMessage" rows="12" placeholder="Testo del messaggio da inviare su WhatsApp…" style="text-align:left;"></textarea></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ PUSHED: INFORMAZIONI ============ -->
   <section class="screen pushed" id="aboutScreen" hidden>
     <header class="navbar">
@@ -434,7 +754,7 @@
         <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Versione 1.0</div>
       </div>
       <div class="section-footer" style="text-align:center;padding:8px 32px 24px;">
-        Gestionale live per tenere traccia dei posti dove far suonare la band: locali, feste di paese, bagni al mare e altro — con anagrafica art director, band e promemoria di ricontatto.
+        Gestionale live per tenere traccia dei posti dove far suonare la band: locali, feste di paese, bagni al mare e altro — con anagrafica art director e promemoria di ricontatto.
       </div>
       <div class="section-header">DATI</div>
       <div class="grouped-list">
@@ -446,12 +766,67 @@
           <div class="row-main"><div class="row-title">Art director</div></div>
           <div class="row-trail"><span id="aboutCountAd" class="row-badge" style="background:var(--fill);color:var(--text-secondary);"></span></div>
         </div>
-        <div class="row" style="cursor:default;">
-          <div class="row-main"><div class="row-title">Bands</div></div>
-          <div class="row-trail"><span id="aboutCountBands" class="row-badge" style="background:var(--fill);color:var(--text-secondary);"></span></div>
-        </div>
       </div>
       <div class="section-footer">Dati salvati localmente nel database di questo computer.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: PROFILO ============ -->
+  <section class="screen pushed" id="profileScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnProfileBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Profilo</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div style="text-align:center;padding:32px 16px 8px;">
+        <img id="profileAvatar" class="avatar-lg" alt="" hidden>
+        <div style="font-size:20px;font-weight:700;" id="profileName"></div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;" id="profileEmail"></div>
+      </div>
+      <div class="grouped-list" style="margin-top:24px;">
+        <div class="row" id="btnLogout" style="cursor:pointer;justify-content:center;">
+          <div class="row-title" style="color:var(--red);font-weight:600;">Esci</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WIZARD: BENVENUTO ============ -->
+  <section class="screen pushed" id="wizardScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row"><span class="inline-title">Benvenuto</span></div>
+    </header>
+    <div class="screen-scroll">
+      <div style="text-align:center;padding:28px 24px 4px;">
+        <div style="font-size:34px;margin-bottom:10px;">🎤</div>
+        <div style="font-size:20px;font-weight:700;">Benvenuto su GigFlow</div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-top:6px;">Raccontaci qualcosa di te prima di iniziare.</div>
+      </div>
+      <div class="section-header">LA TUA BAND</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="wzArtistName">Nome artista/band</label><input id="wzArtistName" type="text" placeholder="es. The Riccione Boys"></div>
+        <div class="field-row picker" id="rowWzGenre">
+          <label>Genere musicale</label>
+          <div class="picker-value"><span id="wzGenreValue" style="color:var(--text-tertiary);">Scegli uno o più generi</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowWzCity">
+          <label>Zona</label>
+          <div class="picker-value"><span id="wzCityValue" style="color:var(--text-tertiary);">Scegli una città</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="grouped-list" style="margin-top:20px;">
+        <div class="row" id="btnWizardContinue" style="justify-content:center;opacity:.4;pointer-events:none;">
+          <div class="row-title" style="color:var(--tint);font-weight:600;">Continua</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -460,6 +835,10 @@
     <button class="tab active" data-tab="list">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
       <span class="tab-label">Palcoscenici</span>
+    </button>
+    <button class="tab" data-tab="favorites">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>
+      <span class="tab-label">Preferiti</span>
     </button>
     <button class="tab" data-tab="recontact">
       <span class="tab-badge-wrap">
@@ -472,7 +851,7 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5" stroke-linecap="round"/></svg>
       <span class="tab-label">Art director</span>
     </button>
-    <button class="tab" data-tab="bands">
+    <button class="tab" data-tab="bands" hidden>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="17" r="2.6"/><circle cx="17" cy="15" r="2.6"/><path d="M9.6 17V6.5L19.6 4.5V15" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-label">Bands</span>
     </button>
@@ -507,6 +886,16 @@
           <div class="picker-value"><span id="filterTypeValue">Tutti i tipi</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowFilterCategory">
+          <label>Categoria</label>
+          <div class="picker-value"><span id="filterCategoryValue">Tutte</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowFilterOwner">
+          <label>Proprietario</label>
+          <div class="picker-value"><span id="filterOwnerValue">Tutti</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
 
       <div class="section-header">POSIZIONE</div>
@@ -525,6 +914,18 @@
         </div>
       </div>
       <div class="section-footer" id="nearMeFooter">Usa la posizione del telefono per mostrare solo i palcoscenici entro il raggio scelto. Funzionano solo i palcoscenici con coordinate geografiche già impostate.</div>
+
+      <div class="section-header">ARCHIVIO</div>
+      <div class="grouped-list">
+        <div class="field-row">
+          <label for="showDeletedToggle" style="flex:1;">Mostra eliminati</label>
+          <label class="ios-switch">
+            <input type="checkbox" id="showDeletedToggle">
+            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+          </label>
+        </div>
+      </div>
+      <div class="section-footer">I palcoscenici eliminati restano archiviati e non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli.</div>
     </div>
   </section>
 
@@ -538,6 +939,9 @@
         </button>
         <span class="inline-title" id="detailInlineTitle">Palcoscenico</span>
         <div class="navbar-trailing">
+          <button class="nav-btn" id="btnFavorite" aria-label="Preferito">
+            <svg id="btnFavoriteIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>
+          </button>
           <button class="nav-btn primary" id="btnSave">Salva</button>
           <button class="nav-btn" id="btnMore" aria-label="Altre azioni">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
@@ -563,8 +967,17 @@
           <div class="picker-value"><span id="typeValue">— nessuno —</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowCategory">
+          <label>Categoria</label>
+          <div class="picker-value"><span id="categoryValue">— nessuna —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row"><label for="fAddress">Indirizzo</label><input id="fAddress" type="text" placeholder="Via, civico"></div>
-        <div class="field-row"><label for="fCity">Città</label><input id="fCity" type="text" placeholder="es. Riccione"></div>
+        <div class="field-row picker" id="rowFCity">
+          <label>Città</label>
+          <div class="picker-value"><span id="fCityValue" style="color:var(--text-tertiary);">Scegli una città</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row"><label for="fLat">Latitudine</label><input id="fLat" type="text" inputmode="decimal" placeholder="43.9891"></div>
         <div class="field-row"><label for="fLng">Longitudine</label><input id="fLng" type="text" inputmode="decimal" placeholder="12.6544"></div>
       </div>
@@ -573,7 +986,11 @@
       <div class="section-header">INFO PALCOSCENICO</div>
       <div class="grouped-list">
         <div class="field-row"><label for="fCapacity">Capienza</label><input id="fCapacity" type="number" inputmode="numeric" placeholder="150"></div>
-        <div class="field-row"><label for="fGenre">Genere / vibe</label><input id="fGenre" type="text" placeholder="rock, cover…"></div>
+        <div class="field-row picker" id="rowFGenre">
+          <label>Genere / vibe</label>
+          <div class="picker-value"><span id="fGenreValue" style="color:var(--text-tertiary);">Scegli uno o più generi</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
 
       <div class="section-header">ART DIRECTOR</div>
@@ -602,6 +1019,16 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
+
+      <div class="section-header">PROPRIETARIO</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowOwner">
+          <label>Proprietario</label>
+          <div class="picker-value"><span id="ownerValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">Chi in GigFlow gestisce questo palcoscenico nel gestionale — diverso dal titolare del locale indicato sopra.</div>
 
       <div class="section-header">QUANDO RICONTATTARE</div>
       <div class="grouped-list">
@@ -706,12 +1133,18 @@
   <div class="sheet" id="sheet">
     <div class="sheet-title" id="sheetTitle" hidden></div>
     <div class="sheet-search" id="sheetSearch" hidden>
-      <input type="text" id="sheetSearchInput" placeholder="Cerca…" autocomplete="off">
+      <div class="sheet-search-field">
+        <input type="text" id="sheetSearchInput" placeholder="Cerca…" autocomplete="off">
+        <button class="clear-btn" id="sheetSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
+      </div>
     </div>
     <div class="sheet-group" id="sheetGroup"></div>
+    <button class="sheet-done" id="sheetDone" hidden>Fatto</button>
     <button class="sheet-cancel" id="sheetCancel">Annulla</button>
   </div>
 </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <script>
 (function(){
@@ -750,6 +1183,19 @@
     return Math.round((d - today) / 86400000);
   }
 
+  function wireClearBtn(input, btn){
+    function sync(){ btn.hidden = !input.value; }
+    input.addEventListener("input", sync);
+    btn.addEventListener("click", function(){
+      input.value = "";
+      sync();
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+      input.focus();
+    });
+    sync();
+    return sync;
+  }
+
   function api(method, path, body){
     var opts = {method:method, headers:{}};
     if(body !== undefined){
@@ -769,12 +1215,17 @@
   var venues = [];
   var artDirectors = [];
   var venueTypes = [];
+  var venueCategories = [];
   var filterStatus = "all";
   var filterType = "all";
+  var filterCategory = "all";
+  var filterOwner = "all";
+  var owners = [];
   var searchText = "";
   var nearMeEnabled = false;
   var nearMeRadiusKm = 30;
   var nearMeCoords = null;
+  var showDeletedEnabled = false;
   var currentId = null;
   var currentAdId = null;
   var saveTimers = {};
@@ -807,7 +1258,7 @@
   }
 
   /* ---------------- navbar scroll collapse ---------------- */
-  [["scrollList","navList"],["scrollRecontact","navRecontact"],["scrollAd","navAd"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
+  [["scrollList","navList"],["scrollFavorites","navFavorites"],["scrollRecontact","navRecontact"],["scrollAd","navAd"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
     var scroller = document.getElementById(pair[0]);
     var nav = document.getElementById(pair[1]);
     scroller.addEventListener("scroll", function(){
@@ -816,7 +1267,7 @@
   });
 
   /* ---------------- tab navigation ---------------- */
-  var tabs = {list: document.getElementById("tabList"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
+  var tabs = {list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
   document.getElementById("tabbar").addEventListener("click", function(e){
     var btn = e.target.closest(".tab");
     if(!btn) return;
@@ -826,6 +1277,7 @@
     });
     document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.getAttribute("data-tab")===name); });
     if(name === "recontact") renderRecontact();
+    if(name === "favorites") renderFavorites();
   });
 
   /* ---------------- sheet component ---------------- */
@@ -836,10 +1288,13 @@
   var elSheetSearchInput = document.getElementById("sheetSearchInput");
   var elSheetGroup = document.getElementById("sheetGroup");
   var elSheetCancel = document.getElementById("sheetCancel");
+  var syncSheetSearchClear = wireClearBtn(elSheetSearchInput, document.getElementById("sheetSearchClearBtn"));
   var sheetActiveOnSelect = null;
   var sheetOptions = [];
   var sheetFreeText = null;
 
+  var SHEET_LARGE_THRESHOLD = 300;
+  var SHEET_LARGE_PREVIEW = 25;
   function renderSheetOptions(query){
     var q = (query || "").trim();
     var qLower = q.toLowerCase();
@@ -855,6 +1310,11 @@
       elSheetGroup.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:14px;">Nessun risultato.</div>';
       return;
     }
+    var hintHtml = "";
+    if(!qLower && filtered.length > SHEET_LARGE_THRESHOLD){
+      hintHtml = '<div style="padding:10px 16px;text-align:center;color:var(--text-tertiary);font-size:12px;">Elenco troppo lungo: mostro i più popolosi. Digita per cercare tra tutti.</div>';
+      filtered = filtered.slice(0, SHEET_LARGE_PREVIEW);
+    }
     elSheetGroup.innerHTML = customHtml + filtered.map(function(x){
       var o = x.o;
       return '<button class="sheet-option'+(o.destructive?' destructive':'')+'" data-i="'+x.i+'">'+
@@ -862,15 +1322,23 @@
         esc(o.label) +
         (o.checkmark ? ' <span class="check">✓</span>' : '') +
         '</button>';
-    }).join("");
+    }).join("") + hintHtml;
   }
 
+  var elSheetDone = document.getElementById("sheetDone");
+  var sheetMultiSelect = false;
+  var sheetHasSearch = false;
+  var sheetDoneCallback = null;
+
   function openSheet(opts){
-    // opts: {title?, searchable?, searchPlaceholder?, freeText?, onFreeText?, options:[{label, value, color, checkmark, destructive}]}
+    // opts: {title?, searchable?, searchPlaceholder?, freeText?, onFreeText?, multiSelect?, onDone?, options:[{label, value, color, checkmark, destructive}]}
     sheetOptions = opts.options;
     sheetFreeText = opts.freeText ? {onSelect: opts.onFreeText} : null;
+    sheetMultiSelect = !!opts.multiSelect;
+    sheetDoneCallback = opts.onDone || null;
     var hasTitle = !!opts.title;
     var hasSearch = !!opts.searchable;
+    sheetHasSearch = hasSearch;
     if(hasTitle){ elSheetTitle.hidden = false; elSheetTitle.textContent = opts.title; }
     else { elSheetTitle.hidden = true; }
     elSheetTitle.style.borderRadius = "14px 14px 0 0";
@@ -878,12 +1346,14 @@
     if(hasSearch){
       elSheetSearch.hidden = false;
       elSheetSearchInput.value = "";
+      syncSheetSearchClear();
       elSheetSearchInput.placeholder = opts.searchPlaceholder || "Cerca…";
       elSheetSearch.style.borderRadius = hasTitle ? "0" : "14px 14px 0 0";
     } else {
       elSheetSearch.hidden = true;
     }
 
+    elSheetDone.hidden = !sheetMultiSelect;
     elSheetGroup.style.borderRadius = (hasTitle || hasSearch) ? "0 0 14px 14px" : "14px";
     renderSheetOptions("");
 
@@ -909,7 +1379,19 @@
       closeSheet();
       return;
     }
-    sheetActiveOnSelect(Number(btn.getAttribute("data-i")));
+    var i = Number(btn.getAttribute("data-i"));
+    if(sheetMultiSelect){
+      var o = sheetOptions[i];
+      o.checkmark = !o.checkmark;
+      if(o.onToggle) o.onToggle(o.checkmark);
+      renderSheetOptions(sheetHasSearch ? elSheetSearchInput.value : "");
+      return;
+    }
+    sheetActiveOnSelect(i);
+  });
+  elSheetDone.addEventListener("click", function(){
+    if(sheetDoneCallback) sheetDoneCallback();
+    closeSheet();
   });
   elSheetCancel.addEventListener("click", closeSheet);
   elSheetBackdrop.addEventListener("click", closeSheet);
@@ -923,7 +1405,7 @@
      sono applicati lato client così i tab "Palcoscenici" e "Ricontatta" restano
      sempre coerenti tra loro, senza round-trip di rete ad ogni tocco. */
   function loadVenues(){
-    return api("GET", "/api/locations").then(function(data){
+    return api("GET", "/api/locations" + (showDeletedEnabled ? "?include_deleted=1" : "")).then(function(data){
       venues = data;
       renderAll();
     });
@@ -931,6 +1413,7 @@
   function renderAll(){
     updateFilterActiveDot();
     renderList();
+    renderFavorites();
     renderRecontact();
     updateRecontactBadge();
   }
@@ -947,6 +1430,18 @@
       updateSettingsTypesCount();
     });
   }
+  function loadOwners(){
+    return api("GET", "/api/owners").then(function(data){
+      owners = data;
+    });
+  }
+  function loadVenueCategories(){
+    return api("GET", "/api/venue_categories").then(function(data){
+      venueCategories = data;
+      renderCategoriesList();
+      updateSettingsCategoriesCount();
+    });
+  }
 
   /* ---------------- PALCOSCENICI tab ---------------- */
   var elCountSub = document.getElementById("countSub");
@@ -957,11 +1452,16 @@
     searchText = elSearch.value;
     renderList();
   });
+  wireClearBtn(elSearch, document.getElementById("searchClearBtn"));
 
   /* ---------------- schermata Filtri ---------------- */
   var elFiltersScreen = document.getElementById("filtersScreen");
   function updateFilterActiveDot(){
-    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && !nearMeEnabled);
+    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !nearMeEnabled && !showDeletedEnabled);
+  }
+  function ownerLabel(email){
+    var o = owners.filter(function(x){ return x.email === email; })[0];
+    return (o && o.name) ? o.name : email;
   }
   function renderFilterStatusRow(){
     var st = statusInfo(filterStatus === "all" ? null : filterStatus);
@@ -970,6 +1470,12 @@
   }
   function renderFilterTypeRow(){
     document.getElementById("filterTypeValue").textContent = filterType === "all" ? "Tutti i tipi" : filterType;
+  }
+  function renderFilterCategoryRow(){
+    document.getElementById("filterCategoryValue").textContent = filterCategory === "all" ? "Tutte" : filterCategory;
+  }
+  function renderFilterOwnerRow(){
+    document.getElementById("filterOwnerValue").textContent = filterOwner === "all" ? "Tutti" : ownerLabel(filterOwner);
   }
   document.getElementById("rowFilterStatus").addEventListener("click", function(){
     var opts = [{label:"Tutti", checkmark: filterStatus==="all", onSelect:function(){
@@ -992,6 +1498,28 @@
       }});
     });
     openSheet({title:"Filtra per tipo", searchable: venueTypes.length > 6, searchPlaceholder:"Cerca tipo…", options:opts});
+  });
+  document.getElementById("rowFilterCategory").addEventListener("click", function(){
+    var opts = [{label:"Tutte", checkmark: filterCategory==="all", onSelect:function(){
+      filterCategory = "all"; renderFilterCategoryRow(); renderAll();
+    }}];
+    venueCategories.forEach(function(c){
+      opts.push({label:c.name, checkmark: filterCategory===c.name, onSelect:function(){
+        filterCategory = c.name; renderFilterCategoryRow(); renderAll();
+      }});
+    });
+    openSheet({title:"Filtra per categoria", searchable: venueCategories.length > 6, searchPlaceholder:"Cerca categoria…", options:opts});
+  });
+  document.getElementById("rowFilterOwner").addEventListener("click", function(){
+    var opts = [{label:"Tutti", checkmark: filterOwner==="all", onSelect:function(){
+      filterOwner = "all"; renderFilterOwnerRow(); renderAll();
+    }}];
+    owners.forEach(function(o){
+      opts.push({label:o.name || o.email, checkmark: filterOwner===o.email, onSelect:function(){
+        filterOwner = o.email; renderFilterOwnerRow(); renderAll();
+      }});
+    });
+    openSheet({title:"Filtra per proprietario", searchable: owners.length > 6, searchPlaceholder:"Cerca proprietario…", options:opts});
   });
   var RADIUS_PRESETS_KM = [5, 10, 20, 30, 50, 100];
   var elNearMeToggle = document.getElementById("nearMeToggle");
@@ -1051,10 +1579,22 @@
     });
   });
 
+  var elShowDeletedToggle = document.getElementById("showDeletedToggle");
+  function renderShowDeletedRow(){
+    elShowDeletedToggle.checked = showDeletedEnabled;
+  }
+  elShowDeletedToggle.addEventListener("change", function(){
+    showDeletedEnabled = elShowDeletedToggle.checked;
+    loadVenues();
+  });
+
   function openFiltersScreen(){
     renderFilterStatusRow();
     renderFilterTypeRow();
+    renderFilterCategoryRow();
+    renderFilterOwnerRow();
     renderNearMeRow();
+    renderShowDeletedRow();
     elFiltersScreen.hidden = false;
     requestAnimationFrame(function(){ elFiltersScreen.classList.add("in"); });
   }
@@ -1065,9 +1605,10 @@
   document.getElementById("btnFilters").addEventListener("click", openFiltersScreen);
   document.getElementById("btnFiltersBack").addEventListener("click", closeFiltersScreen);
   document.getElementById("btnFiltersReset").addEventListener("click", function(){
-    filterStatus = "all"; filterType = "all";
+    filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all";
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
-    renderFilterStatusRow(); renderFilterTypeRow(); renderNearMeRow(); renderAll();
+    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
+    if(showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); loadVenues(); }
     toast("Filtri azzerati");
   });
 
@@ -1083,6 +1624,8 @@
   function matchesFilter(v){
     if(filterStatus !== "all" && v.status !== filterStatus) return false;
     if(filterType !== "all" && v.type !== filterType) return false;
+    if(filterCategory !== "all" && v.category !== filterCategory) return false;
+    if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
     if(nearMeEnabled && nearMeCoords){
       if(v.lat == null || v.lng == null) return false;
       var dist = haversineKm(nearMeCoords.lat, nearMeCoords.lng, v.lat, v.lng);
@@ -1095,7 +1638,8 @@
     return true;
   }
 
-  function venueRowHtml(v){
+  function venueRowHtml(v, opts){
+    var showFav = !opts || opts.showFav !== false;
     var st = statusInfo(v.status);
     var subParts = [];
     if(v.type) subParts.push('<span class="type-tag">'+esc(v.type)+'</span>');
@@ -1103,21 +1647,42 @@
     if(v.contact_name) subParts.push('👤 '+esc(v.contact_name));
     if(v.art_director_name) subParts.push('🎨 '+esc(v.art_director_name));
     var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
+    var favHtml = '<button class="fav-star fav-star-lead'+(v.favorite ? ' active' : '')+'" data-fav-id="'+v.id+'" aria-label="Preferito">'+
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="'+(v.favorite ? 'currentColor' : 'none')+'" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>'+
+    '</button>';
     var leadingHtml = cover
       ? '<img class="row-cover" src="/photos/'+encodeURIComponent(cover.filename)+'" loading="lazy" alt="">'
-      : '<span class="row-dot" style="background:'+st.color+'"></span>';
+      : (showFav ? favHtml : '<span class="row-dot-wrap"><span class="row-dot" style="background:'+st.color+'"></span></span>');
+    var badgeHtml = v.deleted_at
+      ? '<span class="row-badge" style="background:var(--fill);color:var(--text-tertiary);">Eliminato</span>'
+      : '<span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span>';
+    var actionHtml = v.deleted_at
+      ? '<button data-restore-id="'+v.id+'">Ripristina</button>'
+      : '<button data-del-id="'+v.id+'">Elimina</button>';
     return '<div class="swipe-row" data-id="'+v.id+'">'+
-      '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
+      '<div class="row-content"><div class="row'+(v.deleted_at ? ' row-deleted' : '')+'" data-open-id="'+v.id+'">'+
         leadingHtml+
         '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+
-          '<span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span>'+
+          badgeHtml+
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
         '</div>'+
       '</div></div>'+
-      '<div class="row-actions"><button data-del-id="'+v.id+'">Elimina</button></div>'+
+      '<div class="row-actions">'+actionHtml+'</div>'+
     '</div>';
+  }
+  function toggleFavoriteRow(id){
+    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
+    if(!v) return;
+    var next = v.favorite ? 0 : 1;
+    venues = venues.map(function(x){ return String(x.id) === String(id) ? Object.assign({}, x, {favorite: next}) : x; });
+    renderAll();
+    api("PUT", "/api/locations/" + id, {favorite: next}).catch(function(){
+      venues = venues.map(function(x){ return String(x.id) === String(id) ? Object.assign({}, x, {favorite: v.favorite}) : x; });
+      renderAll();
+      toast("Impossibile aggiornare i preferiti");
+    });
   }
 
   function renderList(){
@@ -1125,7 +1690,7 @@
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
     var sorted = filtered.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
     if(sorted.length === 0){
-      var noFilters = filterStatus === "all" && !searchText;
+      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
           ? '<div class="glyph">🎤</div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
@@ -1133,21 +1698,215 @@
         '</div>';
       return;
     }
-    elList.innerHTML = '<div class="grouped-list">' + sorted.map(venueRowHtml).join("") + '</div>';
+    elList.innerHTML = '<div class="grouped-list">' + sorted.map(function(v){ return venueRowHtml(v, {showFav:false}); }).join("") + '</div>';
   }
   elList.addEventListener("click", function(e){
     var del = e.target.closest("[data-del-id]");
     if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
+    var restore = e.target.closest("[data-restore-id]");
+    if(restore){ restoreVenueRow(restore.getAttribute("data-restore-id")); return; }
+    var fav = e.target.closest("[data-fav-id]");
+    if(fav){ toggleFavoriteRow(fav.getAttribute("data-fav-id")); return; }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
   function deleteVenueRow(id){
     api("DELETE", "/api/locations/" + id).then(function(){
-      venues = venues.filter(function(x){ return String(x.id) !== String(id); });
+      if(showDeletedEnabled){
+        venues = venues.map(function(x){
+          return String(x.id) === String(id) ? Object.assign({}, x, {deleted_at: new Date().toISOString()}) : x;
+        });
+      } else {
+        venues = venues.filter(function(x){ return String(x.id) !== String(id); });
+      }
       renderAll();
       toast("Palcoscenico eliminato");
     });
   }
+  function restoreVenueRow(id){
+    api("POST", "/api/locations/" + id + "/restore").then(function(updated){
+      venues = venues.map(function(x){ return String(x.id) === String(id) ? updated : x; });
+      renderAll();
+      toast("Palcoscenico ripristinato");
+    });
+  }
+
+  /* ---------------- vista Elenco/Mappa ---------------- */
+  var elScrollList = document.getElementById("scrollList");
+  var elMapView = document.getElementById("mapView");
+  var leafletMap = null;
+  var mapMarkersLayer = null;
+  var mapPinIcon = null;
+  var mapUserIcon = null;
+  var mapUserMarker = null;
+  var mapUserCircle = null;
+  var mapUserCoords = null;
+  var mapLocating = false;
+  var mapLocateBtn = document.getElementById("mapLocateBtn");
+  var currentViewMode = "list";
+  var MAP_RADIUS_M = 50000;   /* raggio di 50 km attorno alla posizione */
+
+  function getMapPinIcon(){
+    if(mapPinIcon) return mapPinIcon;
+    mapPinIcon = L.divIcon({
+      className: "map-pin-icon",
+      html: '<svg width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z"/><circle cx="14" cy="14" r="5.5" fill="#fff"/></svg>',
+      iconSize: [28, 40],
+      iconAnchor: [14, 40],
+      popupAnchor: [0, -36]
+    });
+    return mapPinIcon;
+  }
+  function getMapUserIcon(){
+    if(mapUserIcon) return mapUserIcon;
+    mapUserIcon = L.divIcon({
+      className: "map-user-dot",
+      html: '<i></i>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+    return mapUserIcon;
+  }
+  function setLocateBusy(busy){
+    mapLocating = busy;
+    if(mapLocateBtn) mapLocateBtn.classList.toggle("locating", busy);
+  }
+  /* centra la mappa sulla posizione dell'utente con un raggio visibile di 50 km */
+  function showMapUserLocation(lat, lng, center){
+    if(!leafletMap) return;
+    if(mapUserMarker) mapUserMarker.setLatLng([lat, lng]);
+    else mapUserMarker = L.marker([lat, lng], {icon:getMapUserIcon(), interactive:false, zIndexOffset:1000}).addTo(leafletMap);
+    if(mapUserCircle) mapUserCircle.setLatLng([lat, lng]);
+    else mapUserCircle = L.circle([lat, lng], {radius:MAP_RADIUS_M, color:"#0a84ff", weight:1, opacity:.45, fillColor:"#0a84ff", fillOpacity:.05, interactive:false}).addTo(leafletMap);
+    if(center) leafletMap.fitBounds(L.latLng(lat, lng).toBounds(MAP_RADIUS_M * 2), {padding:[8, 8]});
+  }
+  function locateOnMap(opts){
+    opts = opts || {};
+    if(!leafletMap) return;
+    if(mapUserCoords) showMapUserLocation(mapUserCoords.lat, mapUserCoords.lng, true);
+    else if(nearMeCoords) showMapUserLocation(nearMeCoords.lat, nearMeCoords.lng, true);
+    if(!("geolocation" in navigator)){
+      if(!opts.silent) toast("Geolocalizzazione non disponibile su questo browser");
+      return;
+    }
+    if(mapLocating) return;
+    setLocateBusy(true);
+    if(!opts.silent && !mapUserCoords && !nearMeCoords) toast("Rilevo la posizione…");
+    navigator.geolocation.getCurrentPosition(function(pos){
+      setLocateBusy(false);
+      mapUserCoords = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      showMapUserLocation(mapUserCoords.lat, mapUserCoords.lng, true);
+      if(!opts.silent) toast("Posizione trovata");
+    }, function(err){
+      setLocateBusy(false);
+      if(opts.silent && (mapUserCoords || nearMeCoords)) return;
+      toast(err.code === err.PERMISSION_DENIED
+        ? "Permesso di posizione negato"
+        : "Impossibile ottenere la posizione (serve una connessione sicura HTTPS)");
+      if(!mapUserCoords && !nearMeCoords) fitMapToVenues();
+    }, {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
+  }
+  function ensureMap(){
+    if(leafletMap) return;
+    leafletMap = L.map("mapCanvas", {attributionControl:true}).setView([44.05, 12.57], 9);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+    }).addTo(leafletMap);
+    mapMarkersLayer = L.layerGroup().addTo(leafletMap);
+  }
+  var mapVenueBounds = [];
+  function fitMapToVenues(){
+    if(leafletMap && mapVenueBounds.length) leafletMap.fitBounds(mapVenueBounds, {padding:[30,30], maxZoom:13});
+  }
+  function renderMapMarkers(){
+    if(!mapMarkersLayer) return;
+    mapMarkersLayer.clearLayers();
+    var withCoords = venues.filter(function(v){ return !v.deleted_at && v.lat != null && v.lng != null; });
+    var bounds = [];
+    withCoords.forEach(function(v){
+      var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon()});
+      var popupHtml = '<div class="map-pin-popup"><div class="mp-name">'+esc(v.name||"Senza nome")+'</div>'+
+        (v.city ? '<div class="mp-sub">'+esc(v.city)+'</div>' : '')+
+        '<button data-open-map-id="'+v.id+'">Apri scheda</button></div>';
+      marker.bindPopup(popupHtml);
+      marker.on("popupopen", function(e){
+        var btn = e.popup.getElement().querySelector("[data-open-map-id]");
+        if(btn) btn.addEventListener("click", function(){
+          leafletMap.closePopup();
+          openDetail(v.id);
+        });
+      });
+      marker.addTo(mapMarkersLayer);
+      bounds.push([v.lat, v.lng]);
+    });
+    mapVenueBounds = bounds;
+    /* il fit sui palcoscenici serve solo se non stiamo centrando sulla posizione dell'utente */
+    if(!mapUserCoords && !nearMeCoords && !mapLocating) fitMapToVenues();
+  }
+  mapLocateBtn.addEventListener("click", function(){ locateOnMap({}); });
+  document.getElementById("viewToggle").addEventListener("click", function(e){
+    var btn = e.target.closest(".view-toggle-btn");
+    if(!btn) return;
+    var mode = btn.getAttribute("data-view");
+    if(mode === currentViewMode) return;
+    currentViewMode = mode;
+    document.querySelectorAll(".view-toggle-btn").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-view")===mode); });
+    if(mode === "map"){
+      elScrollList.hidden = true;
+      elMapView.hidden = false;
+      ensureMap();
+      renderMapMarkers();
+      setTimeout(function(){
+        if(!leafletMap) return;
+        leafletMap.invalidateSize();
+        locateOnMap({silent:true});
+      }, 80);
+    } else {
+      elMapView.hidden = true;
+      elScrollList.hidden = false;
+    }
+  });
+
+  /* ---------------- PREFERITI tab ---------------- */
+  var elFavoritesList = document.getElementById("favoritesList");
+  var elFavoritesSub = document.getElementById("favoritesSub");
+  var elFavSearch = document.getElementById("favSearchInput");
+  var favSearchText = "";
+  elFavSearch.addEventListener("input", function(){
+    favSearchText = elFavSearch.value;
+    renderFavorites();
+  });
+  wireClearBtn(elFavSearch, document.getElementById("favSearchClearBtn"));
+
+  function renderFavorites(){
+    var favs = venues.filter(function(v){ return v.favorite && !v.deleted_at; });
+    if(favSearchText){
+      favs = favs.filter(function(v){
+        var hay = ((v.name||"") + " " + (v.city||"") + " " + (v.type||"")).toLowerCase();
+        return hay.indexOf(favSearchText.toLowerCase()) > -1;
+      });
+    }
+    elFavoritesSub.textContent = favs.length + (favs.length===1 ? " preferito" : " preferiti");
+    var sorted = favs.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
+    if(sorted.length === 0){
+      elFavoritesList.innerHTML = '<div class="empty-state">'+
+        (favSearchText
+          ? '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>'
+          : '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui.</p>')+
+        '</div>';
+      return;
+    }
+    elFavoritesList.innerHTML = '<div class="grouped-list">' + sorted.map(function(v){ return venueRowHtml(v); }).join("") + '</div>';
+  }
+  elFavoritesList.addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-id]");
+    if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
+    var fav = e.target.closest("[data-fav-id]");
+    if(fav){ toggleFavoriteRow(fav.getAttribute("data-fav-id")); return; }
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
+  });
 
   /* ---------------- RICONTATTA tab ---------------- */
   var elRecontactList = document.getElementById("recontactList");
@@ -1187,12 +1946,10 @@
   var elDetail = document.getElementById("detail");
   var elSaveIndicatorTitle = document.getElementById("detailInlineTitle");
   var fName = document.getElementById("fName"),
-      fCity = document.getElementById("fCity"),
       fAddress = document.getElementById("fAddress"),
       fLat = document.getElementById("fLat"),
       fLng = document.getElementById("fLng"),
       fCapacity = document.getElementById("fCapacity"),
-      fGenre = document.getElementById("fGenre"),
       fContactName = document.getElementById("fContactName"),
       fPhone = document.getElementById("fPhone"),
       fEmail = document.getElementById("fEmail"),
@@ -1228,12 +1985,10 @@
     });
   }
   bindField(fName, "name");
-  bindField(fCity, "city");
   bindField(fAddress, "address");
   bindField(fLat, "lat");
   bindField(fLng, "lng");
   bindField(fCapacity, "capacity", function(v){ return v ? Number(v) : ""; });
-  bindField(fGenre, "genre");
   bindField(fContactName, "contact_name");
   bindField(fPhone, "phone");
   bindField(fEmail, "email");
@@ -1354,13 +2109,50 @@
   function renderQuickActions(v){
     var actions = [];
     if(v.phone) actions.push({icon:"📞", label:"Chiama", href:"tel:"+v.phone.replace(/\s+/g,"")});
+    if(v.phone) actions.push({icon:"💬", label:"WhatsApp", waAction:true});
     if(v.email) actions.push({icon:"✉️", label:"Email", href:"mailto:"+v.email});
     if(v.website) actions.push({icon:"🔗", label:"Sito", href:/^https?:\/\//i.test(v.website)?v.website:("https://"+v.website)});
     if(v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "") actions.push({icon:"📍", label:"Mappa", href:"https://www.google.com/maps?q="+v.lat+","+v.lng});
     quickActions.innerHTML = actions.map(function(a){
+      if(a.waAction){
+        return '<button type="button" class="qa" data-qa-whatsapp="1"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></button>';
+      }
       return '<a class="qa" target="_blank" rel="noopener" href="'+esc(a.href)+'"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></a>';
     }).join("");
   }
+
+  function waPhoneDigits(phone){
+    var d = (phone || "").replace(/\D/g, "");
+    if(!d) return "";
+    if(d.indexOf("39") === 0 && d.length >= 11) return d;
+    return "39" + d;
+  }
+  function buildWhatsAppUrl(phone, text){
+    var digits = waPhoneDigits(phone);
+    if(!digits) return null;
+    var url = "https://wa.me/" + digits;
+    if(text) url += "?text=" + encodeURIComponent(text);
+    return url;
+  }
+  function openWhatsAppPicker(v){
+    var opts = [{label:"Apri WhatsApp senza modello", onSelect:function(){
+      var url = buildWhatsAppUrl(v.phone, "");
+      if(url) window.open(url, "_blank");
+    }}];
+    waTemplates.forEach(function(t){
+      opts.push({label:t.name, onSelect:function(){
+        var url = buildWhatsAppUrl(v.phone, t.message);
+        if(url) window.open(url, "_blank");
+      }});
+    });
+    openSheet({title:"Invia messaggio", options:opts});
+  }
+  quickActions.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-qa-whatsapp]");
+    if(!btn) return;
+    var v = currentVenue(); if(!v) return;
+    openWhatsAppPicker(v);
+  });
 
   function renderTypeRow(v){
     document.getElementById("typeValue").textContent = v.type || "— nessuno —";
@@ -1388,6 +2180,58 @@
     });
   });
 
+  function renderCategoryRow(v){
+    document.getElementById("categoryValue").textContent = v.category || "— nessuna —";
+  }
+  document.getElementById("rowCategory").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    var opts = [{label:"— nessuna —", checkmark: !v.category, onSelect:function(){
+      patchVenue("category", "").then(function(updated){ applyUpdatedVenue(updated); renderCategoryRow(updated); renderList(); toast("Categoria rimossa"); });
+    }}];
+    venueCategories.forEach(function(vc){
+      var c = vc.name;
+      opts.push({label:c, checkmark: v.category===c, onSelect:function(){
+        patchVenue("category", c).then(function(updated){ applyUpdatedVenue(updated); renderCategoryRow(updated); renderList(); toast("Categoria: "+c); });
+      }});
+    });
+    openSheet({
+      title:"Categoria del palcoscenico",
+      searchable:true,
+      searchPlaceholder:"Cerca o scrivi una categoria personalizzata…",
+      freeText:true,
+      onFreeText:function(value){
+        patchVenue("category", value).then(function(updated){ applyUpdatedVenue(updated); renderCategoryRow(updated); renderList(); toast("Categoria: "+value); });
+      },
+      options: opts
+    });
+  });
+
+  function renderCityRow(v){
+    var el = document.getElementById("fCityValue");
+    el.textContent = v.city || "Scegli una città";
+    el.style.color = v.city ? "" : "var(--text-tertiary)";
+  }
+  document.getElementById("rowFCity").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    openCityPicker(v.city || "", function(label){
+      patchVenue("city", label).then(function(updated){ applyUpdatedVenue(updated); renderCityRow(updated); renderList(); toast("Città aggiornata"); });
+    }, {freeText:true});
+  });
+
+  function renderGenreRow(v){
+    var el = document.getElementById("fGenreValue");
+    el.textContent = v.genre || "Scegli uno o più generi";
+    el.style.color = v.genre ? "" : "var(--text-tertiary)";
+  }
+  document.getElementById("rowFGenre").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    var current = (v.genre || "").split(",").map(function(g){ return g.trim(); }).filter(Boolean);
+    openGenrePicker(current, function(selected){
+      var value = selected.join(", ");
+      patchVenue("genre", value).then(function(updated){ applyUpdatedVenue(updated); renderGenreRow(updated); renderList(); toast("Genere aggiornato"); });
+    });
+  });
+
   function renderStatusRow(v){
     var st = statusInfo(v.status);
     document.getElementById("statusDot").style.background = st.color;
@@ -1406,6 +2250,18 @@
     var ad = artDirectors.find(function(a){ return a.id === v.art_director_id; });
     document.getElementById("artDirectorValue").textContent = ad ? ad.name : "— nessuno —";
   }
+  function renderOwnerRow(v){
+    document.getElementById("ownerValue").textContent = v.owner_email ? ownerLabel(v.owner_email) : "— nessuno —";
+  }
+  document.getElementById("rowOwner").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    var opts = owners.map(function(o){
+      return {label:o.name || o.email, checkmark: v.owner_email===o.email, onSelect:function(){
+        patchVenue("owner_email", o.email).then(function(updated){ applyUpdatedVenue(updated); renderOwnerRow(updated); renderList(); toast("Proprietario: "+(o.name || o.email)); });
+      }};
+    });
+    openSheet({title:"Proprietario", searchable: owners.length > 6, searchPlaceholder:"Cerca proprietario…", options:opts});
+  });
   document.getElementById("rowArtDirector").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
     var opts = [{label:"— nessuno —", checkmark: v.art_director_id == null, onSelect:function(){
@@ -1455,12 +2311,13 @@
   function fillVenueForm(v){
     fName.value = v.name || "";
     renderTypeRow(v);
-    fCity.value = v.city || "";
+    renderCategoryRow(v);
+    renderCityRow(v);
     fAddress.value = v.address || "";
     fLat.value = v.lat != null ? v.lat : "";
     fLng.value = v.lng != null ? v.lng : "";
     fCapacity.value = v.capacity || "";
-    fGenre.value = v.genre || "";
+    renderGenreRow(v);
     fContactName.value = v.contact_name || "";
     fPhone.value = v.phone || "";
     fEmail.value = v.email || "";
@@ -1472,18 +2329,31 @@
     renderQuickActions(v);
     renderStatusRow(v);
     renderArtDirectorRow(v);
+    renderOwnerRow(v);
     renderNotes(v);
+    renderFavoriteButton(v);
   }
+
+  var elBtnFavorite = document.getElementById("btnFavorite");
+  var elBtnFavoriteIcon = document.getElementById("btnFavoriteIcon");
+  function renderFavoriteButton(v){
+    var active = !!(v && v.favorite);
+    elBtnFavoriteIcon.setAttribute("fill", active ? "currentColor" : "none");
+    elBtnFavorite.classList.toggle("fav-active", active);
+  }
+  elBtnFavorite.addEventListener("click", function(){
+    if(!currentId) return;
+    toggleFavoriteRow(currentId);
+    renderFavoriteButton(currentVenue());
+  });
 
   function collectVenuePayload(){
     return {
       name: fName.value,
-      city: fCity.value,
       address: fAddress.value,
       lat: fLat.value,
       lng: fLng.value,
       capacity: fCapacity.value ? Number(fCapacity.value) : "",
-      genre: fGenre.value,
       contact_name: fContactName.value,
       phone: fPhone.value,
       email: fEmail.value,
@@ -1522,6 +2392,8 @@
         venues = venues.filter(function(x){ return x.id !== v.id; });
         renderAll();
       });
+    } else {
+      renderAll();
     }
     currentId = null;
   }
@@ -1990,6 +2862,7 @@
 
   var elTypesScreen = document.getElementById("typesScreen");
   function openTypesScreen(){
+    renderTypesList();
     elTypesScreen.hidden = false;
     requestAnimationFrame(function(){ elTypesScreen.classList.add("in"); });
   }
@@ -2000,11 +2873,349 @@
   document.getElementById("rowSettingsTypes").addEventListener("click", openTypesScreen);
   document.getElementById("btnTypesBack").addEventListener("click", closeTypesScreen);
 
+  function updateSettingsCategoriesCount(){
+    document.getElementById("settingsCategoriesCount").textContent = venueCategories.length;
+  }
+  function categoryUsageCount(name){
+    return venues.filter(function(v){ return v.category === name; }).length;
+  }
+  function renderCategoriesList(){
+    var elCategoriesList = document.getElementById("categoriesList");
+    if(!venueCategories.length){
+      elCategoriesList.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna categoria configurata.</div>';
+      return;
+    }
+    elCategoriesList.innerHTML = venueCategories.map(function(c){
+      var count = categoryUsageCount(c.name);
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-category="'+c.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(c.name)+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+count+'</span>'+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-category="'+c.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+  document.getElementById("categoriesList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-category]");
+    if(del){
+      var id = del.getAttribute("data-del-category");
+      api("DELETE", "/api/venue_categories/" + id).then(function(){
+        venueCategories = venueCategories.filter(function(c){ return String(c.id) !== String(id); });
+        if(venueCategories.every(function(c){ return c.name !== filterCategory; })) filterCategory = "all";
+        renderCategoriesList();
+        updateSettingsCategoriesCount();
+        renderFilterCategoryRow();
+        toast("Categoria eliminata");
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-category]");
+    if(row) openCategoryEditScreen(Number(row.getAttribute("data-open-category")));
+  });
+
+  var currentCategoryEditId = null;
+  var elCategoryEditScreen = document.getElementById("categoryEditScreen");
+  function openCategoryEditScreen(id){
+    var c = venueCategories.find(function(x){ return x.id === id; });
+    if(!c) return;
+    currentCategoryEditId = id;
+    document.getElementById("categoryEditName").value = c.name;
+    var count = categoryUsageCount(c.name);
+    document.getElementById("categoryEditUsage").textContent = count
+      ? ("Usata da " + count + (count===1 ? " palcoscenico. Rinominandola si aggiorna anche lui." : " palcoscenici. Rinominandola si aggiornano anche loro."))
+      : "Non ancora usata da nessun palcoscenico.";
+    elCategoryEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elCategoryEditScreen.classList.add("in"); });
+    setTimeout(function(){ document.getElementById("categoryEditName").focus(); }, 260);
+  }
+  function closeCategoryEditScreen(){
+    elCategoryEditScreen.classList.remove("in");
+    setTimeout(function(){ elCategoryEditScreen.hidden = true; }, 320);
+    currentCategoryEditId = null;
+  }
+  document.getElementById("btnCategoryEditBack").addEventListener("click", closeCategoryEditScreen);
+  document.getElementById("btnCategoryEditSave").addEventListener("click", function(){
+    if(currentCategoryEditId == null) return;
+    var name = document.getElementById("categoryEditName").value.trim();
+    if(!name){ toast("Il nome è obbligatorio"); return; }
+    var btn = this;
+    withButtonBusy(btn, function(){
+      return api("PUT", "/api/venue_categories/" + currentCategoryEditId, {name:name}).then(function(updated){
+        var i = venueCategories.findIndex(function(c){ return c.id === updated.id; });
+        if(i > -1) venueCategories[i] = updated;
+        return updated.affected_locations ? loadVenues().then(function(){ return updated; }) : updated;
+      });
+    }).then(function(updated){
+      renderCategoriesList();
+      renderFilterCategoryRow();
+      toast(updated.affected_locations
+        ? ("Categoria rinominata (" + updated.affected_locations + " palcoscenici aggiornati)")
+        : "Categoria rinominata");
+      closeCategoryEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  document.getElementById("btnAddCategory").addEventListener("click", function(){
+    var input = document.getElementById("newCategoryInput");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/venue_categories", {name:name}).then(function(created){
+      venueCategories.push(created);
+      input.value = "";
+      renderCategoriesList();
+      updateSettingsCategoriesCount();
+      toast("Categoria aggiunta");
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  var elCategoriesScreen = document.getElementById("categoriesScreen");
+  function openCategoriesScreen(){
+    renderCategoriesList();
+    elCategoriesScreen.hidden = false;
+    requestAnimationFrame(function(){ elCategoriesScreen.classList.add("in"); });
+  }
+  function closeCategoriesScreen(){
+    elCategoriesScreen.classList.remove("in");
+    setTimeout(function(){ elCategoriesScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsCategories").addEventListener("click", openCategoriesScreen);
+  document.getElementById("btnCategoriesBack").addEventListener("click", closeCategoriesScreen);
+
+  /* ---------------- Impostazioni: Le mie bands ---------------- */
+  var myBands = [];
+  function loadMyBands(){
+    return api("GET", "/api/my_bands").then(function(data){
+      myBands = data;
+      updateSettingsMyBandsCount();
+    });
+  }
+  function updateSettingsMyBandsCount(){
+    document.getElementById("settingsMyBandsCount").textContent = myBands.length;
+  }
+  function renderMyBandsList(){
+    var elMyBandsList = document.getElementById("myBandsList");
+    if(!myBands.length){
+      elMyBandsList.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna band configurata.</div>';
+      return;
+    }
+    elMyBandsList.innerHTML = myBands.map(function(b){
+      var subParts = [];
+      if(b.genre) subParts.push(esc(b.genre));
+      if(b.city) subParts.push(esc(b.city));
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-myband="'+b.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(b.name)+'</div>'+
+        (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
+        '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-myband="'+b.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+  document.getElementById("myBandsList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-myband]");
+    if(del){
+      var id = del.getAttribute("data-del-myband");
+      api("DELETE", "/api/my_bands/" + id).then(function(){
+        myBands = myBands.filter(function(b){ return String(b.id) !== String(id); });
+        renderMyBandsList();
+        updateSettingsMyBandsCount();
+        toast("Band eliminata");
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-myband]");
+    if(row) openMyBandEditScreen(Number(row.getAttribute("data-open-myband")));
+  });
+
+  var currentMyBandEditId = null;
+  var myBandEditGenres = [];
+  var myBandEditCity = "";
+  var elMyBandEditScreen = document.getElementById("myBandEditScreen");
+  var myBandGenreValue = document.getElementById("myBandGenreValue");
+  var myBandCityValue = document.getElementById("myBandCityValue");
+  function openMyBandEditScreen(id){
+    var b = myBands.find(function(x){ return x.id === id; });
+    if(!b) return;
+    currentMyBandEditId = id;
+    document.getElementById("myBandEditName").value = b.name;
+    myBandEditGenres = (b.genre || "").split(",").map(function(g){ return g.trim(); }).filter(Boolean);
+    myBandEditCity = b.city || "";
+    myBandGenreValue.textContent = myBandEditGenres.length ? myBandEditGenres.join(", ") : "Scegli uno o più generi";
+    myBandGenreValue.style.color = myBandEditGenres.length ? "" : "var(--text-tertiary)";
+    myBandCityValue.textContent = myBandEditCity || "Scegli una città";
+    myBandCityValue.style.color = myBandEditCity ? "" : "var(--text-tertiary)";
+    elMyBandEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elMyBandEditScreen.classList.add("in"); });
+    setTimeout(function(){ document.getElementById("myBandEditName").focus(); }, 260);
+  }
+  function closeMyBandEditScreen(){
+    elMyBandEditScreen.classList.remove("in");
+    setTimeout(function(){ elMyBandEditScreen.hidden = true; }, 320);
+    currentMyBandEditId = null;
+  }
+  document.getElementById("btnMyBandEditBack").addEventListener("click", closeMyBandEditScreen);
+  document.getElementById("rowMyBandGenre").addEventListener("click", function(){
+    openGenrePicker(myBandEditGenres, function(selected){
+      myBandEditGenres = selected;
+      myBandGenreValue.textContent = myBandEditGenres.length ? myBandEditGenres.join(", ") : "Scegli uno o più generi";
+      myBandGenreValue.style.color = myBandEditGenres.length ? "" : "var(--text-tertiary)";
+    });
+  });
+  document.getElementById("rowMyBandCity").addEventListener("click", function(){
+    openCityPicker(myBandEditCity, function(label){
+      myBandEditCity = label;
+      myBandCityValue.textContent = label;
+      myBandCityValue.style.color = "";
+    });
+  });
+  document.getElementById("btnMyBandEditSave").addEventListener("click", function(){
+    if(currentMyBandEditId == null) return;
+    var name = document.getElementById("myBandEditName").value.trim();
+    if(!name){ toast("Il nome è obbligatorio"); return; }
+    var btn = this;
+    withButtonBusy(btn, function(){
+      return api("PUT", "/api/my_bands/" + currentMyBandEditId, {name:name, genre: myBandEditGenres.join(", "), city: myBandEditCity});
+    }).then(function(updated){
+      var i = myBands.findIndex(function(b){ return b.id === updated.id; });
+      if(i > -1) myBands[i] = updated;
+      renderMyBandsList();
+      toast("Band salvata");
+      closeMyBandEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  document.getElementById("btnAddMyBand").addEventListener("click", function(){
+    var input = document.getElementById("newMyBandInput");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/my_bands", {name:name}).then(function(created){
+      myBands.push(created);
+      input.value = "";
+      renderMyBandsList();
+      updateSettingsMyBandsCount();
+      toast("Band aggiunta");
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  var elMyBandsScreen = document.getElementById("myBandsScreen");
+  function openMyBandsScreen(){
+    renderMyBandsList();
+    updateSettingsMyBandsCount();
+    elMyBandsScreen.hidden = false;
+    requestAnimationFrame(function(){ elMyBandsScreen.classList.add("in"); });
+  }
+  function closeMyBandsScreen(){
+    elMyBandsScreen.classList.remove("in");
+    setTimeout(function(){ elMyBandsScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsMyBands").addEventListener("click", openMyBandsScreen);
+  document.getElementById("btnMyBandsBack").addEventListener("click", closeMyBandsScreen);
+
+  /* ---------------- Impostazioni: Modelli WhatsApp ---------------- */
+  var waTemplates = [];
+  function loadWaTemplates(){
+    return api("GET", "/api/wa_templates").then(function(data){
+      waTemplates = data;
+      updateSettingsWaTemplatesCount();
+    });
+  }
+  function updateSettingsWaTemplatesCount(){
+    document.getElementById("settingsWaTemplatesCount").textContent = waTemplates.length;
+  }
+  function renderWaTemplatesList(){
+    var elWaTemplatesList = document.getElementById("waTemplatesList");
+    if(!waTemplates.length){
+      elWaTemplatesList.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun modello configurato.</div>';
+      return;
+    }
+    elWaTemplatesList.innerHTML = waTemplates.map(function(t){
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-watemplate="'+t.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+
+        '<div class="row-sub">'+esc(t.message)+'</div></div>'+
+        '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-watemplate="'+t.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+  document.getElementById("waTemplatesList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-watemplate]");
+    if(del){
+      var id = del.getAttribute("data-del-watemplate");
+      api("DELETE", "/api/wa_templates/" + id).then(function(){
+        waTemplates = waTemplates.filter(function(t){ return String(t.id) !== String(id); });
+        renderWaTemplatesList();
+        updateSettingsWaTemplatesCount();
+        toast("Modello eliminato");
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-watemplate]");
+    if(row) openWaTemplateEditScreen(Number(row.getAttribute("data-open-watemplate")));
+  });
+
+  var currentWaTemplateEditId = null;
+  var elWaTemplateEditScreen = document.getElementById("waTemplateEditScreen");
+  function openWaTemplateEditScreen(id){
+    var t = waTemplates.find(function(x){ return x.id === id; });
+    if(!t) return;
+    currentWaTemplateEditId = id;
+    document.getElementById("waTemplateEditName").value = t.name;
+    document.getElementById("waTemplateEditMessage").value = t.message;
+    elWaTemplateEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elWaTemplateEditScreen.classList.add("in"); });
+    setTimeout(function(){ document.getElementById("waTemplateEditName").focus(); }, 260);
+  }
+  function closeWaTemplateEditScreen(){
+    elWaTemplateEditScreen.classList.remove("in");
+    setTimeout(function(){ elWaTemplateEditScreen.hidden = true; }, 320);
+    currentWaTemplateEditId = null;
+  }
+  document.getElementById("btnWaTemplateEditBack").addEventListener("click", closeWaTemplateEditScreen);
+  document.getElementById("btnWaTemplateEditSave").addEventListener("click", function(){
+    if(currentWaTemplateEditId == null) return;
+    var name = document.getElementById("waTemplateEditName").value.trim();
+    var message = document.getElementById("waTemplateEditMessage").value.trim();
+    if(!name){ toast("Il nome è obbligatorio"); return; }
+    if(!message){ toast("Il messaggio è obbligatorio"); return; }
+    var btn = this;
+    withButtonBusy(btn, function(){
+      return api("PUT", "/api/wa_templates/" + currentWaTemplateEditId, {name:name, message:message});
+    }).then(function(updated){
+      var i = waTemplates.findIndex(function(t){ return t.id === updated.id; });
+      if(i > -1) waTemplates[i] = updated;
+      renderWaTemplatesList();
+      toast("Modello salvato");
+      closeWaTemplateEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  document.getElementById("btnAddWaTemplate").addEventListener("click", function(){
+    var input = document.getElementById("newWaTemplateInput");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/wa_templates", {name:name, message:""}).then(function(created){
+      waTemplates.push(created);
+      input.value = "";
+      renderWaTemplatesList();
+      updateSettingsWaTemplatesCount();
+      openWaTemplateEditScreen(created.id);
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  var elWaTemplatesScreen = document.getElementById("waTemplatesScreen");
+  function openWaTemplatesScreen(){
+    renderWaTemplatesList();
+    updateSettingsWaTemplatesCount();
+    elWaTemplatesScreen.hidden = false;
+    requestAnimationFrame(function(){ elWaTemplatesScreen.classList.add("in"); });
+  }
+  function closeWaTemplatesScreen(){
+    elWaTemplatesScreen.classList.remove("in");
+    setTimeout(function(){ elWaTemplatesScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsWaTemplates").addEventListener("click", openWaTemplatesScreen);
+  document.getElementById("btnWaTemplatesBack").addEventListener("click", closeWaTemplatesScreen);
+
   var elAboutScreen = document.getElementById("aboutScreen");
   function openAboutScreen(){
     document.getElementById("aboutCountVenues").textContent = venues.length;
     document.getElementById("aboutCountAd").textContent = artDirectors.length;
-    document.getElementById("aboutCountBands").textContent = bands.length;
     elAboutScreen.hidden = false;
     requestAnimationFrame(function(){ elAboutScreen.classList.add("in"); });
   }
@@ -2014,6 +3225,181 @@
   }
   document.getElementById("rowSettingsAbout").addEventListener("click", openAboutScreen);
   document.getElementById("btnAboutBack").addEventListener("click", closeAboutScreen);
+
+  /* ---------------- profilo utente & wizard di benvenuto ---------------- */
+  var me = null;
+  var comuniList = null;
+
+  function loadComuni(){
+    if(comuniList) return Promise.resolve(comuniList);
+    return fetch("/comuni.json").then(function(res){ return res.json(); }).then(function(data){
+      comuniList = data;
+      return comuniList;
+    });
+  }
+  function openCityPicker(currentValue, onSelect, opts){
+    opts = opts || {};
+    loadComuni().then(function(list){
+      var sheetOpts = list.map(function(c){
+        var label = c.nome + " (" + c.sigla + ")";
+        return {label: label, checkmark: currentValue === label, onSelect: function(){ onSelect(label); }};
+      });
+      openSheet({
+        title: "Scegli una città",
+        searchable: true,
+        searchPlaceholder: "Cerca comune…",
+        options: sheetOpts,
+        freeText: !!opts.freeText,
+        onFreeText: opts.freeText ? onSelect : undefined
+      });
+    });
+  }
+
+  var THEME_OPTIONS = [
+    {value: "auto", label: "Automatico"},
+    {value: "light", label: "Chiaro"},
+    {value: "dark", label: "Scuro"},
+    {value: "dim", label: "Grigio scuro"}
+  ];
+  function currentTheme(){
+    var t = localStorage.getItem("gigflow-theme");
+    return (t === "dark" || t === "dim" || t === "light") ? t : "auto";
+  }
+  function applyTheme(value){
+    if(value === "auto"){
+      localStorage.removeItem("gigflow-theme");
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      localStorage.setItem("gigflow-theme", value);
+      document.documentElement.setAttribute("data-theme", value);
+    }
+    renderSettingsTheme();
+  }
+  function renderSettingsTheme(){
+    var current = currentTheme();
+    var opt = THEME_OPTIONS.find(function(o){ return o.value === current; });
+    document.getElementById("settingsThemeValue").textContent = opt ? opt.label : "Automatico";
+  }
+  document.getElementById("rowSettingsTheme").addEventListener("click", function(){
+    var current = currentTheme();
+    openSheet({
+      title: "Tema",
+      options: THEME_OPTIONS.map(function(o){
+        return {label: o.label, checkmark: o.value === current, onSelect: function(){ applyTheme(o.value); }};
+      })
+    });
+  });
+  renderSettingsTheme();
+
+  function renderSettingsProfile(){
+    var show = !!(me && me.email);
+    document.getElementById("sectionAccount").hidden = !show;
+    document.getElementById("rowSettingsProfileWrap").hidden = !show;
+    if(!show) return;
+    var avatar = document.getElementById("settingsProfileAvatar");
+    if(me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
+    document.getElementById("settingsProfileName").textContent = me.name || me.email;
+    document.getElementById("settingsProfileEmail").textContent = me.email;
+  }
+
+  var elProfileScreen = document.getElementById("profileScreen");
+  function openProfileScreen(){
+    var avatar = document.getElementById("profileAvatar");
+    if(me && me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
+    document.getElementById("profileName").textContent = (me && me.name) || "";
+    document.getElementById("profileEmail").textContent = (me && me.email) || "";
+    elProfileScreen.hidden = false;
+    requestAnimationFrame(function(){ elProfileScreen.classList.add("in"); });
+  }
+  function closeProfileScreen(){
+    elProfileScreen.classList.remove("in");
+    setTimeout(function(){ elProfileScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsProfile").addEventListener("click", openProfileScreen);
+  document.getElementById("btnProfileBack").addEventListener("click", closeProfileScreen);
+  document.getElementById("btnLogout").addEventListener("click", function(){
+    confirmDestructive("Vuoi uscire da GigFlow?", "Esci", function(){
+      window.location.href = "/logout";
+    });
+  });
+
+  var MUSIC_GENRES = [
+    "Rock", "Pop", "Indie", "Cover", "Liscio", "Dance / EDM", "Hip Hop",
+    "Rap", "Reggae", "Ska", "Punk", "Metal", "Jazz", "Blues", "Folk",
+    "Cantautorato", "Latino", "Funk / Soul", "Country", "Musica classica",
+    "Altro"
+  ];
+  function openGenrePicker(selected, onDone){
+    var chosen = selected.slice();
+    var opts = MUSIC_GENRES.map(function(g){
+      return {label: g, checkmark: chosen.indexOf(g) > -1, onToggle: function(checked){
+        if(checked){ chosen.push(g); } else { chosen = chosen.filter(function(x){ return x !== g; }); }
+      }};
+    });
+    openSheet({
+      title: "Generi musicali",
+      multiSelect: true,
+      options: opts,
+      onDone: function(){ onDone(chosen); }
+    });
+  }
+
+  var elWizardScreen = document.getElementById("wizardScreen");
+  var wzArtistName = document.getElementById("wzArtistName");
+  var wzGenreValue = document.getElementById("wzGenreValue");
+  var wzCityValue = document.getElementById("wzCityValue");
+  var btnWizardContinue = document.getElementById("btnWizardContinue");
+  var wizardCity = "";
+  var wizardGenres = [];
+  function updateWizardContinueState(){
+    var ok = wzArtistName.value.trim() && wizardGenres.length && wizardCity;
+    btnWizardContinue.style.opacity = ok ? "1" : ".4";
+    btnWizardContinue.style.pointerEvents = ok ? "auto" : "none";
+  }
+  wzArtistName.addEventListener("input", updateWizardContinueState);
+  document.getElementById("rowWzGenre").addEventListener("click", function(){
+    openGenrePicker(wizardGenres, function(selected){
+      wizardGenres = selected;
+      wzGenreValue.textContent = wizardGenres.length ? wizardGenres.join(", ") : "Scegli uno o più generi";
+      wzGenreValue.style.color = wizardGenres.length ? "" : "var(--text-tertiary)";
+      updateWizardContinueState();
+    });
+  });
+  document.getElementById("rowWzCity").addEventListener("click", function(){
+    openCityPicker(wizardCity, function(label){
+      wizardCity = label;
+      wzCityValue.textContent = label;
+      wzCityValue.style.color = "";
+      updateWizardContinueState();
+    });
+  });
+  btnWizardContinue.addEventListener("click", function(){
+    if(btnWizardContinue.style.pointerEvents === "none") return;
+    api("PUT", "/api/me", {artist_name: wzArtistName.value.trim(), genre: wizardGenres.join(", "), city: wizardCity}).then(function(updated){
+      me = updated;
+      closeWizard();
+      renderSettingsProfile();
+      loadMyBands();
+    }).catch(function(err){ toast(err.message); });
+  });
+  function openWizard(){
+    elWizardScreen.hidden = false;
+    requestAnimationFrame(function(){ elWizardScreen.classList.add("in"); });
+  }
+  function closeWizard(){
+    elWizardScreen.classList.remove("in");
+    setTimeout(function(){ elWizardScreen.hidden = true; }, 320);
+  }
+
+  var WIZARD_ENABLED = false; // disabilitato temporaneamente: chiedeva il nome della band al primo accesso
+  function loadMe(){
+    return api("GET", "/api/me").then(function(data){
+      me = data;
+      renderSettingsProfile();
+      if(me.email && !me.onboarded && WIZARD_ENABLED) openWizard();
+      return me;
+    });
+  }
 
   /* ---------------- swipe da bordo sinistro per tornare indietro ---------------- */
   function addEdgeSwipeBack(screenEl, closeFn){
@@ -2040,9 +3426,16 @@
   addEdgeSwipeBack(elAboutScreen, closeAboutScreen);
   addEdgeSwipeBack(elFiltersScreen, closeFiltersScreen);
   addEdgeSwipeBack(elTypeEditScreen, closeTypeEditScreen);
+  addEdgeSwipeBack(elCategoriesScreen, closeCategoriesScreen);
+  addEdgeSwipeBack(elCategoryEditScreen, closeCategoryEditScreen);
+  addEdgeSwipeBack(elProfileScreen, closeProfileScreen);
+  addEdgeSwipeBack(elMyBandsScreen, closeMyBandsScreen);
+  addEdgeSwipeBack(elMyBandEditScreen, closeMyBandEditScreen);
+  addEdgeSwipeBack(elWaTemplatesScreen, closeWaTemplatesScreen);
+  addEdgeSwipeBack(elWaTemplateEditScreen, closeWaTemplateEditScreen);
 
   /* ---------------- boot ---------------- */
-  Promise.all([loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes()]);
+  Promise.all([loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(), loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMe()]);
 })();
 
 if("serviceWorker" in navigator){

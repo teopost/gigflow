@@ -47,16 +47,25 @@ SESSION_TTL_DAYS = 30
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
-PUBLIC_PATHS = {"/login", "/auth/google", "/auth/google/callback", "/logout"}
+PUBLIC_PATHS = {
+    "/login", "/auth/google", "/auth/google/callback", "/logout",
+    # il manifest e il service worker devono restare raggiungibili senza
+    # sessione: il sistema Android che genera l'app installata (WebAPK) li
+    # legge senza le credenziali dell'utente, altrimenti installa solo una
+    # scorciatoia al sito invece dell'app vera (icona generica, barra degli
+    # indirizzi visibile).
+    "/manifest.json", "/sw.js",
+}
 
 
 def auth_enabled():
     return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 LOCATION_FIELDS = [
-    "name", "type", "address", "city", "lat", "lng",
+    "name", "type", "category", "address", "city", "lat", "lng",
     "contact_name", "phone", "email", "website", "capacity", "genre",
-    "art_director_id", "status", "next_contact_date", "planning_note",
+    "art_director_id", "status", "next_contact_date", "planning_note", "favorite",
+    "owner_email",
 ]
 ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
@@ -140,6 +149,12 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS venue_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS photos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
@@ -152,6 +167,35 @@ def init_db():
             email TEXT NOT NULL,
             created_at TEXT NOT NULL,
             expires_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS my_bands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            genre TEXT,
+            city TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS wa_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            email TEXT PRIMARY KEY,
+            name TEXT,
+            picture TEXT,
+            artist_name TEXT,
+            genre TEXT,
+            city TEXT,
+            onboarded_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         );
 
         CREATE INDEX IF NOT EXISTS idx_locations_status ON locations(status);
@@ -171,6 +215,26 @@ def migrate_schema(conn):
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(locations)").fetchall()}
     if "contact_name" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN contact_name TEXT")
+    if "deleted_at" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN deleted_at TEXT")
+    if "favorite" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
+    if "category" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN category TEXT")
+    if "owner_email" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN owner_email TEXT")
+        # dati preesistenti: prima dell'introduzione del proprietario, i palcoscenici
+        # inseriti erano tutti di questo account. Con le multiutenze andrà rivisto.
+        conn.execute(
+            "UPDATE locations SET owner_email = ? WHERE owner_email IS NULL",
+            ("stefano.viciguerra@gmail.com",),
+        )
+
+    my_band_cols = {row["name"] for row in conn.execute("PRAGMA table_info(my_bands)").fetchall()}
+    if "genre" not in my_band_cols:
+        conn.execute("ALTER TABLE my_bands ADD COLUMN genre TEXT")
+    if "city" not in my_band_cols:
+        conn.execute("ALTER TABLE my_bands ADD COLUMN city TEXT")
 
 
 # --- sessioni di login ---------------------------------------------------
@@ -217,7 +281,7 @@ def google_auth_url(redirect_uri, state):
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": "openid email",
+        "scope": "openid email profile",
         "state": state,
         "prompt": "select_account",
     }
@@ -243,6 +307,79 @@ def google_fetch_userinfo(access_token):
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.load(resp)
+
+
+# --- profilo utente (wizard di benvenuto + dati Google) -----------------
+
+ME_FIELDS = ["artist_name", "genre", "city"]
+
+
+def upsert_profile_from_google(conn, email, name, picture):
+    ts = now_iso()
+    existing = conn.execute("SELECT email FROM user_profiles WHERE email = ?", (email,)).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE user_profiles SET name = ?, picture = ?, updated_at = ? WHERE email = ?",
+            (name, picture, ts, email),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO user_profiles (email, name, picture, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (email, name, picture, ts, ts),
+        )
+    conn.commit()
+
+
+def fetch_me(conn, email):
+    if not email:
+        return {
+            "email": None, "name": None, "picture": None,
+            "artist_name": None, "genre": None, "city": None, "onboarded": True,
+        }
+    row = conn.execute("SELECT * FROM user_profiles WHERE email = ?", (email,)).fetchone()
+    if not row:
+        return {
+            "email": email, "name": None, "picture": None,
+            "artist_name": None, "genre": None, "city": None, "onboarded": False,
+        }
+    d = dict(row)
+    d["onboarded"] = bool(d.get("onboarded_at"))
+    return d
+
+
+def update_me(conn, email, body):
+    fields = {}
+    for f in ME_FIELDS:
+        if f not in body:
+            continue
+        value = body[f]
+        fields[f] = value.strip() if isinstance(value, str) else value
+    if fields:
+        ts = now_iso()
+        existing = conn.execute("SELECT email FROM user_profiles WHERE email = ?", (email,)).fetchone()
+        if not existing:
+            conn.execute(
+                "INSERT INTO user_profiles (email, created_at, updated_at) VALUES (?, ?, ?)",
+                (email, ts, ts),
+            )
+        set_clause = ",".join(f"{k} = ?" for k in fields.keys())
+        conn.execute(
+            f"UPDATE user_profiles SET {set_clause}, updated_at = ? WHERE email = ?",
+            list(fields.values()) + [ts, email],
+        )
+        row = conn.execute(
+            "SELECT onboarded_at, artist_name, genre, city FROM user_profiles WHERE email = ?", (email,)
+        ).fetchone()
+        if row and not row["onboarded_at"] and row["artist_name"] and row["city"]:
+            conn.execute("UPDATE user_profiles SET onboarded_at = ? WHERE email = ?", (ts, email))
+            my_band_count = conn.execute("SELECT COUNT(*) AS n FROM my_bands").fetchone()["n"]
+            if my_band_count == 0:
+                conn.execute(
+                    "INSERT INTO my_bands (name, genre, city, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (row["artist_name"], row["genre"], row["city"], ts, ts),
+                )
+        conn.commit()
+    return fetch_me(conn, email)
 
 
 DEFAULT_VENUE_TYPES = [
@@ -288,10 +425,12 @@ def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None):
     return d
 
 
-def fetch_locations(conn, status=None, search=None):
+def fetch_locations(conn, status=None, search=None, include_deleted=False):
     query = "SELECT * FROM locations"
     clauses = []
     params = []
+    if not include_deleted:
+        clauses.append("deleted_at IS NULL")
     if status and status != "all":
         clauses.append("status = ?")
         params.append(status)
@@ -351,16 +490,19 @@ def clean_location_payload(body, partial):
             if value and value not in STATUS_VALUES:
                 raise ApiError(400, "Stato non valido")
             value = value or "da_contattare"
+        elif field == "favorite":
+            value = 1 if value else 0
         elif isinstance(value, str):
             value = value.strip()
         data[field] = value
     return data
 
 
-def create_location(conn, body):
+def create_location(conn, body, owner_email=None):
     data = clean_location_payload(body, partial=False)
     data.setdefault("name", "")
     data.setdefault("status", "da_contattare")
+    data["owner_email"] = owner_email
     ts = now_iso()
     fields = list(data.keys()) + ["created_at", "updated_at"]
     values = list(data.values()) + [ts, ts]
@@ -389,10 +531,26 @@ def update_location(conn, loc_id, body):
 
 
 def delete_location(conn, loc_id):
-    cur = conn.execute("DELETE FROM locations WHERE id = ?", (loc_id,))
+    ts = now_iso()
+    cur = conn.execute(
+        "UPDATE locations SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+        (ts, ts, loc_id),
+    )
     conn.commit()
     if cur.rowcount == 0:
         raise ApiError(404, "Palcoscenico non trovato")
+
+
+def restore_location(conn, loc_id):
+    ts = now_iso()
+    cur = conn.execute(
+        "UPDATE locations SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL",
+        (ts, loc_id),
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Palcoscenico non trovato")
+    return fetch_location(conn, loc_id)
 
 
 def add_note(conn, loc_id, body):
@@ -605,6 +763,94 @@ def delete_band(conn, band_id):
         raise ApiError(404, "Band non trovata")
 
 
+def fetch_my_bands(conn):
+    rows = conn.execute("SELECT * FROM my_bands ORDER BY id ASC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_my_band(conn, body):
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    genre = (body.get("genre") or "").strip()
+    city = (body.get("city") or "").strip()
+    ts = now_iso()
+    cur = conn.execute(
+        "INSERT INTO my_bands (name, genre, city, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        (name, genre, city, ts, ts),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM my_bands WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+def update_my_band(conn, band_id, body):
+    existing = conn.execute("SELECT id FROM my_bands WHERE id = ?", (band_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Band non trovata")
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    genre = (body.get("genre") or "").strip()
+    city = (body.get("city") or "").strip()
+    ts = now_iso()
+    conn.execute(
+        "UPDATE my_bands SET name = ?, genre = ?, city = ?, updated_at = ? WHERE id = ?",
+        (name, genre, city, ts, band_id),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM my_bands WHERE id = ?", (band_id,)).fetchone())
+
+
+def delete_my_band(conn, band_id):
+    cur = conn.execute("DELETE FROM my_bands WHERE id = ?", (band_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Band non trovata")
+
+
+def fetch_wa_templates(conn):
+    rows = conn.execute("SELECT * FROM wa_templates ORDER BY id ASC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_wa_template(conn, body):
+    name = (body.get("name") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    ts = now_iso()
+    cur = conn.execute(
+        "INSERT INTO wa_templates (name, message, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        (name, message, ts, ts),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM wa_templates WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+def update_wa_template(conn, template_id, body):
+    existing = conn.execute("SELECT id FROM wa_templates WHERE id = ?", (template_id,)).fetchone()
+    if not existing:
+        raise ApiError(404, "Modello non trovato")
+    name = (body.get("name") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    ts = now_iso()
+    conn.execute(
+        "UPDATE wa_templates SET name = ?, message = ?, updated_at = ? WHERE id = ?",
+        (name, message, ts, template_id),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM wa_templates WHERE id = ?", (template_id,)).fetchone())
+
+
+def delete_wa_template(conn, template_id):
+    cur = conn.execute("DELETE FROM wa_templates WHERE id = ?", (template_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Modello non trovato")
+
+
 def fetch_venue_types(conn):
     rows = conn.execute("SELECT * FROM venue_types ORDER BY id ASC").fetchall()
     return [dict(r) for r in rows]
@@ -676,15 +922,93 @@ def delete_venue_type(conn, type_id):
     conn.commit()
 
 
+def fetch_venue_categories(conn):
+    rows = conn.execute("SELECT * FROM venue_categories ORDER BY id ASC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_venue_category(conn, body):
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome della categoria è obbligatorio")
+    existing = conn.execute(
+        "SELECT id FROM venue_categories WHERE LOWER(name) = LOWER(?)", (name,)
+    ).fetchone()
+    if existing:
+        raise ApiError(400, "Questa categoria esiste già")
+    cur = conn.execute(
+        "INSERT INTO venue_categories (name, created_at) VALUES (?, ?)", (name, now_iso())
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM venue_categories WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_venue_category(conn, category_id, body):
+    row = conn.execute("SELECT name FROM venue_categories WHERE id = ?", (category_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Categoria non trovata")
+    new_name = (body.get("name") or "").strip()
+    if not new_name:
+        raise ApiError(400, "Il nome della categoria è obbligatorio")
+    old_name = row["name"]
+
+    if new_name.lower() != old_name.lower():
+        dup = conn.execute(
+            "SELECT id FROM venue_categories WHERE LOWER(name) = LOWER(?) AND id != ?",
+            (new_name, category_id),
+        ).fetchone()
+        if dup:
+            raise ApiError(400, "Questa categoria esiste già")
+
+    conn.execute("UPDATE venue_categories SET name = ? WHERE id = ?", (new_name, category_id))
+
+    affected = 0
+    if new_name != old_name:
+        ts = now_iso()
+        cur = conn.execute(
+            "UPDATE locations SET category = ?, updated_at = ? WHERE category = ?",
+            (new_name, ts, old_name),
+        )
+        affected = cur.rowcount
+
+    conn.commit()
+    updated = dict(conn.execute("SELECT * FROM venue_categories WHERE id = ?", (category_id,)).fetchone())
+    updated["affected_locations"] = affected
+    return updated
+
+
+def delete_venue_category(conn, category_id):
+    row = conn.execute("SELECT name FROM venue_categories WHERE id = ?", (category_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Categoria non trovata")
+    count = conn.execute(
+        "SELECT COUNT(*) AS n FROM locations WHERE category = ?", (row["name"],)
+    ).fetchone()["n"]
+    if count > 0:
+        noun = "palcoscenico" if count == 1 else "palcoscenici"
+        verb = "usa" if count == 1 else "usano"
+        raise ApiError(400, f"Impossibile eliminare: {count} {noun} {verb} ancora questa categoria")
+    conn.execute("DELETE FROM venue_categories WHERE id = ?", (category_id,))
+    conn.commit()
+
+
+def list_owners(conn):
+    rows = conn.execute(
+        "SELECT email, name FROM user_profiles ORDER BY COALESCE(name, email) COLLATE NOCASE ASC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
 
 def _h_list_locations(conn, match, query, body):
     status = (query.get("status") or [None])[0]
     search = (query.get("search") or [None])[0]
-    return 200, fetch_locations(conn, status, search)
+    include_deleted = (query.get("include_deleted") or [None])[0] in ("1", "true")
+    return 200, fetch_locations(conn, status, search, include_deleted)
 
 
-def _h_create_location(conn, match, query, body):
-    return 201, create_location(conn, body)
+def _h_list_owners(conn, match, query, body):
+    return 200, list_owners(conn)
 
 
 def _h_get_location(conn, match, query, body):
@@ -698,6 +1022,10 @@ def _h_update_location(conn, match, query, body):
 def _h_delete_location(conn, match, query, body):
     delete_location(conn, int(match.group(1)))
     return 204, {}
+
+
+def _h_restore_location(conn, match, query, body):
+    return 200, restore_location(conn, int(match.group(1)))
 
 
 def _h_add_note(conn, match, query, body):
@@ -751,6 +1079,40 @@ def _h_delete_band(conn, match, query, body):
     return 204, {}
 
 
+def _h_list_my_bands(conn, match, query, body):
+    return 200, fetch_my_bands(conn)
+
+
+def _h_create_my_band(conn, match, query, body):
+    return 201, create_my_band(conn, body)
+
+
+def _h_update_my_band(conn, match, query, body):
+    return 200, update_my_band(conn, int(match.group(1)), body)
+
+
+def _h_delete_my_band(conn, match, query, body):
+    delete_my_band(conn, int(match.group(1)))
+    return 204, {}
+
+
+def _h_list_wa_templates(conn, match, query, body):
+    return 200, fetch_wa_templates(conn)
+
+
+def _h_create_wa_template(conn, match, query, body):
+    return 201, create_wa_template(conn, body)
+
+
+def _h_update_wa_template(conn, match, query, body):
+    return 200, update_wa_template(conn, int(match.group(1)), body)
+
+
+def _h_delete_wa_template(conn, match, query, body):
+    delete_wa_template(conn, int(match.group(1)))
+    return 204, {}
+
+
 def _h_list_venue_types(conn, match, query, body):
     return 200, fetch_venue_types(conn)
 
@@ -768,12 +1130,30 @@ def _h_delete_venue_type(conn, match, query, body):
     return 204, {}
 
 
+def _h_list_venue_categories(conn, match, query, body):
+    return 200, fetch_venue_categories(conn)
+
+
+def _h_create_venue_category(conn, match, query, body):
+    return 201, create_venue_category(conn, body)
+
+
+def _h_update_venue_category(conn, match, query, body):
+    return 200, update_venue_category(conn, int(match.group(1)), body)
+
+
+def _h_delete_venue_category(conn, match, query, body):
+    delete_venue_category(conn, int(match.group(1)))
+    return 204, {}
+
+
 ROUTES = [
     ("GET", re.compile(r"^/api/locations$"), _h_list_locations),
-    ("POST", re.compile(r"^/api/locations$"), _h_create_location),
+    ("GET", re.compile(r"^/api/owners$"), _h_list_owners),
     ("GET", re.compile(r"^/api/locations/(\d+)$"), _h_get_location),
     ("PUT", re.compile(r"^/api/locations/(\d+)$"), _h_update_location),
     ("DELETE", re.compile(r"^/api/locations/(\d+)$"), _h_delete_location),
+    ("POST", re.compile(r"^/api/locations/(\d+)/restore$"), _h_restore_location),
     ("POST", re.compile(r"^/api/locations/(\d+)/notes$"), _h_add_note),
     ("DELETE", re.compile(r"^/api/notes/(\d+)$"), _h_delete_note),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
@@ -786,10 +1166,22 @@ ROUTES = [
     ("POST", re.compile(r"^/api/bands$"), _h_create_band),
     ("PUT", re.compile(r"^/api/bands/(\d+)$"), _h_update_band),
     ("DELETE", re.compile(r"^/api/bands/(\d+)$"), _h_delete_band),
+    ("GET", re.compile(r"^/api/my_bands$"), _h_list_my_bands),
+    ("POST", re.compile(r"^/api/my_bands$"), _h_create_my_band),
+    ("PUT", re.compile(r"^/api/my_bands/(\d+)$"), _h_update_my_band),
+    ("DELETE", re.compile(r"^/api/my_bands/(\d+)$"), _h_delete_my_band),
+    ("GET", re.compile(r"^/api/wa_templates$"), _h_list_wa_templates),
+    ("POST", re.compile(r"^/api/wa_templates$"), _h_create_wa_template),
+    ("PUT", re.compile(r"^/api/wa_templates/(\d+)$"), _h_update_wa_template),
+    ("DELETE", re.compile(r"^/api/wa_templates/(\d+)$"), _h_delete_wa_template),
     ("GET", re.compile(r"^/api/venue_types$"), _h_list_venue_types),
     ("POST", re.compile(r"^/api/venue_types$"), _h_create_venue_type),
     ("PUT", re.compile(r"^/api/venue_types/(\d+)$"), _h_update_venue_type),
     ("DELETE", re.compile(r"^/api/venue_types/(\d+)$"), _h_delete_venue_type),
+    ("GET", re.compile(r"^/api/venue_categories$"), _h_list_venue_categories),
+    ("POST", re.compile(r"^/api/venue_categories$"), _h_create_venue_category),
+    ("PUT", re.compile(r"^/api/venue_categories/(\d+)$"), _h_update_venue_category),
+    ("DELETE", re.compile(r"^/api/venue_categories/(\d+)$"), _h_delete_venue_category),
 ]
 
 
@@ -1079,6 +1471,7 @@ class Handler(BaseHTTPRequestHandler):
                 return True
             conn = get_conn()
             try:
+                upsert_profile_from_google(conn, email, userinfo.get("name"), userinfo.get("picture"))
                 session_id = create_session(conn, email)
             finally:
                 conn.close()
@@ -1097,6 +1490,40 @@ class Handler(BaseHTTPRequestHandler):
             return True
 
         return False
+
+    def _handle_me_route(self, method, path):
+        if path != "/api/me":
+            return False
+        conn = get_conn()
+        try:
+            email = self._current_email(conn)
+            if method == "GET":
+                self._send_json(200, fetch_me(conn, email))
+            elif method == "PUT":
+                if not email:
+                    self._send_json(401, {"error": "Accesso richiesto"})
+                else:
+                    self._send_json(200, update_me(conn, email, self._read_json_body()))
+            else:
+                self._send_json(405, {"error": "Metodo non consentito"})
+        finally:
+            conn.close()
+        return True
+
+    def _handle_create_location_route(self, method, path):
+        if method != "POST" or path != "/api/locations":
+            return False
+        conn = get_conn()
+        try:
+            owner_email = self._current_email(conn)
+            try:
+                payload = create_location(conn, self._read_json_body(), owner_email=owner_email)
+                self._send_json(201, payload)
+            except ApiError as e:
+                self._send_json(e.status, {"error": e.message})
+        finally:
+            conn.close()
+        return True
 
     def _dispatch(self, method):
         parsed = urlparse(self.path)
@@ -1128,6 +1555,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if method == "GET" and path == "/sw.js":
             self._send_file(os.path.join(STATIC_DIR, "sw.js"), "application/javascript; charset=utf-8")
+            return
+
+        if method == "GET" and path == "/comuni.json":
+            self._send_file(os.path.join(STATIC_DIR, "comuni.json"), "application/json; charset=utf-8")
+            return
+
+        if self._handle_me_route(method, path):
+            return
+
+        if self._handle_create_location_route(method, path):
             return
 
         if method == "GET" and (path.startswith("/icons/") or path == "/favicon.ico"):
