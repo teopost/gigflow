@@ -183,6 +183,16 @@
   .map-pin-popup .mp-name{font-weight:700;font-size:14px;margin-bottom:2px;}
   .map-pin-popup .mp-sub{font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
   .map-pin-popup button{border:none;background:var(--tint);color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  /* ---------- band attiva, inviti, membri ---------- */
+  .ws-check{flex:none;width:20px;margin-right:2px;color:var(--tint);display:flex;align-items:center;}
+  .ws-edit{flex:none;border:none;background:none;padding:6px;margin:-6px -4px -6px 0;color:var(--text-tertiary);cursor:pointer;display:flex;align-items:center;}
+  .invite-link{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--text-secondary);word-break:break-all;line-height:1.45;}
+  .invite-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .invite-actions button{flex:1;min-width:120px;border:none;border-radius:10px;padding:11px 12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--tint);color:#fff;}
+  .invite-actions button.secondary{background:var(--fill);color:var(--text);}
+  .invite-meta{font-size:12.5px;color:var(--text-tertiary);margin-top:8px;}
+  .invite-dead{opacity:.5;}
+  .member-role{font-size:11px;font-weight:600;padding:2.5px 8px;border-radius:999px;background:var(--fill);color:var(--text-secondary);white-space:nowrap;}
   .map-user-dot{background:none;border:none;}
   .map-user-dot i{display:block;width:16px;height:16px;border-radius:50%;background:#0a84ff;border:2.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.35);}
   /* la tabbar e' fixed sopra la mappa: alzo attribuzione e pulsante per non finirci sotto */
@@ -525,11 +535,18 @@
       <div class="section-header">BAND</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsMyBands">
-          <div class="row-main"><div class="row-title">Le mie bands</div></div>
+          <div class="row-main"><div class="row-title">Le mie bands</div>
+          <div class="row-sub" id="settingsActiveBand"></div></div>
           <div class="row-trail"><span class="row-badge" id="settingsMyBandsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="row" id="rowSettingsInvite">
+          <div class="row-main"><div class="row-title">Invita nella band</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsMembersCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
+      <div class="section-footer">I dati sono separati per band: chi entra con il tuo link vede i palcoscenici della band attiva, chi si iscrive da solo parte da zero.</div>
       <div class="section-header">MESSAGGI</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsWaTemplates">
@@ -689,6 +706,34 @@
     </div>
   </section>
 
+  <!-- ============ PUSHED: INVITA ============ -->
+  <section class="screen pushed" id="inviteScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnInviteBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Invita</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">LINK DI INVITO</div>
+      <div class="grouped-list" id="inviteList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="row" id="btnCreateInvite" style="justify-content:center;">
+          <div class="row-title" style="color:var(--tint);font-weight:600;">Crea un link di invito</div>
+        </div>
+      </div>
+      <div class="section-footer">Il link vale 7 giorni e può essere usato da più persone. Chi lo apre entra in <span id="inviteBandName">questa band</span> e vede gli stessi palcoscenici che vedi tu. Se finisce nelle mani sbagliate, annullalo qui.</div>
+
+      <div class="section-header">MEMBRI</div>
+      <div class="grouped-list" id="membersList"></div>
+      <div class="section-footer">Solo chi ha creato la band può rimuovere gli altri.</div>
+    </div>
+  </section>
+
   <!-- ============ PUSHED: MODELLI WHATSAPP ============ -->
   <section class="screen pushed" id="waTemplatesScreen" hidden>
     <header class="navbar">
@@ -806,7 +851,7 @@
       <div style="text-align:center;padding:28px 24px 4px;">
         <div style="font-size:34px;margin-bottom:10px;">🎤</div>
         <div style="font-size:20px;font-weight:700;">Benvenuto su GigFlow</div>
-        <div style="font-size:14px;color:var(--text-secondary);margin-top:6px;">Raccontaci qualcosa di te prima di iniziare.</div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-top:6px;">Crea la tua band per iniziare da zero. Se invece devi unirti a una band che esiste già, chiudi qui e apri il link di invito che ti hanno mandato.</div>
       </div>
       <div class="section-header">LA TUA BAND</div>
       <div class="grouped-list">
@@ -2986,10 +3031,17 @@
     return api("GET", "/api/my_bands").then(function(data){
       myBands = data;
       updateSettingsMyBandsCount();
+      renderMyBandsList();
     });
+  }
+  function activeBand(){
+    return myBands.find(function(b){ return b.active; }) || null;
   }
   function updateSettingsMyBandsCount(){
     document.getElementById("settingsMyBandsCount").textContent = myBands.length;
+    var a = activeBand();
+    document.getElementById("settingsActiveBand").textContent = a ? a.name : "Nessuna band attiva";
+    document.getElementById("settingsMembersCount").textContent = a ? (a.member_count || "") : "";
   }
   function renderMyBandsList(){
     var elMyBandsList = document.getElementById("myBandsList");
@@ -3001,12 +3053,33 @@
       var subParts = [];
       if(b.genre) subParts.push(esc(b.genre));
       if(b.city) subParts.push(esc(b.city));
-      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-myband="'+b.id+'">'+
+      subParts.push(b.venue_count + (b.venue_count === 1 ? " palcoscenico" : " palcoscenici"));
+      if(b.member_count > 1) subParts.push(b.member_count + " membri");
+      var check = b.active
+        ? '<span class="ws-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>'
+        : '<span class="ws-check"></span>';
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-switch-myband="'+b.id+'">'+
+        check+
         '<div class="row-main"><div class="row-title">'+esc(b.name)+'</div>'+
-        (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
-        '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+        '<div class="row-sub">'+subParts.join(" · ")+'</div></div>'+
+        '<div class="row-trail"><button class="ws-edit" data-open-myband="'+b.id+'" aria-label="Modifica band">'+
+        '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.6" r="1"/></svg>'+
+        '</button></div>'+
       '</div></div><div class="row-actions"><button data-del-myband="'+b.id+'">Elimina</button></div></div>';
     }).join("");
+  }
+  function switchToBand(id){
+    var target = myBands.find(function(b){ return String(b.id) === String(id); });
+    if(!target || target.active) return;
+    api("PUT", "/api/workspaces/active", {workspace_id: Number(id)}).then(function(list){
+      myBands = list;
+      renderMyBandsList();
+      updateSettingsMyBandsCount();
+      toast("Band attiva: " + target.name);
+      // Cambiando band cambiano tutti i dati: vanno ricaricati tutti,
+      // altrimenti in schermo resterebbero quelli della band precedente.
+      return loadAllData();
+    }).catch(function(err){ toast(err.message); });
   }
   document.getElementById("myBandsList").addEventListener("click", function(e){
     var del = e.target.closest("[data-del-myband]");
@@ -3017,11 +3090,14 @@
         renderMyBandsList();
         updateSettingsMyBandsCount();
         toast("Band eliminata");
+        return loadAllData();
       }).catch(function(err){ toast(err.message); });
       return;
     }
-    var row = e.target.closest("[data-open-myband]");
-    if(row) openMyBandEditScreen(Number(row.getAttribute("data-open-myband")));
+    var edit = e.target.closest("[data-open-myband]");
+    if(edit){ openMyBandEditScreen(Number(edit.getAttribute("data-open-myband"))); return; }
+    var row = e.target.closest("[data-switch-myband]");
+    if(row) switchToBand(row.getAttribute("data-switch-myband"));
   });
 
   var currentMyBandEditId = null;
@@ -3107,6 +3183,141 @@
   }
   document.getElementById("rowSettingsMyBands").addEventListener("click", openMyBandsScreen);
   document.getElementById("btnMyBandsBack").addEventListener("click", closeMyBandsScreen);
+
+  /* ---------------- Impostazioni: invita nella band ---------------- */
+  var elInviteScreen = document.getElementById("inviteScreen");
+  var invites = [];
+  var members = [];
+
+  function fmtInviteDate(iso){
+    try{
+      return new Date(iso).toLocaleDateString("it-IT", {day:"numeric", month:"long"});
+    }catch(e){ return iso; }
+  }
+  function inviteStateLabel(inv){
+    if(inv.revoked) return "annullato";
+    if(inv.expired) return "scaduto";
+    if(inv.exhausted) return "esaurito";
+    return "valido fino al " + fmtInviteDate(inv.expires_at);
+  }
+  function renderInvites(){
+    var el = document.getElementById("inviteList");
+    var live = invites.filter(function(i){ return i.valid; });
+    if(!live.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun link attivo. Creane uno e mandalo su WhatsApp.</div>';
+      return;
+    }
+    el.innerHTML = live.map(function(inv){
+      var used = inv.used_count === 1 ? "1 persona è entrata" : inv.used_count + " persone sono entrate";
+      return '<div class="field-row" style="display:block;">'+
+        '<div class="invite-link">'+esc(inv.url)+'</div>'+
+        '<div class="invite-actions">'+
+          '<button data-copy-invite="'+esc(inv.url)+'">Copia link</button>'+
+          '<button class="secondary" data-share-invite="'+esc(inv.url)+'">WhatsApp</button>'+
+          '<button class="secondary" data-revoke-invite="'+esc(inv.token)+'">Annulla</button>'+
+        '</div>'+
+        '<div class="invite-meta">'+inviteStateLabel(inv)+' · '+used+'</div>'+
+      '</div>';
+    }).join("");
+  }
+  function renderMembers(){
+    var el = document.getElementById("membersList");
+    if(!members.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun membro.</div>';
+      return;
+    }
+    var a = activeBand();
+    var iAmOwner = a && a.role === "owner";
+    el.innerHTML = members.map(function(mem){
+      var isMe = me && me.email === mem.email;
+      var canRemove = iAmOwner && !isMe && members.length > 1;
+      return '<div class="swipe-row"><div class="row-content"><div class="row">'+
+        '<div class="row-main"><div class="row-title">'+esc(mem.name || mem.email)+(isMe ? " (tu)" : "")+'</div>'+
+        '<div class="row-sub">'+esc(mem.email)+'</div></div>'+
+        '<div class="row-trail"><span class="member-role">'+(mem.role === "owner" ? "creatore" : "membro")+'</span></div>'+
+      '</div></div>'+
+      (canRemove ? '<div class="row-actions"><button data-remove-member="'+esc(mem.email)+'">Rimuovi</button></div>' : '')+
+      '</div>';
+    }).join("");
+  }
+  function loadInviteScreen(){
+    var a = activeBand();
+    document.getElementById("inviteBandName").textContent = a ? a.name : "questa band";
+    return Promise.all([
+      api("GET", "/api/invites").then(function(d){ invites = d; renderInvites(); }),
+      api("GET", "/api/workspaces/members").then(function(d){ members = d; renderMembers(); })
+    ]).catch(function(err){ toast(err.message); });
+  }
+  function openInviteScreen(){
+    elInviteScreen.hidden = false;
+    requestAnimationFrame(function(){ elInviteScreen.classList.add("in"); });
+    loadInviteScreen();
+  }
+  function closeInviteScreen(){
+    elInviteScreen.classList.remove("in");
+    setTimeout(function(){ elInviteScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsInvite").addEventListener("click", openInviteScreen);
+  document.getElementById("btnInviteBack").addEventListener("click", closeInviteScreen);
+
+  document.getElementById("btnCreateInvite").addEventListener("click", function(){
+    api("POST", "/api/invites", {}).then(function(inv){
+      invites.unshift(inv);
+      renderInvites();
+      copyInviteLink(inv.url, "Link creato e copiato");
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  function copyInviteLink(url, okMessage){
+    // navigator.clipboard esiste solo in contesto sicuro: senza HTTPS si
+    // ripiega su un campo di testo temporaneo, altrimenti il tocco non fa
+    // niente e sembra un bug.
+    function fallback(){
+      var ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try{ document.execCommand("copy"); toast(okMessage); }
+      catch(e){ toast("Copia il link a mano: " + url); }
+      document.body.removeChild(ta);
+    }
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(url).then(function(){ toast(okMessage); }, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  document.getElementById("inviteList").addEventListener("click", function(e){
+    var copy = e.target.closest("[data-copy-invite]");
+    if(copy){ copyInviteLink(copy.getAttribute("data-copy-invite"), "Link copiato"); return; }
+    var share = e.target.closest("[data-share-invite]");
+    if(share){
+      var url = share.getAttribute("data-share-invite");
+      var a = activeBand();
+      var text = "Ti invito su GigFlow" + (a ? " nella band " + a.name : "") + ": " + url;
+      window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+      return;
+    }
+    var rev = e.target.closest("[data-revoke-invite]");
+    if(rev){
+      api("DELETE", "/api/invites/" + encodeURIComponent(rev.getAttribute("data-revoke-invite"))).then(function(list){
+        invites = list; renderInvites(); toast("Invito annullato");
+      }).catch(function(err){ toast(err.message); });
+    }
+  });
+
+  document.getElementById("membersList").addEventListener("click", function(e){
+    var rm = e.target.closest("[data-remove-member]");
+    if(!rm) return;
+    var email = rm.getAttribute("data-remove-member");
+    api("DELETE", "/api/workspaces/members/" + encodeURIComponent(email)).then(function(list){
+      members = list; renderMembers();
+      toast("Membro rimosso");
+      return loadMyBands().then(updateSettingsMyBandsCount);
+    }).catch(function(err){ toast(err.message); });
+  });
 
   /* ---------------- Impostazioni: Modelli WhatsApp ---------------- */
   var waTemplates = [];
@@ -3379,7 +3590,9 @@
       me = updated;
       closeWizard();
       renderSettingsProfile();
-      loadMyBands();
+      // Il wizard ha appena creato la prima band: adesso ci sono dei dati da
+      // caricare, e prima non ce n'erano.
+      return loadAllData();
     }).catch(function(err){ toast(err.message); });
   });
   function openWizard(){
@@ -3391,14 +3604,39 @@
     setTimeout(function(){ elWizardScreen.hidden = true; }, 320);
   }
 
-  var WIZARD_ENABLED = false; // disabilitato temporaneamente: chiedeva il nome della band al primo accesso
   function loadMe(){
     return api("GET", "/api/me").then(function(data){
       me = data;
       renderSettingsProfile();
-      if(me.email && !me.onboarded && WIZARD_ENABLED) openWizard();
+      // Il wizard non serve piu' a "presentarsi": serve a dare una band a chi
+      // non ne ha nessuna, altrimenti l'app non ha dati da mostrare ne' un
+      // posto dove scriverne.
+      if(me.email && me.needs_workspace) openWizard();
       return me;
     });
+  }
+
+  /* Ricarica tutti i dati che dipendono dalla band attiva. Serve al primo
+     avvio, dopo un cambio band e dopo la creazione della prima band. */
+  function loadAllData(){
+    return Promise.all([
+      loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
+      loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates()
+    ]).catch(function(){
+      // Senza band attiva le API rispondono 409: e' normale per un utente
+      // appena iscritto, ci pensa il wizard.
+    });
+  }
+
+  /* Esito dell'apertura di un link di invito, passato dal server nell'URL. */
+  function showInviteOutcome(){
+    var params = new URLSearchParams(window.location.search);
+    var joined = params.get("joined");
+    var error = params.get("invite_error");
+    if(!joined && !error) return;
+    if(joined) toast("Sei entrato in " + joined);
+    else toast(error);
+    history.replaceState(null, "", window.location.pathname);
   }
 
   /* ---------------- swipe da bordo sinistro per tornare indietro ---------------- */
@@ -3431,11 +3669,14 @@
   addEdgeSwipeBack(elProfileScreen, closeProfileScreen);
   addEdgeSwipeBack(elMyBandsScreen, closeMyBandsScreen);
   addEdgeSwipeBack(elMyBandEditScreen, closeMyBandEditScreen);
+  addEdgeSwipeBack(elInviteScreen, closeInviteScreen);
   addEdgeSwipeBack(elWaTemplatesScreen, closeWaTemplatesScreen);
   addEdgeSwipeBack(elWaTemplateEditScreen, closeWaTemplateEditScreen);
 
   /* ---------------- boot ---------------- */
-  Promise.all([loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(), loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMe()]);
+  // loadMe per primo: decide se c'e' una band attiva, e senza quella le
+  // altre chiamate risponderebbero 409.
+  loadMe().then(loadAllData).then(showInviteOutcome);
 })();
 
 if("serviceWorker" in navigator){
