@@ -36,6 +36,20 @@ PHOTO_EXT_CONTENT_TYPE = {
 # disattivato e l'app si comporta come prima (nessuna autenticazione).
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+# Chi puo' modificare i template che precaricano le band nuove. Non e' un
+# ruolo dentro l'app come Leader: e' chi amministra questa installazione,
+# quindi vive nel file .env e non nel database.
+ADMIN_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("ADMIN_EMAILS", "").split(",")
+    if e.strip()
+}
+
+
+def is_admin(email):
+    return bool(email) and (email or "").strip().lower() in ADMIN_EMAILS
+
+
 SESSION_COOKIE = "session_id"
 STATE_COOKIE = "oauth_state"
 SESSION_TTL_DAYS = 30
@@ -239,6 +253,17 @@ def init_db():
             revoked_at TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS app_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            name TEXT NOT NULL,
+            message TEXT,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_templates_kind ON app_templates(kind, position);
         CREATE INDEX IF NOT EXISTS idx_members_email ON workspace_members(email);
         CREATE INDEX IF NOT EXISTS idx_invites_workspace ON invites(workspace_id);
         CREATE INDEX IF NOT EXISTS idx_locations_status ON locations(status);
@@ -248,6 +273,7 @@ def init_db():
         """
     )
     migrate_schema(conn)
+    seed_app_templates(conn)
     # Le tipologie di default non sono piu' globali: nascono con il workspace,
     # dentro create_workspace.
     conn.commit()
@@ -735,6 +761,9 @@ def fetch_me(conn, email):
     # Senza band attiva l'app non ha dati da mostrare: il wizard deve partire
     # anche se il profilo risulta gia' compilato da un giro precedente.
     d["needs_workspace"] = active is None
+    # Con il login spento non c'e' un utente da riconoscere: l'app gira in
+    # locale per una persona sola, che e' anche l'amministratore.
+    d["is_admin"] = (not auth_enabled()) or is_admin(email)
     return d
 
 
@@ -824,6 +853,109 @@ def render_default_text(text, band_name, genre=None, person=None):
     )
 
 
+TEMPLATE_KINDS = {
+    "venue_type": ("venue_types", False),
+    "venue_category": ("venue_categories", False),
+    "wa_template": ("wa_templates", True),
+}
+
+
+def seed_app_templates(conn):
+    """Porta le costanti qui sopra dentro app_templates, una volta sola.
+
+    Da li' in poi la fonte di verita' e' la tabella, che l'amministratore
+    puo' modificare: le costanti restano solo come seme per un'installazione
+    nuova.
+    """
+    if conn.execute("SELECT 1 FROM app_templates LIMIT 1").fetchone():
+        return
+    ts = now_iso()
+    rows = []
+    for i, name in enumerate(DEFAULT_VENUE_TYPES):
+        rows.append(("venue_type", name, None, i, ts, ts))
+    for i, name in enumerate(DEFAULT_VENUE_CATEGORIES):
+        rows.append(("venue_category", name, None, i, ts, ts))
+    for i, t in enumerate(DEFAULT_WA_TEMPLATES):
+        rows.append(("wa_template", t["name"], t["message"], i, ts, ts))
+    conn.executemany(
+        "INSERT INTO app_templates (kind, name, message, position, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+
+
+def fetch_templates(conn, kind=None):
+    if kind:
+        if kind not in TEMPLATE_KINDS:
+            raise ApiError(400, "Tipo di template non valido")
+        rows = conn.execute(
+            "SELECT * FROM app_templates WHERE kind = ? ORDER BY position ASC, id ASC", (kind,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM app_templates ORDER BY kind ASC, position ASC, id ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_template(conn, kind, body):
+    if kind not in TEMPLATE_KINDS:
+        raise ApiError(400, "Tipo di template non valido")
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    has_message = TEMPLATE_KINDS[kind][1]
+    message = (body.get("message") or "").strip() if has_message else None
+    dup = conn.execute(
+        "SELECT id FROM app_templates WHERE kind = ? AND LOWER(name) = LOWER(?)", (kind, name)
+    ).fetchone()
+    if dup:
+        raise ApiError(400, "Esiste già un template con questo nome")
+    ts = now_iso()
+    position = conn.execute(
+        "SELECT COALESCE(MAX(position), -1) + 1 AS p FROM app_templates WHERE kind = ?", (kind,)
+    ).fetchone()["p"]
+    cur = conn.execute(
+        "INSERT INTO app_templates (kind, name, message, position, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (kind, name, message, position, ts, ts),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM app_templates WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+def update_template(conn, template_id, body):
+    row = conn.execute("SELECT * FROM app_templates WHERE id = ?", (template_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Template non trovato")
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    dup = conn.execute(
+        "SELECT id FROM app_templates WHERE kind = ? AND LOWER(name) = LOWER(?) AND id != ?",
+        (row["kind"], name, template_id),
+    ).fetchone()
+    if dup:
+        raise ApiError(400, "Esiste già un template con questo nome")
+    message = row["message"]
+    if TEMPLATE_KINDS[row["kind"]][1] and "message" in body:
+        message = (body.get("message") or "").strip()
+    conn.execute(
+        "UPDATE app_templates SET name = ?, message = ?, updated_at = ? WHERE id = ?",
+        (name, message, now_iso(), template_id),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM app_templates WHERE id = ?", (template_id,)).fetchone())
+
+
+def delete_template(conn, template_id):
+    cur = conn.execute("DELETE FROM app_templates WHERE id = ?", (template_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Template non trovato")
+
+
 def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
     """Precarica tipologie, categorie e modelli WhatsApp di una band nuova.
 
@@ -832,23 +964,26 @@ def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
     """
     ts = now_iso()
 
-    if not conn.execute(
+    types = [t["name"] for t in fetch_templates(conn, "venue_type")]
+    if types and not conn.execute(
         "SELECT 1 FROM venue_types WHERE workspace_id = ? LIMIT 1", (ws,)
     ).fetchone():
         conn.executemany(
             "INSERT INTO venue_types (name, workspace_id, created_at) VALUES (?, ?, ?)",
-            [(name, ws, ts) for name in DEFAULT_VENUE_TYPES],
+            [(name, ws, ts) for name in types],
         )
 
-    if DEFAULT_VENUE_CATEGORIES and not conn.execute(
+    categories = [t["name"] for t in fetch_templates(conn, "venue_category")]
+    if categories and not conn.execute(
         "SELECT 1 FROM venue_categories WHERE workspace_id = ? LIMIT 1", (ws,)
     ).fetchone():
         conn.executemany(
             "INSERT INTO venue_categories (name, workspace_id, created_at) VALUES (?, ?, ?)",
-            [(name, ws, ts) for name in DEFAULT_VENUE_CATEGORIES],
+            [(name, ws, ts) for name in categories],
         )
 
-    if not conn.execute(
+    messages = fetch_templates(conn, "wa_template")
+    if messages and not conn.execute(
         "SELECT 1 FROM wa_templates WHERE workspace_id = ? LIMIT 1", (ws,)
     ).fetchone():
         conn.executemany(
@@ -857,10 +992,10 @@ def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
             [
                 (
                     render_default_text(t["name"], band_name, genre, person),
-                    render_default_text(t["message"], band_name, genre, person),
+                    render_default_text(t["message"] or "", band_name, genre, person),
                     ws, ts, ts,
                 )
-                for t in DEFAULT_WA_TEMPLATES
+                for t in messages
             ],
         )
 
@@ -1032,6 +1167,30 @@ def restore_location(conn, ws, loc_id):
     if cur.rowcount == 0:
         raise ApiError(404, "Palcoscenico non trovato")
     return fetch_location(conn, ws, loc_id)
+
+
+def purge_location(conn, ws, loc_id):
+    """Eliminazione definitiva: sparisce il palcoscenico e tutto quello che
+    gli sta attaccato. Al contrario dell'archiviazione non e' recuperabile,
+    quindi i file delle foto vanno tolti anche dal disco."""
+    existing = conn.execute(
+        "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not existing:
+        raise ApiError(404, "Palcoscenico non trovato")
+    filenames = [
+        r["filename"]
+        for r in conn.execute("SELECT filename FROM photos WHERE location_id = ?", (loc_id,)).fetchall()
+    ]
+    conn.execute("DELETE FROM photos WHERE location_id = ?", (loc_id,))
+    conn.execute("DELETE FROM notes WHERE location_id = ?", (loc_id,))
+    conn.execute("DELETE FROM locations WHERE id = ?", (loc_id,))
+    conn.commit()
+    for filename in filenames:
+        try:
+            os.remove(os.path.join(PHOTOS_DIR, filename))
+        except OSError:
+            pass
 
 
 def add_note(conn, ws, loc_id, body):
@@ -1624,6 +1783,11 @@ def _h_delete_location(conn, match, query, body, ctx):
     return 204, {}
 
 
+def _h_purge_location(conn, match, query, body, ctx):
+    purge_location(conn, require_ws(ctx), int(match.group(1)))
+    return 204, {}
+
+
 def _h_restore_location(conn, match, query, body, ctx):
     return 200, restore_location(conn, require_ws(ctx), int(match.group(1)))
 
@@ -1728,6 +1892,37 @@ def _h_create_invite(conn, match, query, body, ctx):
     return 201, invite_to_dict(row, ctx.origin)
 
 
+def require_admin(ctx):
+    """L'amministratore e' definito nel .env di questa installazione. Se
+    ADMIN_EMAILS e' vuoto non c'e' nessun amministratore: meglio nessuno che
+    tutti, perche' queste rotte cambiano cosa ricevono le band di chiunque."""
+    if not auth_enabled():
+        return
+    if not is_admin(ctx.email):
+        raise ApiError(403, "Riservato all'amministratore dell'app")
+
+
+def _h_list_templates(conn, match, query, body, ctx):
+    require_admin(ctx)
+    return 200, fetch_templates(conn, (query.get("kind") or [None])[0])
+
+
+def _h_create_template(conn, match, query, body, ctx):
+    require_admin(ctx)
+    return 201, create_template(conn, (body.get("kind") or "").strip(), body)
+
+
+def _h_update_template(conn, match, query, body, ctx):
+    require_admin(ctx)
+    return 200, update_template(conn, int(match.group(1)), body)
+
+
+def _h_delete_template(conn, match, query, body, ctx):
+    require_admin(ctx)
+    delete_template(conn, int(match.group(1)))
+    return 204, {}
+
+
 def _h_list_wa_templates(conn, match, query, body, ctx):
     return 200, fetch_wa_templates(conn, require_ws(ctx))
 
@@ -1786,6 +1981,7 @@ ROUTES = [
     ("PUT", re.compile(r"^/api/locations/(\d+)$"), _h_update_location),
     ("DELETE", re.compile(r"^/api/locations/(\d+)$"), _h_delete_location),
     ("POST", re.compile(r"^/api/locations/(\d+)/restore$"), _h_restore_location),
+    ("DELETE", re.compile(r"^/api/locations/(\d+)/permanent$"), _h_purge_location),
     ("POST", re.compile(r"^/api/locations/(\d+)/notes$"), _h_add_note),
     ("DELETE", re.compile(r"^/api/notes/(\d+)$"), _h_delete_note),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
@@ -1813,6 +2009,10 @@ ROUTES = [
     ("POST", re.compile(r"^/api/wa_templates$"), _h_create_wa_template),
     ("PUT", re.compile(r"^/api/wa_templates/(\d+)$"), _h_update_wa_template),
     ("DELETE", re.compile(r"^/api/wa_templates/(\d+)$"), _h_delete_wa_template),
+    ("GET", re.compile(r"^/api/admin/templates$"), _h_list_templates),
+    ("POST", re.compile(r"^/api/admin/templates$"), _h_create_template),
+    ("PUT", re.compile(r"^/api/admin/templates/(\d+)$"), _h_update_template),
+    ("DELETE", re.compile(r"^/api/admin/templates/(\d+)$"), _h_delete_template),
     ("GET", re.compile(r"^/api/venue_types$"), _h_list_venue_types),
     ("POST", re.compile(r"^/api/venue_types$"), _h_create_venue_type),
     ("PUT", re.compile(r"^/api/venue_types/(\d+)$"), _h_update_venue_type),

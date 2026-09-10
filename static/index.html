@@ -193,6 +193,9 @@
   .invite-meta{font-size:12.5px;color:var(--text-tertiary);margin-top:8px;}
   .invite-dead{opacity:.5;}
   .member-role{font-size:11px;font-weight:600;padding:2.5px 8px;border-radius:999px;background:var(--fill);color:var(--text-secondary);white-space:nowrap;}
+  .admin-warning{margin:4px 16px 6px;padding:12px 14px;border-radius:10px;background:var(--fill);border-left:3px solid var(--orange);font-size:13.5px;line-height:1.5;color:var(--text-secondary);}
+  .admin-warning strong{display:block;color:var(--text);margin-bottom:3px;}
+  .section-footer code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--fill);padding:1px 4px;border-radius:4px;}
   .map-user-dot{background:none;border:none;}
   .map-user-dot i{display:block;width:16px;height:16px;border-radius:50%;background:#0a84ff;border:2.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.35);}
   /* la tabbar e' fixed sopra la mappa: alzo attribuzione e pulsante per non finirci sotto */
@@ -501,6 +504,101 @@
   </section>
 
   <!-- ============ TAB: IMPOSTAZIONI ============ -->
+  <section class="screen tab-screen" id="tabAdmin" data-tab="admin" hidden>
+    <header class="navbar">
+      <div class="navbar-row"><span class="inline-title">Admin</span></div>
+      <div class="large-title-wrap"><h1 class="large-title">Admin</h1>
+      <div class="subtitle-count">Configurazione dell'app</div></div>
+    </header>
+    <div class="screen-scroll">
+      <div class="admin-warning">
+        <strong>Non sono le impostazioni della tua band.</strong>
+        Qui si modificano i template con cui vengono precaricate le band
+        <em>nuove</em>: cambiarli non tocca le band che esistono già, comprese le tue.
+        Vedi questa scheda perché il tuo indirizzo è fra gli amministratori dell'app.
+      </div>
+
+      <div class="section-header">TEMPLATE PER LE BAND NUOVE</div>
+      <div class="grouped-list">
+        <div class="row" id="rowAdminTypes">
+          <div class="row-main"><div class="row-title">Tipologie</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminTypesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowAdminCategories">
+          <div class="row-main"><div class="row-title">Categorie</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowAdminWa">
+          <div class="row-main"><div class="row-title">Modelli WhatsApp</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminWaCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">Nei modelli WhatsApp puoi usare <code>{band}</code>, <code>{genere}</code> e <code>{nome}</code>: vengono sostituiti con i dati della band al momento della creazione. Quello che scrivi fra parentesi quadre resta com'è, da compilare a mano.</div>
+
+      <div class="section-header">ASPETTO</div>
+      <div class="grouped-list">
+        <div class="row" id="rowAdminTheme">
+          <div class="row-main"><div class="row-title">Tema</div></div>
+          <div class="row-trail"><span id="adminThemeValue" style="color:var(--text-secondary);font-size:15px;">Automatico</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">Il tema vale solo per questo dispositivo, non per gli altri utenti.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: ELENCO TEMPLATE ============ -->
+  <section class="screen pushed" id="adminListScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnAdminListBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Admin
+        </button>
+        <span class="inline-title" id="adminListTitle">Template</span>
+        <span class="nav-btn" style="visibility:hidden;">Admin</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header" id="adminListHeader">TEMPLATE</div>
+      <div class="grouped-list" id="adminList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="adminNewName" placeholder="Nome…" autocomplete="off">
+          <button id="btnAdminAdd">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer" id="adminListFooter"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA TEMPLATE ============ -->
+  <section class="screen pushed" id="adminEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnAdminEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Indietro
+        </button>
+        <span class="inline-title">Template</span>
+        <button class="nav-btn primary" id="btnAdminEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="adminEditName" placeholder="Nome" /></div>
+      <div id="adminEditMessageWrap" hidden>
+        <div class="section-header">MESSAGGIO</div>
+        <div class="grouped-list">
+          <div class="field-row stacked"><textarea id="adminEditMessage" rows="12" placeholder="Testo del messaggio…" style="text-align:left;"></textarea></div>
+        </div>
+        <div class="section-footer">Segnaposto disponibili: <code>{band}</code>, <code>{genere}</code>, <code>{nome}</code>.</div>
+      </div>
+    </div>
+  </section>
+
   <section class="screen tab-screen" id="tabSettings" data-tab="settings" hidden>
     <header class="navbar" id="navSettings">
       <div class="navbar-row"><span class="inline-title">Impostazioni</span></div>
@@ -907,6 +1005,10 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="17" r="2.6"/><circle cx="17" cy="15" r="2.6"/><path d="M9.6 17V6.5L19.6 4.5V15" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-label">Bands</span>
     </button>
+    <button class="tab" data-tab="admin" id="tabBtnAdmin" hidden>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l7.5 3v6c0 4.4-3.1 8.2-7.5 10-4.4-1.8-7.5-5.6-7.5-10v-6z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span class="tab-label">Admin</span>
+    </button>
     <button class="tab" data-tab="settings">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="18" r="2"/></svg>
       <span class="tab-label">Impostazioni</span>
@@ -970,14 +1072,14 @@
       <div class="section-header">ARCHIVIO</div>
       <div class="grouped-list">
         <div class="field-row">
-          <label for="showDeletedToggle" style="flex:1;">Mostra eliminati</label>
+          <label for="showDeletedToggle" style="flex:1;">Mostra archiviati</label>
           <label class="ios-switch">
             <input type="checkbox" id="showDeletedToggle">
             <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
           </label>
         </div>
       </div>
-      <div class="section-footer">I palcoscenici eliminati restano archiviati e non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli.</div>
+      <div class="section-footer">I palcoscenici archiviati non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli, oppure eliminarli definitivamente.</div>
     </div>
   </section>
 
@@ -1319,7 +1421,7 @@
   });
 
   /* ---------------- tab navigation ---------------- */
-  var tabs = {list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
+  var tabs = {list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), admin: document.getElementById("tabAdmin"), settings: document.getElementById("tabSettings")};
   document.getElementById("tabbar").addEventListener("click", function(e){
     var btn = e.target.closest(".tab");
     if(!btn) return;
@@ -1706,11 +1808,14 @@
       ? '<img class="row-cover" src="/photos/'+encodeURIComponent(cover.filename)+'" loading="lazy" alt="">'
       : (showFav ? favHtml : '<span class="row-dot-wrap"><span class="row-dot" style="background:'+st.color+'"></span></span>');
     var badgeHtml = v.deleted_at
-      ? '<span class="row-badge" style="background:var(--fill);color:var(--text-tertiary);">Eliminato</span>'
+      ? '<span class="row-badge" style="background:var(--fill);color:var(--text-tertiary);">Archiviato</span>'
       : '<span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span>';
+    // Due azioni: quella reversibile in grigio, quella definitiva in rosso.
     var actionHtml = v.deleted_at
-      ? '<button data-restore-id="'+v.id+'">Ripristina</button>'
-      : '<button data-del-id="'+v.id+'">Elimina</button>';
+      ? '<button class="role" data-restore-id="'+v.id+'">Ripristina</button>'+
+        '<button data-purge-id="'+v.id+'">Elimina</button>'
+      : '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
+        '<button data-purge-id="'+v.id+'">Elimina</button>';
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row'+(v.deleted_at ? ' row-deleted' : '')+'" data-open-id="'+v.id+'">'+
         leadingHtml+
@@ -1721,7 +1826,7 @@
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
         '</div>'+
       '</div></div>'+
-      '<div class="row-actions">'+actionHtml+'</div>'+
+      '<div class="row-actions two">'+actionHtml+'</div>'+
     '</div>';
   }
   function toggleFavoriteRow(id){
@@ -1753,6 +1858,8 @@
     elList.innerHTML = '<div class="grouped-list">' + sorted.map(function(v){ return venueRowHtml(v, {showFav:false}); }).join("") + '</div>';
   }
   elList.addEventListener("click", function(e){
+    var purge = e.target.closest("[data-purge-id]");
+    if(purge){ purgeVenueRow(purge.getAttribute("data-purge-id")); return; }
     var del = e.target.closest("[data-del-id]");
     if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
     var restore = e.target.closest("[data-restore-id]");
@@ -1772,8 +1879,30 @@
         venues = venues.filter(function(x){ return String(x.id) !== String(id); });
       }
       renderAll();
-      toast("Palcoscenico eliminato");
+      toast("Palcoscenico archiviato");
     });
+  }
+  function purgeVenueRow(id){
+    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
+    var n = v && v.photos ? v.photos.length : 0;
+    var note = v && v.notes ? v.notes.length : 0;
+    var extra = [];
+    if(note) extra.push(note + (note===1 ? " nota" : " note"));
+    if(n) extra.push(n + (n===1 ? " foto" : " foto"));
+    // L'archiviazione si annulla, questa no: va detto prima, con dentro
+    // cosa si porta via.
+    confirmDestructive(
+      (v && v.name ? v.name : "Questo palcoscenico") +
+        (extra.length ? " · " + extra.join(", ") : ""),
+      "Elimina definitivamente",
+      function(){
+        api("DELETE", "/api/locations/" + id + "/permanent").then(function(){
+          venues = venues.filter(function(x){ return String(x.id) !== String(id); });
+          renderAll();
+          toast("Palcoscenico eliminato definitivamente");
+        }).catch(function(err){ toast(err.message); });
+      }
+    );
   }
   function restoreVenueRow(id){
     api("POST", "/api/locations/" + id + "/restore").then(function(updated){
@@ -2452,14 +2581,14 @@
   document.getElementById("btnBack").addEventListener("click", closeDetail);
   document.getElementById("btnMore").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
-    confirmDestructive(v.name || "Questo palcoscenico", "Elimina palcoscenico", function(){
+    confirmDestructive(v.name || "Questo palcoscenico", "Archivia palcoscenico", function(){
       api("DELETE", "/api/locations/" + v.id).then(function(){
         venues = venues.filter(function(x){ return x.id !== v.id; });
         elDetail.classList.remove("in");
         setTimeout(function(){ elDetail.hidden = true; }, 320);
         currentId = null;
         renderAll();
-        toast("Palcoscenico eliminato");
+        toast("Palcoscenico archiviato");
       });
     });
   });
@@ -3518,9 +3647,11 @@
   function renderSettingsTheme(){
     var current = currentTheme();
     var opt = THEME_OPTIONS.find(function(o){ return o.value === current; });
-    document.getElementById("settingsThemeValue").textContent = opt ? opt.label : "Automatico";
+    var label = opt ? opt.label : "Automatico";
+    document.getElementById("settingsThemeValue").textContent = label;
+    document.getElementById("adminThemeValue").textContent = label;
   }
-  document.getElementById("rowSettingsTheme").addEventListener("click", function(){
+  function openThemePicker(){
     var current = currentTheme();
     openSheet({
       title: "Tema",
@@ -3528,6 +3659,141 @@
         return {label: o.label, checkmark: o.value === current, onSelect: function(){ applyTheme(o.value); }};
       })
     });
+  }
+  document.getElementById("rowSettingsTheme").addEventListener("click", openThemePicker);
+  document.getElementById("rowAdminTheme").addEventListener("click", openThemePicker);
+
+  /* ---------------- scheda Admin: i template delle band nuove ----------------
+     Sono impostazioni di questa installazione, non del workspace: cambiarle
+     non tocca le band che esistono gia', solo quelle che verranno create. */
+  var elAdminListScreen = document.getElementById("adminListScreen");
+  var elAdminEditScreen = document.getElementById("adminEditScreen");
+  var templates = {venue_type: [], venue_category: [], wa_template: []};
+  var adminKind = null;
+  var adminEditId = null;
+
+  var ADMIN_KINDS = {
+    venue_type: {
+      title: "Tipologie", header: "TIPOLOGIE DI PARTENZA", placeholder: "Nuova tipologia…",
+      footer: "Sono le tipologie di palcoscenico che una band nuova si trova già pronte. Tocca per rinominare, scorri a sinistra per eliminare.",
+      hasMessage: false, countEl: "adminTypesCount"
+    },
+    venue_category: {
+      title: "Categorie", header: "CATEGORIE DI PARTENZA", placeholder: "Nuova categoria…",
+      footer: "Le categorie che una band nuova si trova già pronte. Al momento non ce n'è nessuna: finché la lista resta vuota, le band nuove nascono senza categorie.",
+      hasMessage: false, countEl: "adminCategoriesCount"
+    },
+    wa_template: {
+      title: "Modelli WhatsApp", header: "MODELLI DI PARTENZA", placeholder: "Nome del modello…",
+      footer: "I messaggi tipo che una band nuova si trova già pronti. Usa {band}, {genere} e {nome} per i dati della band; quello che scrivi fra parentesi quadre resta com'è.",
+      hasMessage: true, countEl: "adminWaCount"
+    }
+  };
+
+  function loadTemplates(){
+    if(!me || !me.is_admin) return Promise.resolve();
+    return api("GET", "/api/admin/templates").then(function(rows){
+      templates = {venue_type: [], venue_category: [], wa_template: []};
+      rows.forEach(function(r){ if(templates[r.kind]) templates[r.kind].push(r); });
+      Object.keys(ADMIN_KINDS).forEach(function(k){
+        document.getElementById(ADMIN_KINDS[k].countEl).textContent = templates[k].length;
+      });
+      if(adminKind) renderAdminList();
+    }).catch(function(){
+      // Non amministratore o rotta non disponibile: la scheda resta nascosta.
+    });
+  }
+
+  function renderAdminList(){
+    var cfg = ADMIN_KINDS[adminKind];
+    var rows = templates[adminKind] || [];
+    var el = document.getElementById("adminList");
+    if(!rows.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun template. Le band nuove nasceranno senza.</div>';
+      return;
+    }
+    el.innerHTML = rows.map(function(t){
+      var sub = cfg.hasMessage && t.message
+        ? '<div class="row-sub">'+esc(t.message.split("\n")[0].slice(0, 60))+'…</div>' : "";
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-admin-open="'+t.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+sub+'</div>'+
+        '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-admin-del="'+t.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+
+  function openAdminList(kind){
+    adminKind = kind;
+    var cfg = ADMIN_KINDS[kind];
+    document.getElementById("adminListTitle").textContent = cfg.title;
+    document.getElementById("adminListHeader").textContent = cfg.header;
+    document.getElementById("adminListFooter").textContent = cfg.footer;
+    document.getElementById("adminNewName").placeholder = cfg.placeholder;
+    document.getElementById("adminNewName").value = "";
+    renderAdminList();
+    elAdminListScreen.hidden = false;
+    requestAnimationFrame(function(){ elAdminListScreen.classList.add("in"); });
+  }
+  function closeAdminList(){
+    elAdminListScreen.classList.remove("in");
+    setTimeout(function(){ elAdminListScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowAdminTypes").addEventListener("click", function(){ openAdminList("venue_type"); });
+  document.getElementById("rowAdminCategories").addEventListener("click", function(){ openAdminList("venue_category"); });
+  document.getElementById("rowAdminWa").addEventListener("click", function(){ openAdminList("wa_template"); });
+  document.getElementById("btnAdminListBack").addEventListener("click", closeAdminList);
+
+  document.getElementById("btnAdminAdd").addEventListener("click", function(){
+    var input = document.getElementById("adminNewName");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/admin/templates", {kind: adminKind, name: name}).then(function(created){
+      input.value = "";
+      return loadTemplates().then(function(){
+        // Un modello senza testo non serve a niente: si apre subito.
+        if(ADMIN_KINDS[adminKind].hasMessage) openAdminEdit(created.id);
+      });
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  document.getElementById("adminList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-admin-del]");
+    if(del){
+      var id = del.getAttribute("data-admin-del");
+      api("DELETE", "/api/admin/templates/" + id)
+        .then(loadTemplates)
+        .then(function(){ toast("Template eliminato"); })
+        .catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-admin-open]");
+    if(row) openAdminEdit(Number(row.getAttribute("data-admin-open")));
+  });
+
+  function openAdminEdit(id){
+    var t = (templates[adminKind] || []).find(function(x){ return x.id === id; });
+    if(!t) return;
+    adminEditId = id;
+    document.getElementById("adminEditName").value = t.name || "";
+    document.getElementById("adminEditMessage").value = t.message || "";
+    document.getElementById("adminEditMessageWrap").hidden = !ADMIN_KINDS[adminKind].hasMessage;
+    elAdminEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elAdminEditScreen.classList.add("in"); });
+  }
+  function closeAdminEdit(){
+    elAdminEditScreen.classList.remove("in");
+    setTimeout(function(){ elAdminEditScreen.hidden = true; }, 320);
+    adminEditId = null;
+  }
+  document.getElementById("btnAdminEditBack").addEventListener("click", closeAdminEdit);
+  document.getElementById("btnAdminEditSave").addEventListener("click", function(){
+    if(adminEditId == null) return;
+    var body = {name: document.getElementById("adminEditName").value.trim()};
+    if(ADMIN_KINDS[adminKind].hasMessage) body.message = document.getElementById("adminEditMessage").value;
+    api("PUT", "/api/admin/templates/" + adminEditId, body)
+      .then(loadTemplates)
+      .then(function(){ closeAdminEdit(); toast("Template salvato"); })
+      .catch(function(err){ toast(err.message); });
   });
   renderSettingsTheme();
 
@@ -3640,6 +3906,10 @@
       // Il wizard non serve piu' a "presentarsi": serve a dare una band a chi
       // non ne ha nessuna, altrimenti l'app non ha dati da mostrare ne' un
       // posto dove scriverne.
+      // La scheda Admin compare solo a chi e' elencato in ADMIN_EMAILS. E'
+      // una comodita' dell'interfaccia: il controllo vero e' sul server, che
+      // rifiuta le rotte /api/admin a chiunque altro.
+      document.getElementById("tabBtnAdmin").hidden = !me.is_admin;
       if(me.email && me.needs_workspace) openWizard();
       return me;
     });
@@ -3650,7 +3920,8 @@
   function loadAllData(){
     return Promise.all([
       loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
-      loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates()
+      loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates(),
+      loadTemplates()
     ]).catch(function(){
       // Senza band attiva le API rispondono 409: e' normale per un utente
       // appena iscritto, ci pensa il wizard.
@@ -3699,6 +3970,8 @@
   addEdgeSwipeBack(elMyBandsScreen, closeMyBandsScreen);
   addEdgeSwipeBack(elMyBandEditScreen, closeMyBandEditScreen);
   addEdgeSwipeBack(elInviteScreen, closeInviteScreen);
+  addEdgeSwipeBack(elAdminListScreen, closeAdminList);
+  addEdgeSwipeBack(elAdminEditScreen, closeAdminEdit);
   addEdgeSwipeBack(elWaTemplatesScreen, closeWaTemplatesScreen);
   addEdgeSwipeBack(elWaTemplateEditScreen, closeWaTemplateEditScreen);
 
