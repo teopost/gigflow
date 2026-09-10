@@ -2799,21 +2799,59 @@
   var elNewGigFields = document.getElementById("newGigFields");
   var elBtnNewGig = document.getElementById("btnNewGig");
   var expandedGigId = null;
-  var gigSaveTimers = {};
+  /* Modificare una serata funziona come aggiungerne una: si compila e si
+     salva. Prima i campi si salvavano da soli dopo mezzo secondo — funzionava,
+     ma senza dirtelo, e con due comportamenti diversi per due pannelli
+     identici. Le modifiche stanno in una bozza finche' non tocchi Salva. */
+  var gigDraft = null;
+  var gigDraftOriginal = null;
+
+  function openGigDraft(g){
+    gigDraft = {
+      season: g.season || "",
+      status: g.status,
+      gig_date: g.gig_date || "",
+      fee: (g.fee != null ? String(g.fee) : ""),
+      outcome_note: g.outcome_note || ""
+    };
+    gigDraftOriginal = JSON.stringify(gigDraft);
+  }
+  function closeGigDraft(){
+    expandedGigId = null;
+    gigDraft = null;
+    gigDraftOriginal = null;
+  }
+  function readGigDraft(){
+    if(!gigDraft) return;
+    ["season","gig_date","fee","outcome_note"].forEach(function(f){
+      var el = elGigsList.querySelector('[data-gig-field="'+f+'"]');
+      if(el) gigDraft[f] = el.value;
+    });
+  }
+  function gigDraftDirty(){
+    if(!gigDraft) return false;
+    readGigDraft();
+    return JSON.stringify(gigDraft) !== gigDraftOriginal;
+  }
 
   function gigPanelHtml(g){
-    var st = statusInfo(g.status);
+    var d = gigDraft || g;
+    var st = statusInfo(d.status);
     return '<div class="gig-panel">'+
       '<div class="field-row"><label>Stagione</label>'+
-        '<input type="text" placeholder="2027" data-gig-field="season" data-gig-id="'+g.id+'" value="'+esc(g.season)+'"></div>'+
+        '<input type="text" placeholder="2027" data-gig-field="season" data-gig-id="'+g.id+'" value="'+esc(d.season)+'"></div>'+
       '<div class="field-row picker" data-gig-status="'+g.id+'"><label>Stato</label>'+
         '<div class="picker-value"><span class="dot" style="background:'+st.color+'"></span><span>'+esc(st.label)+'</span>'+CHEVRON+'</div></div>'+
       '<div class="field-row"><label>Data serata</label>'+
-        '<input type="date" data-gig-field="gig_date" data-gig-id="'+g.id+'" value="'+esc(g.gig_date || "")+'"></div>'+
+        '<input type="date" data-gig-field="gig_date" data-gig-id="'+g.id+'" value="'+esc(d.gig_date)+'"></div>'+
       '<div class="field-row"><label>Compenso €</label>'+
-        '<input type="number" inputmode="decimal" placeholder="350" data-gig-field="fee" data-gig-id="'+g.id+'" value="'+(g.fee != null ? esc(g.fee) : "")+'"></div>'+
+        '<input type="number" inputmode="decimal" placeholder="350" data-gig-field="fee" data-gig-id="'+g.id+'" value="'+esc(d.fee)+'"></div>'+
       '<div class="field-row stacked"><label>Com\'è andata</label>'+
-        '<textarea rows="2" placeholder="es. serata piena, ci richiamano a settembre" data-gig-field="outcome_note" data-gig-id="'+g.id+'">'+esc(g.outcome_note || "")+'</textarea></div>'+
+        '<textarea rows="2" placeholder="es. serata piena, ci richiamano a settembre" data-gig-field="outcome_note" data-gig-id="'+g.id+'">'+esc(d.outcome_note)+'</textarea></div>'+
+      '<div class="add-note-row" style="justify-content:flex-end;gap:18px;">'+
+        '<button type="button" id="btnGigCancel" style="color:var(--text-secondary);">Annulla</button>'+
+        '<button type="button" id="btnGigSave" data-gig-id="'+g.id+'">Salva</button>'+
+      '</div>'+
     '</div>';
   }
 
@@ -2863,38 +2901,37 @@
     if(rerender) renderGigs(updated);
     renderAll();
   }
-  function saveGig(gigId, patch, rerender){
-    return api("PUT", "/api/gigs/" + gigId, patch).then(function(updated){
-      applyGigResponse(updated, rerender);
-      return updated;
+  function saveGigDraft(gigId, btn){
+    readGigDraft();
+    var v = currentVenue(); if(!v || !gigDraft) return;
+    var g = venueGigs(v).filter(function(x){ return String(x.id) === String(gigId); })[0];
+    var chiude = !!g && g.open && (gigDraft.status === "suonato" || gigDraft.status === "rifiutato");
+    var body = {
+      season: gigDraft.season,
+      status: gigDraft.status,
+      gig_date: gigDraft.gig_date,
+      fee: gigDraft.fee,
+      outcome_note: gigDraft.outcome_note
+    };
+    withButtonBusy(btn, function(){
+      return api("PUT", "/api/gigs/" + gigId, body);
+    }).then(function(updated){
+      closeGigDraft();
+      applyGigResponse(updated, true);
+      toast("Serata salvata" + ((chiude && updated.next_contact_date)
+        ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
     }).catch(function(err){ toast(err.message); });
   }
-  function scheduleGigSave(gigId, field, value){
-    var key = gigId + "_" + field;
-    clearTimeout(gigSaveTimers[key]);
-    gigSaveTimers[key] = setTimeout(function(){
-      var patch = {}; patch[field] = value;
-      // Niente re-render mentre si scrive: rifare la lista sotto le dita
-      // farebbe perdere il fuoco al campo.
-      saveGig(gigId, patch, false);
-    }, 400);
-  }
 
-  elGigsList.addEventListener("input", function(e){
-    var input = e.target.closest("[data-gig-field]");
-    if(!input) return;
-    scheduleGigSave(input.getAttribute("data-gig-id"), input.getAttribute("data-gig-field"), input.value);
-  });
-  elGigsList.addEventListener("change", function(e){
-    // La data si conferma in un colpo solo, quindi qui il re-render non da'
-    // fastidio e la riga sopra si aggiorna subito.
-    var input = e.target.closest('[data-gig-field="gig_date"]');
-    if(!input) return;
-    var gigId = input.getAttribute("data-gig-id");
-    clearTimeout(gigSaveTimers[gigId + "_gig_date"]);
-    saveGig(gigId, {gig_date: input.value}, true);
-  });
   elGigsList.addEventListener("click", function(e){
+    var salva = e.target.closest("#btnGigSave");
+    if(salva){ saveGigDraft(salva.getAttribute("data-gig-id"), salva); return; }
+    if(e.target.closest("#btnGigCancel")){
+      closeGigDraft();
+      var cv0 = currentVenue();
+      if(cv0) renderGigs(cv0);
+      return;
+    }
     var del = e.target.closest("[data-gig-del]");
     if(del){
       var delId = del.getAttribute("data-gig-del");
@@ -2907,7 +2944,7 @@
         : "Questa serata";
       confirmDestructive(what, "Elimina serata", function(){
         api("DELETE", "/api/gigs/" + delId).then(function(updated){
-          expandedGigId = null;
+          closeGigDraft();
           applyGigResponse(updated, true);
           toast("Serata eliminata");
         }).catch(function(err){ toast(err.message); });
@@ -2919,15 +2956,15 @@
       var sid = stRow.getAttribute("data-gig-status");
       var v = currentVenue(); if(!v) return;
       var g = venueGigs(v).filter(function(x){ return String(x.id) === String(sid); })[0];
+      // Il pannello si ridisegna dopo la scelta: prima si mette al riparo
+      // quello che e' gia' stato scritto negli altri campi.
+      readGigDraft();
       openSheet({title:"Stato della serata", options: STATUSES.map(function(sv){
-        return {label:sv.label, color:sv.color, checkmark: !!g && g.status === sv.key, onSelect:function(){
-          var chiude = (sv.key === "suonato" || sv.key === "rifiutato") && !!g && g.open;
-          saveGig(sid, {status: sv.key}, true).then(function(updated){
-            // Chiudendo, il server sposta il promemoria: dirlo, altrimenti e'
-            // una data che cambia da sola senza che nessuno lo veda.
-            toast("Stato: " + sv.label + ((chiude && updated && updated.next_contact_date)
-              ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
-          });
+        return {label:sv.label, color:sv.color, checkmark: !!gigDraft && gigDraft.status === sv.key, onSelect:function(){
+          if(!gigDraft) return;
+          gigDraft.status = sv.key;
+          var cv1 = currentVenue();
+          if(cv1) renderGigs(cv1);
         }};
       })});
       return;
@@ -2935,9 +2972,20 @@
     var row = e.target.closest("[data-gig-row]");
     if(!row) return;
     var id = row.getAttribute("data-gig-row");
-    expandedGigId = String(expandedGigId) === String(id) ? null : id;
-    var cv = currentVenue();
-    if(cv) renderGigs(cv);
+    var cv = currentVenue(); if(!cv) return;
+    if(String(expandedGigId) === String(id)){
+      // Richiudere di nascosto quello che hai appena scritto sarebbe il
+      // modo peggiore di perderlo: o salvi o annulli.
+      if(gigDraftDirty()){ toast("Salva o annulla le modifiche"); return; }
+      closeGigDraft();
+    } else {
+      if(gigDraftDirty()){ toast("Salva o annulla le modifiche"); return; }
+      var target = venueGigs(cv).filter(function(x){ return String(x.id) === String(id); })[0];
+      if(!target) return;
+      expandedGigId = id;
+      openGigDraft(target);
+    }
+    renderGigs(cv);
   });
 
   /* Aggiungere una serata si compila dove sta il pulsante: i campi si aprono
@@ -3175,7 +3223,7 @@
     currentId = id;
     var v = currentVenue();
     if(!v) return;
-    expandedGigId = null;
+    closeGigDraft();
     elNewGigInput.value = "";
     closeNewGig();
     fillVenueForm(v);

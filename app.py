@@ -1342,9 +1342,13 @@ def update_gig(conn, ws, gig_id, body):
             (wanted, now_iso(), loc_id),
         )
     elif closing:
+        # La riga DOPO l'aggiornamento: il pannello salva data e chiusura in
+        # una volta sola, quindi guardando quella di prima la data della
+        # serata non ci sarebbe ancora e si ripiegherebbe su oggi.
+        after = conn.execute("SELECT * FROM gigs WHERE id = ?", (gig_id,)).fetchone()
         conn.execute(
             "UPDATE locations SET next_contact_date = ?, updated_at = ? WHERE id = ?",
-            (next_contact_after_gig(conn, loc_id, before), now_iso(), loc_id),
+            (next_contact_after_gig(conn, loc_id, after or before), now_iso(), loc_id),
         )
     conn.commit()
     return fetch_location(conn, ws, loc_id)
