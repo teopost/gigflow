@@ -6,3 +6,7 @@ __pycache__/
 # Contengono dati reali di contatto (nomi, telefoni, email) di locali e
 # referenti raccolti per l'importazione: non vanno resi pubblici.
 *.xlsx
+
+# Screenshot di altre app tenuti in locale come riferimento per la UI:
+# contengono nomi di locali e foto di persone, non vanno resi pubblici.
+esempi/
