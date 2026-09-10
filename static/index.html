@@ -1233,14 +1233,14 @@
       </div>
       <div class="section-footer" id="statusFooter">È lo stato della serata in corso.</div>
 
-      <div class="section-header">SERATE</div>
+      <div class="section-header" id="gigsHeader">SERATE</div>
       <div class="grouped-list" id="gigsList"></div>
-      <div class="section-footer" id="gigsFooter"></div>
       <div class="grouped-list" style="margin-top:10px;">
         <div class="add-note-row">
           <input type="text" id="newGigInput" placeholder="Nuova stagione…" autocomplete="off">
           <button id="btnNewGig">Aggiungi</button>
         </div>
+        <div class="gig-panel" id="newGigFields" hidden></div>
       </div>
 
       <div class="section-header">PROPRIETARIO</div>
@@ -1438,11 +1438,13 @@
     if(isNaN(n)) return "";
     return "€ " + (n % 1 === 0 ? String(n) : n.toFixed(2).replace(".", ","));
   }
+  /* Quante volte ci hai suonato e in quali stagioni: sta nell'intestazione
+     della sezione, non in un paragrafo sotto l'elenco. */
   function seasonsPlayedText(v){
     var n = v.gigs_played || 0;
     var seasons = v.seasons_played || [];
     if(!n || !seasons.length) return "";
-    return "Ci hai suonato " + n + (n === 1 ? " volta" : " volte") + " (" + seasons.join(", ") + ")";
+    return n + (n === 1 ? " suonata" : " suonate") + " (" + seasons.join(", ") + ")";
   }
 
   function esc(str){
@@ -2738,8 +2740,10 @@
 
   /* ---------------- SERATE nella scheda ---------------- */
   var elGigsList = document.getElementById("gigsList");
-  var elGigsFooter = document.getElementById("gigsFooter");
+  var elGigsHeader = document.getElementById("gigsHeader");
   var elNewGigInput = document.getElementById("newGigInput");
+  var elNewGigFields = document.getElementById("newGigFields");
+  var elBtnNewGig = document.getElementById("btnNewGig");
   var expandedGigId = null;
   var gigSaveTimers = {};
 
@@ -2787,10 +2791,7 @@
       ? gigs.map(gigRowHtml).join("")
       : '<div class="gig-empty">Nessuna serata ancora.</div>';
     var played = seasonsPlayedText(v);
-    elGigsFooter.textContent = (played
-      ? played + ". Ogni stagione è una riga a sé: ripartire non cancella gli anni scorsi."
-      : "Una riga per stagione: la trattativa aperta e quelle passate, con la data quando arriva."
-    ) + " Tocca una serata per aprirla, scorri a sinistra per eliminarla.";
+    elGigsHeader.textContent = played ? ("Serate · " + played) : "Serate";
     elNewGigInput.placeholder = nextSeasonFor(v);
   }
 
@@ -2871,18 +2872,82 @@
     if(cv) renderGigs(cv);
   });
 
-  document.getElementById("btnNewGig").addEventListener("click", function(){
+  /* Aggiungere una serata si compila dove sta il pulsante: i campi si aprono
+     sotto il campo della stagione e la riga nell'elenco compare solo quando
+     salvi. Cosi' non si vede una riga vuota comparire in cima mentre la stai
+     ancora riempiendo, e se cambi idea non resta niente da cancellare. */
+  var newGigOpen = false;
+  var newGigDraft = null;
+
+  function renderNewGigFields(){
+    elNewGigFields.hidden = !newGigOpen;
+    elBtnNewGig.textContent = newGigOpen ? "Salva" : "Aggiungi";
+    if(!newGigOpen){ elNewGigFields.innerHTML = ""; return; }
+    var st = statusInfo(newGigDraft.status);
+    elNewGigFields.innerHTML =
+      '<div class="field-row picker" id="newGigStatus"><label>Stato</label>'+
+        '<div class="picker-value"><span class="dot" style="background:'+st.color+'"></span><span>'+esc(st.label)+'</span>'+CHEVRON+'</div></div>'+
+      '<div class="field-row"><label>Data serata</label>'+
+        '<input type="date" id="newGigDate" value="'+esc(newGigDraft.gig_date)+'"></div>'+
+      '<div class="field-row"><label>Compenso €</label>'+
+        '<input type="number" inputmode="decimal" placeholder="350" id="newGigFee" value="'+esc(newGigDraft.fee)+'"></div>'+
+      '<div class="field-row stacked"><label>Com\'è andata</label>'+
+        '<textarea rows="2" id="newGigNote" placeholder="es. serata piena, ci richiamano a settembre">'+esc(newGigDraft.outcome_note)+'</textarea></div>'+
+      '<div class="act-strip"><button type="button" class="act-chip" id="btnNewGigCancel">Annulla</button></div>';
+  }
+  function readNewGigFields(){
+    if(!newGigOpen || !newGigDraft) return;
+    var d = document.getElementById("newGigDate");
+    var f = document.getElementById("newGigFee");
+    var n = document.getElementById("newGigNote");
+    if(d) newGigDraft.gig_date = d.value;
+    if(f) newGigDraft.fee = f.value;
+    if(n) newGigDraft.outcome_note = n.value;
+  }
+  function closeNewGig(){
+    newGigOpen = false;
+    newGigDraft = null;
+    renderNewGigFields();
+  }
+
+  elNewGigFields.addEventListener("click", function(e){
+    if(e.target.closest("#btnNewGigCancel")){ closeNewGig(); return; }
+    if(!e.target.closest("#newGigStatus")) return;
+    // I campi si ridisegnano dopo la scelta: prima si mette al riparo quello
+    // che e' gia' stato scritto.
+    readNewGigFields();
+    openSheet({title:"Stato della serata", options: STATUSES.map(function(sv){
+      return {label:sv.label, color:sv.color, checkmark: newGigDraft.status === sv.key, onSelect:function(){
+        newGigDraft.status = sv.key;
+        renderNewGigFields();
+      }};
+    })});
+  });
+
+  elBtnNewGig.addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
+    if(!newGigOpen){
+      newGigOpen = true;
+      newGigDraft = {status:"da_contattare", gig_date:"", fee:"", outcome_note:""};
+      renderNewGigFields();
+      return;
+    }
+    readNewGigFields();
     // Vuoto vuol dire "quella che mi stai proponendo": il segnaposto mostra
     // gia' la stagione giusta, scriverla a mano serve solo per etichette come
     // "Estate 2027".
-    var season = elNewGigInput.value.trim() || nextSeasonFor(v);
-    api("POST", "/api/locations/" + v.id + "/gigs", {season: season}).then(function(updated){
+    var body = {season: elNewGigInput.value.trim() || nextSeasonFor(v), status: newGigDraft.status};
+    if(newGigDraft.gig_date) body.gig_date = newGigDraft.gig_date;
+    if(newGigDraft.fee !== "") body.fee = newGigDraft.fee;
+    if(newGigDraft.outcome_note) body.outcome_note = newGigDraft.outcome_note;
+    var season = body.season;
+    withButtonBusy(elBtnNewGig, function(){
+      return api("POST", "/api/locations/" + v.id + "/gigs", body);
+    }).then(function(updated){
       elNewGigInput.value = "";
-      var created = venueGigs(updated).filter(function(g){ return g.season === season; })[0];
-      expandedGigId = created ? created.id : null;
+      closeNewGig();
       applyGigResponse(updated, true);
-      toast("Nuova serata: stagione " + season);
+      toast("Serata aggiunta: stagione " + season);
     }).catch(function(err){ toast(err.message); });
   });
 
@@ -3043,6 +3108,8 @@
     var v = currentVenue();
     if(!v) return;
     expandedGigId = null;
+    elNewGigInput.value = "";
+    closeNewGig();
     fillVenueForm(v);
     elDetail.hidden = false;
     requestAnimationFrame(function(){ elDetail.classList.add("in"); });
