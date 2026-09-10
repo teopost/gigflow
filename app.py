@@ -364,6 +364,17 @@ def migrate_schema(conn):
     migrate_to_workspaces(conn)
     migrate_to_gigs(conn)
 
+    # Un palcoscenico rimasto senza serate non e' un errore — vuol dire che
+    # nessuna stagione e' ancora aperta — ma il suo stato deve dirlo. Le
+    # versioni prima di questa lasciavano appeso il valore vecchio quando si
+    # eliminava l'ultima serata: qui si ripara, ed e' idempotente.
+    conn.execute(
+        "UPDATE locations SET status = 'da_contattare', updated_at = ? "
+        "WHERE status != 'da_contattare' "
+        "AND NOT EXISTS (SELECT 1 FROM gigs g WHERE g.location_id = locations.id)",
+        (now_iso(),),
+    )
+
 
 def migrate_to_gigs(conn):
     """Porta la storia esistente dentro le serate. Prima di questa versione lo
@@ -1139,13 +1150,17 @@ def current_gig_row(conn, loc_id):
 def refresh_location_status(conn, loc_id):
     """locations.status e' una copia: la verita' sta sulla serata in corso.
     Tenerla aggiornata qui vuol dire che elenchi, filtri e badge continuano a
-    funzionare esattamente come prima, senza sapere niente delle serate."""
+    funzionare esattamente come prima, senza sapere niente delle serate.
+
+    Senza nessuna serata lo stato torna a "da contattare": e' un posto in
+    rubrica su cui non e' ancora stata aperta nessuna stagione. Lasciare il
+    valore vecchio mostrerebbe "Confermato" su un palcoscenico che non ha
+    nessuna serata confermata.
+    """
     row = current_gig_row(conn, loc_id)
-    if not row:
-        return
     conn.execute(
         "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
-        (row["status"], now_iso(), loc_id),
+        (row["status"] if row else "da_contattare", now_iso(), loc_id),
     )
 
 
@@ -1574,17 +1589,27 @@ def add_note(conn, ws, loc_id, body):
     require_location(conn, ws, loc_id)
     ts = now_iso()
     gig = current_gig_row(conn, loc_id)
-    conn.execute(
+    nota_id = conn.execute(
         "INSERT INTO notes (location_id, gig_id, kind, text, created_at) VALUES (?, ?, ?, ?, ?)",
         (loc_id, gig["id"] if gig else None, kind, text, ts),
-    )
+    ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
     # Aver contattato il posto e' esattamente cosa distingue "da contattare"
     # da "contattato": avanzarlo qui evita di dover cambiare lo stato a mano
     # ogni volta. Da "contattato" in poi non si tocca piu' niente: dove sia
     # arrivata la trattativa lo sa solo chi la sta portando avanti.
-    if kind != "nota" and gig is not None and gig["status"] == "da_contattare":
+    #
+    # Senza nessuna serata l'attivita' ne apre una per la stagione corrente
+    # (ci pensa set_location_status): lavorare un posto vuol dire aver
+    # cominciato, e la nota appena scritta e' la prova.
+    if kind != "nota" and (gig is None or gig["status"] == "da_contattare"):
         set_location_status(conn, loc_id, "contattato")
+        if gig is None:
+            nuova = current_gig_row(conn, loc_id)
+            if nuova is not None:
+                conn.execute(
+                    "UPDATE notes SET gig_id = ? WHERE id = ?", (nuova["id"], nota_id)
+                )
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 
