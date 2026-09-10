@@ -2402,7 +2402,7 @@
     var toConfirm = past.filter(function(x){ return x.g.status === "confermato"; });
     var html = "";
     if(toConfirm.length){
-      html += '<div class="agenda-group">Da confermare</div><div class="grouped-list">' +
+      html += '<div class="agenda-group">Da confermare<span class="group-count">'+toConfirm.length+'</span></div><div class="grouped-list">' +
         toConfirm.map(function(x){
           return '<div class="row" data-open-id="'+x.v.id+'">'+
             '<div class="row-main"><div class="row-title">'+esc(x.v.name||"Senza nome")+'</div>'+
@@ -2420,17 +2420,32 @@
           '</div>';
         }).join("") + '</div>';
     }
-    if(upcoming.length){
-      html += '<div class="agenda-group">Prossime serate</div><div class="grouped-list">' +
-        upcoming.map(function(x){
+    // "Prossime serate" vuol dire quello che suonerai: solo le confermate.
+    // Una data segnata su una trattativa ancora aperta e' una proposta, non
+    // un impegno, e mischiarla al calendario lo rende inaffidabile — con la
+    // sola pastiglia dei giorni mancanti erano pure indistinguibili.
+    var confermate = upcoming.filter(function(x){ return x.g.status === "confermato"; });
+    var proposte = upcoming.filter(function(x){ return x.g.status !== "confermato"; });
+    if(confermate.length){
+      html += '<div class="agenda-group">Prossime serate<span class="group-count">'+confermate.length+'</span></div><div class="grouped-list">' +
+        confermate.map(function(x){
           var d = daysUntil(x.g.gig_date);
           var tag = d === 0 ? "oggi" : ("tra " + d + "g");
           return gigAgendaRowHtml(x, tag, d <= 7 ? "var(--orange)" : "var(--text-secondary)");
         }).join("") + '</div>';
     }
+    if(proposte.length){
+      // Non spariscono: una data che stai trattando serve almeno a non
+      // prenderne un'altra lo stesso giorno. Qui la pastiglia dice lo stato,
+      // che e' l'informazione che manca.
+      html += '<div class="agenda-group">Date non confermate<span class="group-count">'+proposte.length+'</span></div><div class="grouped-list">' +
+        proposte.map(function(x){
+          return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
+        }).join("") + '</div>';
+    }
     var pastDone = past.filter(function(x){ return x.g.status !== "confermato"; });
     if(pastDone.length){
-      html += '<div class="agenda-group">Già passate</div><div class="grouped-list">' +
+      html += '<div class="agenda-group">Già passate<span class="group-count">'+pastDone.length+'</span></div><div class="grouped-list">' +
         pastDone.map(function(x){
           return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
         }).join("") + '</div>';
