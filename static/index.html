@@ -363,7 +363,8 @@
   .nudge-text{font-size:13px;color:var(--text-secondary);line-height:1.45;margin-top:3px;}
   .nudge-btn{margin-top:10px;border:none;border-radius:8px;background:var(--tint);color:#fff;font-size:14px;font-weight:600;font-family:inherit;padding:9px 15px;cursor:pointer;}
   .nudge-btn:active{opacity:.7;}
-  .agenda-group{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;}
+  .agenda-group{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  .group-count{font-weight:600;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
   .gig-confirm{display:flex;gap:8px;padding:0 16px 11px;background:var(--bg-elevated);}
   .gig-confirm button{flex:1;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;padding:9px 4px;cursor:pointer;}
   .gig-confirm .yes{background:var(--green-soft);color:#1f8b3d;}
@@ -2286,6 +2287,25 @@
     }
   }
 
+  function monthLabel(dateStr){
+    var d = new Date((dateStr || "") + "T00:00:00");
+    if(isNaN(d)) return dateStr || "";
+    return d.toLocaleDateString("it-IT", {month:"long", year:"numeric"});
+  }
+  function recontactRowHtml(v){
+    var d = daysUntil(v.next_contact_date);
+    var tag = d < 0 ? ("scaduto · "+Math.abs(d)+"g") : (d === 0 ? "oggi" : ("tra "+d+"g"));
+    var color = d < 0 ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
+    return '<div class="row" data-open-id="'+v.id+'">'+
+      '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+      '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+esc(v.planning_note) : "")+'</div></div>'+
+      '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
+      CHEVRON+'</div>'+
+    '</div>';
+  }
+  /* Raggruppati a rottura di mese. L'elenco arriva gia' ordinato per data,
+     quindi basta confrontare l'anno-mese con quello della riga precedente:
+     "questo mese ne ho tre" e' la domanda vera quando pianifichi. */
   function renderRecontactList(){
     var withDate = venuesToRecontact();
     if(!withDate.length){
@@ -2293,17 +2313,20 @@
         '<p>Apri un palcoscenico e imposta "Prossimo contatto" per ricordarti quando richiamarlo — utile per chi pianifica presto, come i bagni al mare a febbraio/marzo.</p></div>';
       return;
     }
-    elRecontactList.innerHTML = '<div class="grouped-list">' + withDate.map(function(v){
-      var d = daysUntil(v.next_contact_date);
-      var tag = d < 0 ? ("scaduto · "+Math.abs(d)+"g") : (d === 0 ? "oggi" : ("tra "+d+"g"));
-      var color = d < 0 ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
-      return '<div class="row" data-open-id="'+v.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+esc(v.planning_note) : "")+'</div></div>'+
-        '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
-        CHEVRON+'</div>'+
-      '</div>';
-    }).join("") + '</div>';
+    var html = "";
+    var currentMonth = null;
+    withDate.forEach(function(v){
+      var month = (v.next_contact_date || "").slice(0, 7);
+      if(month !== currentMonth){
+        if(currentMonth !== null) html += '</div>';
+        var quanti = withDate.filter(function(x){ return (x.next_contact_date || "").slice(0, 7) === month; }).length;
+        html += '<div class="agenda-group">'+esc(monthLabel(v.next_contact_date))+
+          '<span class="group-count">'+quanti+'</span></div><div class="grouped-list">';
+        currentMonth = month;
+      }
+      html += recontactRowHtml(v);
+    });
+    elRecontactList.innerHTML = html + '</div>';
   }
   elRecontactList.addEventListener("click", function(e){
     var row = e.target.closest("[data-open-id]");
