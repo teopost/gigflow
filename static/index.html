@@ -2997,7 +2997,9 @@
 
   function renderNewGigFields(){
     elNewGigFields.hidden = !newGigOpen;
-    elBtnNewGig.textContent = newGigOpen ? "Salva" : "Aggiungi";
+    // Aperto il modulo, il pulsante in alto sparisce: Annulla e Salva stanno
+    // in fondo a destra, nello stesso posto del pannello di modifica.
+    elBtnNewGig.hidden = newGigOpen;
     if(!newGigOpen){ elNewGigFields.innerHTML = ""; return; }
     var st = statusInfo(newGigDraft.status);
     elNewGigFields.innerHTML =
@@ -3009,7 +3011,10 @@
         '<input type="number" inputmode="decimal" placeholder="350" id="newGigFee" value="'+esc(newGigDraft.fee)+'"></div>'+
       '<div class="field-row stacked"><label>Com\'è andata</label>'+
         '<textarea rows="2" id="newGigNote" placeholder="es. serata piena, ci richiamano a settembre">'+esc(newGigDraft.outcome_note)+'</textarea></div>'+
-      '<div class="act-strip"><button type="button" class="act-chip" id="btnNewGigCancel">Annulla</button></div>';
+      '<div class="add-note-row" style="justify-content:flex-end;gap:18px;">'+
+        '<button type="button" id="btnNewGigCancel" style="color:var(--text-secondary);">Annulla</button>'+
+        '<button type="button" id="btnNewGigSave">Salva</button>'+
+      '</div>';
   }
   function readNewGigFields(){
     if(!newGigOpen || !newGigDraft) return;
@@ -3024,9 +3029,12 @@
     newGigOpen = false;
     newGigDraft = null;
     renderNewGigFields();
+    elBtnNewGig.hidden = false;
   }
 
   elNewGigFields.addEventListener("click", function(e){
+    var salva = e.target.closest("#btnNewGigSave");
+    if(salva){ saveNewGig(salva); return; }
     if(e.target.closest("#btnNewGigCancel")){ closeNewGig(); return; }
     if(!e.target.closest("#newGigStatus")) return;
     // I campi si ridisegnano dopo la scelta: prima si mette al riparo quello
@@ -3040,14 +3048,8 @@
     })});
   });
 
-  elBtnNewGig.addEventListener("click", function(){
-    var v = currentVenue(); if(!v) return;
-    if(!newGigOpen){
-      newGigOpen = true;
-      newGigDraft = {status:"da_contattare", gig_date:"", fee:"", outcome_note:""};
-      renderNewGigFields();
-      return;
-    }
+  function saveNewGig(btn){
+    var v = currentVenue(); if(!v || !newGigDraft) return;
     readNewGigFields();
     // Vuoto vuol dire "quella che mi stai proponendo": il segnaposto mostra
     // gia' la stagione giusta, scriverla a mano serve solo per etichette come
@@ -3057,7 +3059,7 @@
     if(newGigDraft.fee !== "") body.fee = newGigDraft.fee;
     if(newGigDraft.outcome_note) body.outcome_note = newGigDraft.outcome_note;
     var season = body.season;
-    withButtonBusy(elBtnNewGig, function(){
+    withButtonBusy(btn, function(){
       return api("POST", "/api/locations/" + v.id + "/gigs", body);
     }).then(function(updated){
       elNewGigInput.value = "";
@@ -3065,6 +3067,13 @@
       applyGigResponse(updated, true);
       toast("Serata aggiunta: stagione " + season);
     }).catch(function(err){ toast(err.message); });
+  }
+
+  elBtnNewGig.addEventListener("click", function(){
+    if(!currentVenue() || newGigOpen) return;
+    newGigOpen = true;
+    newGigDraft = {status:"da_contattare", gig_date:"", fee:"", outcome_note:""};
+    renderNewGigFields();
   });
 
   function renderArtDirectorRow(v){
