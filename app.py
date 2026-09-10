@@ -352,8 +352,8 @@ def migrate_to_workspaces(conn):
     # I workspace oltre al primo nascono vuoti dalla migrazione, quindi non
     # hanno passato da create_workspace: le tipologie di default vanno messe
     # qui, altrimenti si ritrovano l'elenco dei tipi vuoto.
-    for ws_id in ws_ids:
-        seed_default_venue_types(conn, ws_id)
+    for ws_id, (seed_name, seed_genre, _city) in zip(ws_ids, seeds):
+        seed_workspace_defaults(conn, ws_id, seed_name, seed_genre)
 
     conn.execute(
         "UPDATE user_profiles SET active_workspace_id = ? WHERE active_workspace_id IS NULL",
@@ -528,7 +528,15 @@ def create_workspace(conn, email, name, genre=None, city=None):
             "VALUES (?, ?, 'leader', ?)",
             (ws_id, email, ts),
         )
-    seed_default_venue_types(conn, ws_id)
+    person = None
+    if email:
+        row = conn.execute(
+            "SELECT name, artist_name FROM user_profiles WHERE email = ?", (email,)
+        ).fetchone()
+        if row:
+            # Il nome di battesimo basta: nel messaggio si presenta una persona.
+            person = (row["name"] or "").split(" ")[0] or None
+    seed_workspace_defaults(conn, ws_id, name, genre, person)
     conn.commit()
     set_active_workspace(conn, email, ws_id)
     return ws_id
@@ -764,26 +772,97 @@ def update_me(conn, email, body):
     return fetch_me(conn, email)
 
 
+# --- template di partenza per una band nuova ---------------------------
+#
+# Ricalcati sui dati reali dei Pink Froid: sono l'unico set gia' rodato sul
+# campo. Quello che viene inserito qui e' una copia che appartiene alla band
+# nuova, quindi ognuno puo' poi cambiarla senza toccare le altre.
+#
+# Nei testi ci sono due tipi di segnaposto, e la differenza conta:
+#   {band}, {genere}, {nome}  vengono sostituiti in automatico con i dati
+#                             della band che si sta creando;
+#   [fra parentesi quadre]    restano da compilare a mano, perche' sono dati
+#                             personali (telefono, email, link ai video) che
+#                             non si possono indovinare e che non vanno
+#                             ereditati da un'altra band.
+
 DEFAULT_VENUE_TYPES = [
-    "Locale / club", "Festa di paese", "Sagra",
-    "Bagno / stabilimento balneare", "Villaggio / resort",
-    "Evento privato", "Spazio pubblico", "Da verificare",
+    "Locale / Club / Pub", "Festa di paese", "Sagra",
+    "Stabilimento balneare", "Villaggio / resort",
+    "Evento privato", "Spazio pubblico", "Bar", "Ristorante",
+]
+
+# I Pink Froid non hanno mai usato le categorie e nessun palcoscenico ne ha
+# una assegnata: non c'e' nessun set rodato da cui copiare, quindi una band
+# nuova parte senza categorie invece che con categorie inventate.
+DEFAULT_VENUE_CATEGORIES = []
+
+DEFAULT_WA_TEMPLATES = [
+    {
+        "name": "Invio materiale",
+        "message": (
+            "Ciao, mi chiamo {nome} e faccio parte dei {band}{genere}.\n"
+            "Se avete in programma di fare musica dal vivo la prossima "
+            "stagione possiamo proporre un paio d'ore divertenti.\n"
+            "Qui sotto un link dove potrete vedere un collage di video di "
+            "spettatori dei nostri concerti.\n\n"
+            "[incolla qui il link ai vostri video]\n\n"
+            "Per contatti al telefono o via WhatsApp [il tuo numero] o per "
+            "e-mail [la tua email].\n"
+            "Grazie."
+        ),
+    },
 ]
 
 
-def seed_default_venue_types(conn, ws):
-    """Ogni band nuova parte con le sue tipologie: sono per workspace, quindi
-    il conteggio va fatto sul workspace e non su tutta la tabella."""
-    count = conn.execute(
-        "SELECT COUNT(*) AS n FROM venue_types WHERE workspace_id = ?", (ws,)
-    ).fetchone()["n"]
-    if count > 0:
-        return
-    ts = now_iso()
-    conn.executemany(
-        "INSERT INTO venue_types (name, workspace_id, created_at) VALUES (?, ?, ?)",
-        [(name, ws, ts) for name in DEFAULT_VENUE_TYPES],
+def render_default_text(text, band_name, genre=None, person=None):
+    genre_part = f", {genre.strip().lower()}" if (genre or "").strip() else ""
+    return (
+        text.replace("{band}", band_name or "la nostra band")
+            .replace("{genere}", genre_part)
+            .replace("{nome}", (person or "").strip() or "[il tuo nome]")
     )
+
+
+def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
+    """Precarica tipologie, categorie e modelli WhatsApp di una band nuova.
+
+    Riempie solo le tabelle vuote per quel workspace, cosi' rieseguirla non
+    duplica niente e non sovrascrive quello che l'utente ha gia' cambiato.
+    """
+    ts = now_iso()
+
+    if not conn.execute(
+        "SELECT 1 FROM venue_types WHERE workspace_id = ? LIMIT 1", (ws,)
+    ).fetchone():
+        conn.executemany(
+            "INSERT INTO venue_types (name, workspace_id, created_at) VALUES (?, ?, ?)",
+            [(name, ws, ts) for name in DEFAULT_VENUE_TYPES],
+        )
+
+    if DEFAULT_VENUE_CATEGORIES and not conn.execute(
+        "SELECT 1 FROM venue_categories WHERE workspace_id = ? LIMIT 1", (ws,)
+    ).fetchone():
+        conn.executemany(
+            "INSERT INTO venue_categories (name, workspace_id, created_at) VALUES (?, ?, ?)",
+            [(name, ws, ts) for name in DEFAULT_VENUE_CATEGORIES],
+        )
+
+    if not conn.execute(
+        "SELECT 1 FROM wa_templates WHERE workspace_id = ? LIMIT 1", (ws,)
+    ).fetchone():
+        conn.executemany(
+            "INSERT INTO wa_templates (name, message, workspace_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [
+                (
+                    render_default_text(t["name"], band_name, genre, person),
+                    render_default_text(t["message"], band_name, genre, person),
+                    ws, ts, ts,
+                )
+                for t in DEFAULT_WA_TEMPLATES
+            ],
+        )
 
 
 class ApiError(Exception):
