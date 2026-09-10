@@ -1223,13 +1223,12 @@
 
       <div class="section-header">STATO DELLA TRATTATIVA</div>
       <div class="grouped-list">
-        <div class="field-row picker" id="rowStatus">
-          <label>Stato attuale</label>
-          <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Da contattare</span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        <div class="field-row" id="rowStatus">
+          <label id="statusSeasonLabel">Serata</label>
+          <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Da contattare</span></div>
         </div>
       </div>
-      <div class="section-footer">È lo stato della serata in corso, quella della stagione aperta qui sotto — non del palcoscenico per sempre.</div>
+      <div class="section-footer" id="statusFooter">È lo stato della serata in corso.</div>
 
       <div class="section-header">SERATE</div>
       <div class="grouped-list" id="gigsList"></div>
@@ -2713,25 +2712,28 @@
     });
   });
 
+  /* Lo stato si legge qui e si scrive solo sulla riga della sua stagione,
+     dove si vede sempre quale si sta muovendo. Prima era modificabile in due
+     posti per la stessa cosa: comodo, ma su un palcoscenico con tre stagioni
+     alle spalle non era piu' chiaro quale delle tre stessi cambiando. */
+  var elStatusSeasonLabel = document.getElementById("statusSeasonLabel");
+  var elStatusFooter = document.getElementById("statusFooter");
   function renderStatusRow(v){
-    var st = statusInfo(v.status);
-    document.getElementById("statusDot").style.background = st.color;
-    document.getElementById("statusValue").textContent = st.label;
+    var gigs = venueGigs(v);
+    var open = gigs.filter(function(g){ return g.open; })[0];
+    var g = open || gigs[0] || null;
+    var colors = g ? gigStateColors(g) : {color: statusInfo(v.status).color};
+    document.getElementById("statusDot").style.background = colors.color;
+    document.getElementById("statusValue").textContent = g ? gigStateLabel(g) : statusInfo(v.status).label;
+    elStatusSeasonLabel.textContent = g ? ("Serata " + g.season) : "Serata";
+    if(!g){
+      elStatusFooter.textContent = "Non c'è ancora nessuna serata: aprine una qui sotto per seguire la trattativa.";
+    } else if(open){
+      elStatusFooter.textContent = "Per cambiarlo apri la serata " + g.season + " nell'elenco qui sotto.";
+    } else {
+      elStatusFooter.textContent = "La stagione " + g.season + " è chiusa. Tocca \"+ Nuova serata\" per ripartire: lo stato seguirà quella nuova.";
+    }
   }
-  document.getElementById("rowStatus").addEventListener("click", function(){
-    var v = currentVenue(); if(!v) return;
-    /* Cambiare lo stato da qui cambia quello della serata in corso: il
-       server ci pensa da solo, il campo sul palcoscenico e' solo la copia
-       che fa funzionare elenchi e filtri. */
-    openSheet({options: STATUSES.map(function(s){
-      return {label:s.label, color:s.color, checkmark: v.status===s.key, onSelect:function(){
-        patchVenue("status", s.key).then(function(updated){
-          applyUpdatedVenue(updated); renderStatusRow(updated); renderGigs(updated); renderAll();
-          toast("Stato: "+s.label);
-        });
-      }};
-    })});
-  });
 
   /* ---------------- SERATE nella scheda ---------------- */
   var elGigsList = document.getElementById("gigsList");

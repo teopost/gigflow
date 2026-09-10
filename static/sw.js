@@ -8,7 +8,7 @@
 // usa una strategia "network-first": se il server risponde si vede sempre
 // l'ultima versione; la cache serve solo come fallback quando sei offline.
 
-const CACHE_NAME = "palcoscenici-shell-v15";
+const CACHE_NAME = "palcoscenici-shell-v16";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json?v=2",

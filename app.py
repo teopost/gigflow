@@ -110,6 +110,7 @@ GIG_FIELDS = ["season", "status", "gig_date", "fee", "outcome_note"]
 CLOSING_STATUSES = {"suonato", "rifiutato"}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+SEASON_YEAR_RE = re.compile(r"(\d{4})")
 
 # Il tipo di attivita' fatta sul palcoscenico. "nota" e' il default e copre
 # tutto quello che si scriveva prima che le attivita' avessero un tipo.
@@ -1158,14 +1159,34 @@ def insert_gig(conn, loc_id, season, status, ts=None):
     return cur.lastrowid
 
 
+def next_season_for(conn, loc_id):
+    """La stagione da aprire: l'anno corrente, o l'anno dopo l'ultima stagione
+    gia' usata se si e' andati avanti. Legge le quattro cifre dentro
+    l'etichetta, cosi' funziona anche con "Estate 2027"."""
+    cur = int(current_season())
+    best = cur - 1
+    for r in conn.execute("SELECT season FROM gigs WHERE location_id = ?", (loc_id,)).fetchall():
+        m = SEASON_YEAR_RE.search(str(r["season"] or ""))
+        if m:
+            best = max(best, int(m.group(1)))
+    return str(max(cur, best + 1))
+
+
 def set_location_status(conn, loc_id, status):
     """Cambiare lo stato dalla scheda del palcoscenico vuol dire cambiarlo
-    sulla serata in corso. Se lo scrivessimo solo su locations, la prima
-    modifica alla serata lo sovrascriverebbe."""
+    sulla serata in corso: se lo scrivessimo solo su locations, la prima
+    modifica alla serata lo sovrascriverebbe.
+
+    Ma su una serata CHIUSA non si scrive mai da qui. Una stagione conclusa e'
+    storia: rimetterla a "da contattare" per ripartire cancellerebbe il fatto
+    che ci hai suonato, che e' esattamente quello che le serate esistono per
+    non perdere. Se non c'e' niente di aperto si apre la stagione dopo. Per
+    correggere un anno passato si passa dalla sua riga, dove si vede quale.
+    """
     row = current_gig_row(conn, loc_id)
     ts = now_iso()
-    if row is None:
-        insert_gig(conn, loc_id, current_season(), status, ts)
+    if row is None or row["closed_at"] is not None:
+        insert_gig(conn, loc_id, next_season_for(conn, loc_id), status, ts)
     else:
         conn.execute(
             "UPDATE gigs SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?",
