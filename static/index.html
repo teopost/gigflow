@@ -337,14 +337,18 @@
   /* ---------- serate ---------- */
   .gig-row{display:flex;align-items:center;gap:10px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);cursor:pointer;}
   .gig-row:active{background:var(--fill);}
-  .gig-row + .gig-row, .gig-panel + .gig-row{border-top:.5px solid var(--separator);}
+  .grouped-list > .swipe-row:not(:first-child) .row-content .gig-row{border-top:.5px solid var(--separator);}
   .gig-season{flex:none;min-width:52px;font-size:13px;font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums;}
   .gig-main{flex:1;min-width:0;}
   .gig-date{font-size:16px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .gig-sub{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
   .gig-panel{background:var(--bg);border-top:.5px solid var(--separator);}
   .gig-panel .field-row{background:var(--bg);}
-  .gig-panel .field-row label{flex:0 0 104px;font-size:15px;}
+  /* flex-basis su una riga in colonna diventa ALTEZZA, non larghezza: senza
+     :not(.stacked) l'etichetta di "Com'e' andata" si prendeva 104px di vuoto
+     e spingeva la riga scrivibile in fondo al box. */
+  .gig-panel .field-row:not(.stacked) label{flex:0 0 104px;font-size:15px;}
+  .gig-panel .field-row.stacked label{font-size:13px;}
   .gig-empty{padding:12px 16px;background:var(--bg-elevated);font-size:14px;color:var(--text-secondary);}
 
   /* ---------- attivita' con un tocco ---------- */
@@ -352,7 +356,6 @@
   .act-strip::-webkit-scrollbar{display:none;}
   .act-chip{flex:none;display:flex;align-items:center;gap:6px;border:none;border-radius:999px;background:var(--fill);color:var(--text);font-size:14px;font-weight:600;font-family:inherit;padding:8px 13px;cursor:pointer;white-space:nowrap;}
   .act-chip:active{opacity:.55;}
-  .act-chip.danger{background:var(--destructive-soft);color:var(--destructive);}
 
   /* ---------- avvisi dell'agenda ---------- */
   .nudge{margin:12px 16px 2px;background:var(--tint-soft);border-radius:10px;padding:13px 14px;}
@@ -1234,11 +1237,9 @@
       <div class="grouped-list" id="gigsList"></div>
       <div class="section-footer" id="gigsFooter"></div>
       <div class="grouped-list" style="margin-top:10px;">
-        <div class="row" id="btnNewGig">
-          <div class="row-main">
-            <div class="row-title" style="color:var(--tint);">+ Nuova serata</div>
-            <div class="row-sub" id="newGigHint">Riparti per una stagione nuova</div>
-          </div>
+        <div class="add-note-row">
+          <input type="text" id="newGigInput" placeholder="Nuova stagione…" autocomplete="off">
+          <button id="btnNewGig">Aggiungi</button>
         </div>
       </div>
 
@@ -2738,6 +2739,7 @@
   /* ---------------- SERATE nella scheda ---------------- */
   var elGigsList = document.getElementById("gigsList");
   var elGigsFooter = document.getElementById("gigsFooter");
+  var elNewGigInput = document.getElementById("newGigInput");
   var expandedGigId = null;
   var gigSaveTimers = {};
 
@@ -2753,8 +2755,7 @@
       '<div class="field-row"><label>Compenso €</label>'+
         '<input type="number" inputmode="decimal" placeholder="350" data-gig-field="fee" data-gig-id="'+g.id+'" value="'+(g.fee != null ? esc(g.fee) : "")+'"></div>'+
       '<div class="field-row stacked"><label>Com\'è andata</label>'+
-        '<input type="text" style="text-align:left;" placeholder="es. serata piena, ci richiamano a settembre" data-gig-field="outcome_note" data-gig-id="'+g.id+'" value="'+esc(g.outcome_note || "")+'"></div>'+
-      '<div class="act-strip"><button type="button" class="act-chip danger" data-gig-del="'+g.id+'">Elimina questa serata</button></div>'+
+        '<textarea rows="2" placeholder="es. serata piena, ci richiamano a settembre" data-gig-field="outcome_note" data-gig-id="'+g.id+'">'+esc(g.outcome_note || "")+'</textarea></div>'+
     '</div>';
   }
 
@@ -2767,13 +2768,15 @@
     var dateHtml = g.gig_date
       ? fmtDateShort(g.gig_date)
       : '<span style="color:var(--text-tertiary);">Data da fissare</span>';
-    var html = '<div class="gig-row" data-gig-row="'+g.id+'">'+
-      '<span class="gig-season">'+esc(g.season)+'</span>'+
-      '<div class="gig-main"><div class="gig-date">'+dateHtml+'</div>'+
-      (sub.length ? '<div class="gig-sub">'+sub.join(" · ")+'</div>' : '')+'</div>'+
-      '<div class="row-trail"><span class="row-badge" style="background:'+c.soft+';color:'+c.color+';">'+esc(gigStateLabel(g))+'</span>'+
-      CHEVRON+'</div>'+
-    '</div>';
+    var html = '<div class="swipe-row"><div class="row-content">'+
+      '<div class="gig-row" data-gig-row="'+g.id+'">'+
+        '<span class="gig-season">'+esc(g.season)+'</span>'+
+        '<div class="gig-main"><div class="gig-date">'+dateHtml+'</div>'+
+        (sub.length ? '<div class="gig-sub">'+sub.join(" · ")+'</div>' : '')+'</div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:'+c.soft+';color:'+c.color+';">'+esc(gigStateLabel(g))+'</span>'+
+        CHEVRON+'</div>'+
+      '</div>'+
+    '</div><div class="row-actions"><button data-gig-del="'+g.id+'">Elimina</button></div></div>';
     if(String(expandedGigId) === String(g.id)) html += gigPanelHtml(g);
     return html;
   }
@@ -2784,10 +2787,11 @@
       ? gigs.map(gigRowHtml).join("")
       : '<div class="gig-empty">Nessuna serata ancora.</div>';
     var played = seasonsPlayedText(v);
-    elGigsFooter.textContent = played
+    elGigsFooter.textContent = (played
       ? played + ". Ogni stagione è una riga a sé: ripartire non cancella gli anni scorsi."
-      : "Una riga per stagione: la trattativa aperta e quelle passate, con la data quando arriva.";
-    document.getElementById("newGigHint").textContent = "Riparti per la stagione " + nextSeasonFor(v);
+      : "Una riga per stagione: la trattativa aperta e quelle passate, con la data quando arriva."
+    ) + " Tocca una serata per aprirla, scorri a sinistra per eliminarla.";
+    elNewGigInput.placeholder = nextSeasonFor(v);
   }
 
   function applyGigResponse(updated, rerender){
@@ -2831,7 +2835,14 @@
     var del = e.target.closest("[data-gig-del]");
     if(del){
       var delId = del.getAttribute("data-gig-del");
-      confirmDestructive("Questa serata e la sua storia", "Elimina serata", function(){
+      // Come per l'eliminazione definitiva di un palcoscenico: dire prima
+      // quale stagione si porta via, perche' non si annulla.
+      var dv = currentVenue();
+      var dg = dv ? venueGigs(dv).filter(function(x){ return String(x.id) === String(delId); })[0] : null;
+      var what = dg
+        ? ("Serata " + dg.season + " · " + (dg.gig_date ? fmtDateShort(dg.gig_date) : gigStateLabel(dg)))
+        : "Questa serata";
+      confirmDestructive(what, "Elimina serata", function(){
         api("DELETE", "/api/gigs/" + delId).then(function(updated){
           expandedGigId = null;
           applyGigResponse(updated, true);
@@ -2862,8 +2873,12 @@
 
   document.getElementById("btnNewGig").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
-    var season = nextSeasonFor(v);
+    // Vuoto vuol dire "quella che mi stai proponendo": il segnaposto mostra
+    // gia' la stagione giusta, scriverla a mano serve solo per etichette come
+    // "Estate 2027".
+    var season = elNewGigInput.value.trim() || nextSeasonFor(v);
     api("POST", "/api/locations/" + v.id + "/gigs", {season: season}).then(function(updated){
+      elNewGigInput.value = "";
       var created = venueGigs(updated).filter(function(g){ return g.season === season; })[0];
       expandedGigId = created ? created.id : null;
       applyGigResponse(updated, true);
