@@ -17,7 +17,7 @@ import socket
 import urllib.error
 import urllib.request
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, urlencode, unquote
 
@@ -1159,6 +1159,30 @@ def insert_gig(conn, loc_id, season, status, ts=None):
     return cur.lastrowid
 
 
+def plus_one_year(date_str):
+    """Stessa data, anno dopo. Il 29 febbraio scala al 28: meglio una data
+    buona che nessuna."""
+    try:
+        d = date.fromisoformat((date_str or "").strip())
+    except ValueError:
+        return None
+    try:
+        return d.replace(year=d.year + 1).isoformat()
+    except ValueError:
+        return d.replace(year=d.year + 1, day=28).isoformat()
+
+
+def next_contact_after_gig(conn, loc_id, gig_row):
+    """Un locale si ricontatta piu' o meno nello stesso periodo ogni anno.
+    La base migliore e' il promemoria che ti eri gia' dato per quel posto;
+    se non ce n'e' uno, la data della serata; in mancanza di tutto, oggi."""
+    row = conn.execute(
+        "SELECT next_contact_date FROM locations WHERE id = ?", (loc_id,)
+    ).fetchone()
+    base = (row["next_contact_date"] if row else None) or (gig_row["gig_date"] if gig_row else None)
+    return plus_one_year(base or date.today().isoformat())
+
+
 def next_season_for(conn, loc_id):
     """La stagione da aprire: l'anno corrente, o l'anno dopo l'ultima stagione
     gia' usata se si e' andati avanti. Legge le quattro cifre dentro
@@ -1270,8 +1294,18 @@ def gig_location_id(conn, ws, gig_id):
 
 
 def update_gig(conn, ws, gig_id, body):
+    """`next_contact_date` non e' un campo della serata ma del palcoscenico:
+    si accetta lo stesso qui perche' chiudere una serata e darsi la data per
+    ripartire sono una cosa sola, e farne due chiamate lascerebbe la serata
+    chiusa senza promemoria se la seconda fallisce."""
     loc_id = gig_location_id(conn, ws, gig_id)
+    before = conn.execute("SELECT * FROM gigs WHERE id = ?", (gig_id,)).fetchone()
     data = clean_gig_payload(body, partial=True)
+    closing = (
+        "status" in data
+        and data["status"] in CLOSING_STATUSES
+        and before["closed_at"] is None
+    )
     if data:
         if "status" in data:
             data["closed_at"] = now_iso() if data["status"] in CLOSING_STATUSES else None
@@ -1281,7 +1315,23 @@ def update_gig(conn, ws, gig_id, body):
             f"UPDATE gigs SET {set_clause} WHERE id = ?", list(data.values()) + [gig_id]
         )
         refresh_location_status(conn, loc_id)
-        conn.commit()
+
+    # Solo sul passaggio a chiusa: correggere il compenso di una serata gia'
+    # suonata non deve rispostare il promemoria.
+    if "next_contact_date" in body:
+        wanted = (body.get("next_contact_date") or "").strip() or None
+        if wanted and not GIG_DATE_RE.match(wanted):
+            raise ApiError(400, "Data di ricontatto non valida")
+        conn.execute(
+            "UPDATE locations SET next_contact_date = ?, updated_at = ? WHERE id = ?",
+            (wanted, now_iso(), loc_id),
+        )
+    elif closing:
+        conn.execute(
+            "UPDATE locations SET next_contact_date = ?, updated_at = ? WHERE id = ?",
+            (next_contact_after_gig(conn, loc_id, before), now_iso(), loc_id),
+        )
+    conn.commit()
     return fetch_location(conn, ws, loc_id)
 
 

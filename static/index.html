@@ -1414,6 +1414,23 @@
     var m = String(d.getMonth()+1), day = String(d.getDate());
     return d.getFullYear() + "-" + (m.length<2 ? "0"+m : m) + "-" + (day.length<2 ? "0"+day : day);
   }
+  /* Un locale si ricontatta piu' o meno nello stesso periodo ogni anno: la
+     base e' il promemoria che ti eri gia' dato, poi la data della serata,
+     poi oggi. Stessa regola del server, cosi' quello che vedi proposto nel
+     form e' quello che verrebbe scritto comunque. */
+  function plusOneYearStr(dateStr){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || "");
+    if(!m) return "";
+    var y = Number(m[1]) + 1, mm = m[2], dd = m[3];
+    if(mm === "02" && dd === "29"){
+      var bisestile = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+      if(!bisestile) dd = "28";
+    }
+    return y + "-" + mm + "-" + dd;
+  }
+  function proposedNextContact(v, g){
+    return plusOneYearStr(v.next_contact_date || (g && g.gig_date) || todayStr());
+  }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
   function nextSeasonFor(v){
     var cur = Number(currentSeason());
@@ -2368,6 +2385,12 @@
             '<div class="row-main"><div class="row-title">'+esc(x.v.name||"Senza nome")+'</div>'+
             '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+' · stagione '+esc(x.g.season)+'</div></div>'+
           '</div>'+
+          '<div class="gig-panel">'+
+            '<div class="field-row stacked"><label>Com\'è andata</label>'+
+              '<textarea rows="2" id="conf-note-'+x.g.id+'" placeholder="es. serata piena, ci richiamano">'+esc(x.g.outcome_note || "")+'</textarea></div>'+
+            '<div class="field-row"><label>Prossimo contatto</label>'+
+              '<input type="date" id="conf-date-'+x.g.id+'" value="'+esc(proposedNextContact(x.v, x.g))+'"></div>'+
+          '</div>'+
           '<div class="gig-confirm">'+
             '<button type="button" class="yes" data-played="'+x.g.id+'">Ho suonato</button>'+
             '<button type="button" class="no" data-cancelled="'+x.g.id+'">Annullata</button>'+
@@ -2396,10 +2419,18 @@
     var no = yes ? null : e.target.closest("[data-cancelled]");
     if(yes || no){
       var gigId = yes ? yes.getAttribute("data-played") : no.getAttribute("data-cancelled");
-      api("PUT", "/api/gigs/" + gigId, {status: yes ? "suonato" : "rifiutato"}).then(function(updated){
+      var noteEl = document.getElementById("conf-note-" + gigId);
+      var dateEl = document.getElementById("conf-date-" + gigId);
+      var payload = {status: yes ? "suonato" : "rifiutato"};
+      if(noteEl) payload.outcome_note = noteEl.value;
+      // Anche se e' vuota: svuotare il campo vuol dire "non ricontattarli".
+      if(dateEl) payload.next_contact_date = dateEl.value;
+      api("PUT", "/api/gigs/" + gigId, payload).then(function(updated){
         applyUpdatedVenue(updated);
         renderAll();
-        toast(yes ? "Segnata come suonata" : "Segnata come annullata");
+        syncNextContactField(updated);
+        toast((yes ? "Segnata come suonata" : "Segnata come annullata") +
+          (updated.next_contact_date ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
       }).catch(function(err){ toast(err.message); });
       return;
     }
@@ -2734,7 +2765,7 @@
     } else if(open){
       elStatusFooter.textContent = "Per cambiarlo apri la serata " + g.season + " nell'elenco qui sotto.";
     } else {
-      elStatusFooter.textContent = "La stagione " + g.season + " è chiusa. Tocca \"+ Nuova serata\" per ripartire: lo stato seguirà quella nuova.";
+      elStatusFooter.textContent = "La stagione " + g.season + " è chiusa. Aggiungi una serata qui sotto per ripartire: lo stato seguirà quella nuova.";
     }
   }
 
@@ -2795,9 +2826,17 @@
     elNewGigInput.placeholder = nextSeasonFor(v);
   }
 
+  /* Chiudere una serata sposta il promemoria di un anno lato server: se la
+     scheda e' aperta, il campo deve mostrarlo subito invece di restare
+     fermo sul valore vecchio finche' non la si riapre. */
+  function syncNextContactField(updated){
+    if(String(updated.id) !== String(currentId)) return;
+    fNextContact.value = updated.next_contact_date || "";
+  }
   function applyGigResponse(updated, rerender){
     applyUpdatedVenue(updated);
     renderStatusRow(updated);
+    syncNextContactField(updated);
     if(rerender) renderGigs(updated);
     renderAll();
   }
@@ -2859,7 +2898,13 @@
       var g = venueGigs(v).filter(function(x){ return String(x.id) === String(sid); })[0];
       openSheet({title:"Stato della serata", options: STATUSES.map(function(sv){
         return {label:sv.label, color:sv.color, checkmark: !!g && g.status === sv.key, onSelect:function(){
-          saveGig(sid, {status: sv.key}, true).then(function(){ toast("Stato: " + sv.label); });
+          var chiude = (sv.key === "suonato" || sv.key === "rifiutato") && !!g && g.open;
+          saveGig(sid, {status: sv.key}, true).then(function(updated){
+            // Chiudendo, il server sposta il promemoria: dirlo, altrimenti e'
+            // una data che cambia da sola senza che nessuno lo veda.
+            toast("Stato: " + sv.label + ((chiude && updated && updated.next_contact_date)
+              ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
+          });
         }};
       })});
       return;
