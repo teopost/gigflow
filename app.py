@@ -100,6 +100,27 @@ STATUS_VALUES = {
     "confermato", "suonato", "rifiutato",
 }
 
+# Gli stessi sei stati, ma applicati alla singola serata invece che al
+# palcoscenico: e' quello che permette di ripartire da zero ogni stagione
+# senza cancellare com'e' andata l'anno prima.
+GIG_FIELDS = ["season", "status", "gig_date", "fee", "outcome_note"]
+
+# Dopo "suonato" o "rifiutato" su quella stagione non c'e' piu' niente da
+# fare: la serata si chiude e la prossima nasce come riga nuova.
+CLOSING_STATUSES = {"suonato", "rifiutato"}
+
+GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# Il tipo di attivita' fatta sul palcoscenico. "nota" e' il default e copre
+# tutto quello che si scriveva prima che le attivita' avessero un tipo.
+NOTE_KINDS = {"nota", "visita", "chiamata", "messaggio", "email"}
+NOTE_KIND_LABELS = {
+    "visita": "Passato dal locale",
+    "chiamata": "Telefonata",
+    "messaggio": "Messaggio inviato",
+    "email": "Email inviata",
+}
+
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -263,6 +284,21 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS gigs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            season TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'da_contattare',
+            gig_date TEXT,
+            fee REAL,
+            outcome_note TEXT,
+            closed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_gigs_location ON gigs(location_id, season);
+        CREATE INDEX IF NOT EXISTS idx_gigs_date ON gigs(gig_date);
         CREATE INDEX IF NOT EXISTS idx_templates_kind ON app_templates(kind, position);
         CREATE INDEX IF NOT EXISTS idx_members_email ON workspace_members(email);
         CREATE INDEX IF NOT EXISTS idx_invites_workspace ON invites(workspace_id);
@@ -308,6 +344,15 @@ def migrate_schema(conn):
                 f"CREATE INDEX IF NOT EXISTS idx_{table}_workspace ON {table}(workspace_id)"
             )
 
+    note_cols = {row["name"] for row in conn.execute("PRAGMA table_info(notes)").fetchall()}
+    if "kind" not in note_cols:
+        conn.execute("ALTER TABLE notes ADD COLUMN kind TEXT")
+    if "gig_id" not in note_cols:
+        # Senza REFERENCES: la nota resta appesa al palcoscenico anche se la
+        # serata viene cancellata, il legame col ciclo e' un in piu'.
+        conn.execute("ALTER TABLE notes ADD COLUMN gig_id INTEGER")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_notes_gig ON notes(gig_id)")
+
     profile_cols = {row["name"] for row in conn.execute("PRAGMA table_info(user_profiles)").fetchall()}
     if "active_workspace_id" not in profile_cols:
         conn.execute("ALTER TABLE user_profiles ADD COLUMN active_workspace_id INTEGER")
@@ -316,6 +361,43 @@ def migrate_schema(conn):
     conn.execute("UPDATE workspace_members SET role = 'leader' WHERE role = 'owner'")
 
     migrate_to_workspaces(conn)
+    migrate_to_gigs(conn)
+
+
+def migrate_to_gigs(conn):
+    """Porta la storia esistente dentro le serate. Prima di questa versione lo
+    stato della trattativa viveva sul palcoscenico, quindi ogni palcoscenico
+    aveva un solo ciclo: quello in corso. Diventa la sua prima serata, e le
+    successive nascono quando si riparte per una stagione nuova.
+
+    Gira una volta sola ed e' additiva come quella dei workspace: nessuna
+    DROP, locations.status non viene toccata — resta la copia da cui elenchi
+    e filtri leggono gia' oggi.
+    """
+    if conn.execute("SELECT id FROM gigs LIMIT 1").fetchone():
+        return
+    # Anche i palcoscenici archiviati: se vengono ripristinati la loro storia
+    # deve essere ancora li'.
+    rows = conn.execute("SELECT id, status, created_at FROM locations").fetchall()
+    if not rows:
+        return
+    season = current_season()
+    ts = now_iso()
+    conn.executemany(
+        "INSERT INTO gigs (location_id, season, status, closed_at, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            (
+                r["id"],
+                season,
+                r["status"] or "da_contattare",
+                ts if (r["status"] or "") in CLOSING_STATUSES else None,
+                r["created_at"] or ts,
+                ts,
+            )
+            for r in rows
+        ],
+    )
 
 
 def migrate_to_workspaces(conn):
@@ -1023,12 +1105,192 @@ def to_number_or_none(value, kind=float):
         raise ApiError(400, "Valore numerico non valido")
 
 
-def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None):
+# Una serata = un tentativo di suonare in quel posto in quella stagione.
+# L'ordine e' sempre lo stesso: la stagione piu' recente in cima, e dentro la
+# stessa stagione prima le date fissate.
+GIG_ORDER = "ORDER BY season DESC, gig_date IS NULL, gig_date DESC, id DESC"
+
+
+def current_season():
+    """La stagione di default e' l'anno: chi pianifica per periodi diversi
+    ("Estate 2027") puo' scriverci quello che vuole, e' testo libero."""
+    return str(datetime.now(timezone.utc).year)
+
+
+def gig_to_dict(row):
+    d = dict(row)
+    d["open"] = d.get("closed_at") is None
+    return d
+
+
+def current_gig_row(conn, loc_id):
+    """La serata che conta adesso: quella aperta della stagione piu' recente,
+    e se non ce ne sono aperte l'ultima chiusa. E' da qui che il palcoscenico
+    prende lo stato mostrato negli elenchi, ed e' a questa che si attaccano le
+    attivita' registrate."""
+    return conn.execute(
+        "SELECT * FROM gigs WHERE location_id = ? "
+        "ORDER BY (closed_at IS NULL) DESC, season DESC, id DESC LIMIT 1",
+        (loc_id,),
+    ).fetchone()
+
+
+def refresh_location_status(conn, loc_id):
+    """locations.status e' una copia: la verita' sta sulla serata in corso.
+    Tenerla aggiornata qui vuol dire che elenchi, filtri e badge continuano a
+    funzionare esattamente come prima, senza sapere niente delle serate."""
+    row = current_gig_row(conn, loc_id)
+    if not row:
+        return
+    conn.execute(
+        "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
+        (row["status"], now_iso(), loc_id),
+    )
+
+
+def insert_gig(conn, loc_id, season, status, ts=None):
+    ts = ts or now_iso()
+    cur = conn.execute(
+        "INSERT INTO gigs (location_id, season, status, closed_at, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (loc_id, season, status, ts if status in CLOSING_STATUSES else None, ts, ts),
+    )
+    return cur.lastrowid
+
+
+def set_location_status(conn, loc_id, status):
+    """Cambiare lo stato dalla scheda del palcoscenico vuol dire cambiarlo
+    sulla serata in corso. Se lo scrivessimo solo su locations, la prima
+    modifica alla serata lo sovrascriverebbe."""
+    row = current_gig_row(conn, loc_id)
+    ts = now_iso()
+    if row is None:
+        insert_gig(conn, loc_id, current_season(), status, ts)
+    else:
+        conn.execute(
+            "UPDATE gigs SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?",
+            (status, ts if status in CLOSING_STATUSES else None, ts, row["id"]),
+        )
+    conn.execute(
+        "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?", (status, ts, loc_id)
+    )
+
+
+def clean_gig_payload(body, partial):
+    data = {}
+    for field in GIG_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if field == "status":
+            if value and value not in STATUS_VALUES:
+                raise ApiError(400, "Stato non valido")
+            value = value or "da_contattare"
+        elif field == "season":
+            value = (value or "").strip()
+            if not value:
+                raise ApiError(400, "La stagione è obbligatoria")
+        elif field == "gig_date":
+            value = (value or "").strip() or None
+            if value and not GIG_DATE_RE.match(value):
+                raise ApiError(400, "Data della serata non valida")
+        elif field == "fee":
+            value = to_number_or_none(value, float)
+        elif isinstance(value, str):
+            value = value.strip()
+        data[field] = value
+    return data
+
+
+def require_location(conn, ws, loc_id):
+    row = conn.execute(
+        "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+    return row
+
+
+def create_gig(conn, ws, loc_id, body):
+    require_location(conn, ws, loc_id)
+    data = clean_gig_payload(body or {}, partial=False)
+    data.setdefault("season", current_season())
+    data.setdefault("status", "da_contattare")
+    ts = now_iso()
+    # Ripartire per una stagione nuova chiude quelle vecchie rimaste in
+    # sospeso: se di quella trattativa non se n'e' fatto niente per un anno,
+    # aperta non e' piu'. Lo stato resta scritto com'era, la storia non si
+    # riscrive.
+    conn.execute(
+        "UPDATE gigs SET closed_at = ?, updated_at = ? "
+        "WHERE location_id = ? AND closed_at IS NULL AND season < ?",
+        (ts, ts, loc_id, data["season"]),
+    )
+    fields = ["location_id"] + list(data.keys()) + ["closed_at", "created_at", "updated_at"]
+    values = [loc_id] + list(data.values()) + [
+        ts if data["status"] in CLOSING_STATUSES else None, ts, ts,
+    ]
+    placeholders = ",".join("?" for _ in fields)
+    conn.execute(f"INSERT INTO gigs ({','.join(fields)}) VALUES ({placeholders})", values)
+    refresh_location_status(conn, loc_id)
+    conn.commit()
+    return fetch_location(conn, ws, loc_id)
+
+
+def gig_location_id(conn, ws, gig_id):
+    row = conn.execute(
+        "SELECT g.location_id FROM gigs g JOIN locations l ON l.id = g.location_id "
+        "WHERE g.id = ? AND l.workspace_id = ?",
+        (gig_id, ws),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Serata non trovata")
+    return row["location_id"]
+
+
+def update_gig(conn, ws, gig_id, body):
+    loc_id = gig_location_id(conn, ws, gig_id)
+    data = clean_gig_payload(body, partial=True)
+    if data:
+        if "status" in data:
+            data["closed_at"] = now_iso() if data["status"] in CLOSING_STATUSES else None
+        data["updated_at"] = now_iso()
+        set_clause = ",".join(f"{k} = ?" for k in data.keys())
+        conn.execute(
+            f"UPDATE gigs SET {set_clause} WHERE id = ?", list(data.values()) + [gig_id]
+        )
+        refresh_location_status(conn, loc_id)
+        conn.commit()
+    return fetch_location(conn, ws, loc_id)
+
+
+def delete_gig(conn, ws, gig_id):
+    loc_id = gig_location_id(conn, ws, gig_id)
+    # Le attivita' restano: erano cose fatte davvero, perdono solo il legame
+    # con il ciclo che non c'e' piu'.
+    conn.execute("UPDATE notes SET gig_id = NULL WHERE gig_id = ?", (gig_id,))
+    conn.execute("DELETE FROM gigs WHERE id = ?", (gig_id,))
+    refresh_location_status(conn, loc_id)
+    conn.commit()
+    return fetch_location(conn, ws, loc_id)
+
+
+def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None,
+                     gigs_by_location=None):
     d = dict(row)
     ad = ad_by_id.get(d.get("art_director_id"))
     d["art_director_name"] = ad["name"] if ad else None
     d["notes"] = notes_by_location.get(d["id"], [])
     d["photos"] = (photos_by_location or {}).get(d["id"], [])
+    gigs = (gigs_by_location or {}).get(d["id"], [])
+    d["gigs"] = gigs
+    # Quante volte ci hai suonato e in quali stagioni: e' il dato che dice se
+    # vale la pena richiamare questo posto, e viene gratis dalle righe.
+    played = [g for g in gigs if g["status"] == "suonato"]
+    d["gigs_played"] = len(played)
+    d["seasons_played"] = sorted({g["season"] for g in played}, reverse=True)
+    open_gigs = [g for g in gigs if g["open"]]
+    d["current_gig_id"] = open_gigs[0]["id"] if open_gigs else (gigs[0]["id"] if gigs else None)
     return d
 
 
@@ -1072,7 +1334,18 @@ def fetch_locations(conn, ws, status=None, search=None, include_deleted=False):
     for p in photo_rows:
         photos_by_location.setdefault(p["location_id"], []).append(dict(p))
 
-    return [location_to_dict(r, notes_by_location, ad_by_id, photos_by_location) for r in rows]
+    gig_rows = conn.execute(
+        "SELECT g.* FROM gigs g JOIN locations l ON l.id = g.location_id "
+        "WHERE l.workspace_id = ? " + GIG_ORDER, (ws,)
+    ).fetchall()
+    gigs_by_location = {}
+    for g in gig_rows:
+        gigs_by_location.setdefault(g["location_id"], []).append(gig_to_dict(g))
+
+    return [
+        location_to_dict(r, notes_by_location, ad_by_id, photos_by_location, gigs_by_location)
+        for r in rows
+    ]
 
 
 def fetch_location(conn, ws, loc_id):
@@ -1091,7 +1364,13 @@ def fetch_location(conn, ws, loc_id):
         "SELECT * FROM photos WHERE location_id = ? ORDER BY created_at ASC", (loc_id,)
     ).fetchall()
     photos_by_location = {loc_id: [dict(p) for p in photo_rows]}
-    return location_to_dict(row, notes_by_location, ad_by_id, photos_by_location)
+    gig_rows = conn.execute(
+        "SELECT * FROM gigs WHERE location_id = ? " + GIG_ORDER, (loc_id,)
+    ).fetchall()
+    gigs_by_location = {loc_id: [gig_to_dict(g) for g in gig_rows]}
+    return location_to_dict(
+        row, notes_by_location, ad_by_id, photos_by_location, gigs_by_location
+    )
 
 
 def clean_location_payload(body, partial):
@@ -1129,6 +1408,9 @@ def create_location(conn, ws, body, owner_email=None):
     cur = conn.execute(
         f"INSERT INTO locations ({','.join(fields)}) VALUES ({placeholders})", values
     )
+    # Un palcoscenico nuovo e' un tentativo di serata per la stagione in corso:
+    # senza questa riga non ci sarebbe niente su cui registrare la trattativa.
+    insert_gig(conn, cur.lastrowid, current_season(), data["status"], ts)
     conn.commit()
     return fetch_location(conn, ws, cur.lastrowid)
 
@@ -1140,13 +1422,18 @@ def update_location(conn, ws, loc_id, body):
     if not existing:
         raise ApiError(404, "Palcoscenico non trovato")
     data = clean_location_payload(body, partial=True)
-    if not data:
-        return fetch_location(conn, ws, loc_id)
-    data["updated_at"] = now_iso()
-    set_clause = ",".join(f"{k} = ?" for k in data.keys())
-    conn.execute(
-        f"UPDATE locations SET {set_clause} WHERE id = ?", list(data.values()) + [loc_id]
-    )
+    # Lo stato non e' un campo del palcoscenico ma della sua serata in corso:
+    # chi lo manda qui (la scheda, l'app installata di una versione vecchia)
+    # continua a funzionare, ma finisce nel posto giusto.
+    status = data.pop("status", None)
+    if data:
+        data["updated_at"] = now_iso()
+        set_clause = ",".join(f"{k} = ?" for k in data.keys())
+        conn.execute(
+            f"UPDATE locations SET {set_clause} WHERE id = ?", list(data.values()) + [loc_id]
+        )
+    if status is not None:
+        set_location_status(conn, loc_id, status)
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 
@@ -1191,6 +1478,7 @@ def purge_location(conn, ws, loc_id):
     ]
     conn.execute("DELETE FROM photos WHERE location_id = ?", (loc_id,))
     conn.execute("DELETE FROM notes WHERE location_id = ?", (loc_id,))
+    conn.execute("DELETE FROM gigs WHERE location_id = ?", (loc_id,))
     conn.execute("DELETE FROM locations WHERE id = ?", (loc_id,))
     conn.commit()
     for filename in filenames:
@@ -1201,20 +1489,31 @@ def purge_location(conn, ws, loc_id):
 
 
 def add_note(conn, ws, loc_id, body):
+    kind = (body.get("kind") or "nota").strip() or "nota"
+    if kind not in NOTE_KINDS:
+        raise ApiError(400, "Tipo di attività non valido")
     text = (body.get("text") or "").strip()
     if not text:
+        # I pulsanti rapidi registrano l'attivita' con un tocco solo: il testo
+        # lo mette l'app, altrimenti registrare una telefonata costerebbe
+        # quanto scriverne una nota.
+        text = NOTE_KIND_LABELS.get(kind, "")
+    if not text:
         raise ApiError(400, "Il testo della nota è obbligatorio")
-    existing = conn.execute(
-        "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
-    ).fetchone()
-    if not existing:
-        raise ApiError(404, "Palcoscenico non trovato")
+    require_location(conn, ws, loc_id)
     ts = now_iso()
+    gig = current_gig_row(conn, loc_id)
     conn.execute(
-        "INSERT INTO notes (location_id, text, created_at) VALUES (?, ?, ?)",
-        (loc_id, text, ts),
+        "INSERT INTO notes (location_id, gig_id, kind, text, created_at) VALUES (?, ?, ?, ?, ?)",
+        (loc_id, gig["id"] if gig else None, kind, text, ts),
     )
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
+    # Aver contattato il posto e' esattamente cosa distingue "da contattare"
+    # da "contattato": avanzarlo qui evita di dover cambiare lo stato a mano
+    # ogni volta. Da "contattato" in poi non si tocca piu' niente: dove sia
+    # arrivata la trattativa lo sa solo chi la sta portando avanti.
+    if kind != "nota" and gig is not None and gig["status"] == "da_contattare":
+        set_location_status(conn, loc_id, "contattato")
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 
@@ -1807,6 +2106,18 @@ def _h_delete_note(conn, match, query, body, ctx):
     return 200, delete_note(conn, require_ws(ctx), int(match.group(1)))
 
 
+def _h_create_gig(conn, match, query, body, ctx):
+    return 201, create_gig(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_update_gig(conn, match, query, body, ctx):
+    return 200, update_gig(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_delete_gig(conn, match, query, body, ctx):
+    return 200, delete_gig(conn, require_ws(ctx), int(match.group(1)))
+
+
 def _h_add_photo(conn, match, query, body, ctx):
     return 201, add_photo(conn, require_ws(ctx), int(match.group(1)), body)
 
@@ -2009,6 +2320,9 @@ ROUTES = [
     ("DELETE", re.compile(r"^/api/locations/(\d+)/permanent$"), _h_purge_location),
     ("POST", re.compile(r"^/api/locations/(\d+)/notes$"), _h_add_note),
     ("DELETE", re.compile(r"^/api/notes/(\d+)$"), _h_delete_note),
+    ("POST", re.compile(r"^/api/locations/(\d+)/gigs$"), _h_create_gig),
+    ("PUT", re.compile(r"^/api/gigs/(\d+)$"), _h_update_gig),
+    ("DELETE", re.compile(r"^/api/gigs/(\d+)$"), _h_delete_gig),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
     ("DELETE", re.compile(r"^/api/photos/(\d+)$"), _h_delete_photo),
     ("GET", re.compile(r"^/api/art_directors$"), _h_list_art_directors),
