@@ -284,6 +284,9 @@ def migrate_schema(conn):
     if "active_workspace_id" not in profile_cols:
         conn.execute("ALTER TABLE user_profiles ADD COLUMN active_workspace_id INTEGER")
 
+    # "owner" era il nome interno del primo giro; il ruolo si chiama Leader.
+    conn.execute("UPDATE workspace_members SET role = 'leader' WHERE role = 'owner'")
+
     migrate_to_workspaces(conn)
 
 
@@ -335,7 +338,7 @@ def migrate_to_workspaces(conn):
             conn.execute(
                 "INSERT OR IGNORE INTO workspace_members "
                 "(workspace_id, email, role, joined_at) VALUES (?, ?, ?, ?)",
-                (ws_id, email, "owner", ts),
+                (ws_id, email, "leader", ts),
             )
 
     # Tutti i dati sciolti finiscono nel primo workspace: gli altri nascono
@@ -449,7 +452,7 @@ def fetch_workspaces_for(conn, email, active_id=None):
         rows = conn.execute("SELECT * FROM workspaces ORDER BY id ASC").fetchall()
         out = [dict(r) for r in rows]
         for d in out:
-            d["role"] = "owner"
+            d["role"] = "leader"
     else:
         rows = conn.execute(
             "SELECT w.*, m.role FROM workspaces w "
@@ -520,7 +523,7 @@ def create_workspace(conn, email, name, genre=None, city=None):
     if email:
         conn.execute(
             "INSERT OR IGNORE INTO workspace_members (workspace_id, email, role, joined_at) "
-            "VALUES (?, ?, 'owner', ?)",
+            "VALUES (?, ?, 'leader', ?)",
             (ws_id, email, ts),
         )
     seed_default_venue_types(conn, ws_id)
@@ -539,12 +542,47 @@ def fetch_members(conn, workspace_id):
     return [dict(r) for r in rows]
 
 
+def count_leaders(conn, workspace_id):
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM workspace_members WHERE workspace_id = ? AND role = 'leader'",
+        (workspace_id,),
+    ).fetchone()["n"]
+
+
+def set_member_role(conn, workspace_id, actor_email, target_email, role):
+    """Promuove a Leader o riporta a Member. Il Leader e' chi puo' gestire la
+    band: inviti, ruoli e rimozioni."""
+    if role not in ("leader", "member"):
+        raise ApiError(400, "Ruolo non valido")
+    if not is_member(conn, workspace_id, target_email):
+        raise ApiError(404, "Questa persona non fa parte della band")
+    if actor_email and member_role(conn, workspace_id, actor_email) != "leader":
+        raise ApiError(403, "Solo un Leader può cambiare i ruoli")
+    if actor_email and actor_email == target_email:
+        raise ApiError(400, "Non puoi cambiare il tuo ruolo")
+    current = member_role(conn, workspace_id, target_email)
+    if current == role:
+        return
+    # Senza Leader nessuno potrebbe piu' invitare, cambiare ruoli o rimuovere:
+    # la band resterebbe bloccata per sempre.
+    if current == "leader" and count_leaders(conn, workspace_id) <= 1:
+        raise ApiError(400, "Questo è l'ultimo Leader: promuovine un altro prima di retrocederlo")
+    conn.execute(
+        "UPDATE workspace_members SET role = ? WHERE workspace_id = ? AND email = ?",
+        (role, workspace_id, target_email),
+    )
+    conn.commit()
+
+
 def remove_member(conn, workspace_id, actor_email, target_email):
     if not is_member(conn, workspace_id, target_email):
         raise ApiError(404, "Questa persona non fa parte della band")
-    if actor_email and member_role(conn, workspace_id, actor_email) != "owner" \
+    if actor_email and member_role(conn, workspace_id, actor_email) != "leader" \
             and actor_email != target_email:
-        raise ApiError(403, "Solo chi ha creato la band può rimuovere gli altri membri")
+        raise ApiError(403, "Solo un Leader può rimuovere gli altri membri")
+    if member_role(conn, workspace_id, target_email) == "leader" \
+            and count_leaders(conn, workspace_id) <= 1:
+        raise ApiError(400, "Questo è l'ultimo Leader: promuovine un altro prima di rimuoverlo")
     remaining = conn.execute(
         "SELECT COUNT(*) AS n FROM workspace_members WHERE workspace_id = ?", (workspace_id,)
     ).fetchone()["n"]
@@ -1167,7 +1205,7 @@ def create_my_band(conn, ctx, body):
     )
     row = conn.execute("SELECT * FROM workspaces WHERE id = ?", (ws_id,)).fetchone()
     d = dict(row)
-    d["role"] = "owner"
+    d["role"] = "leader"
     d["venue_count"] = 0
     d["member_count"] = 1 if ctx.email else 0
     d["active"] = True
@@ -1189,7 +1227,7 @@ def update_my_band(conn, ctx, ws_id, body):
     if not row:
         raise ApiError(404, "Band non trovata")
     d = dict(row)
-    d["role"] = member_role(conn, ws_id, ctx.email) or "owner"
+    d["role"] = member_role(conn, ws_id, ctx.email) or "leader"
     d["venue_count"] = conn.execute(
         "SELECT COUNT(*) AS n FROM locations WHERE workspace_id = ? AND deleted_at IS NULL", (ws_id,)
     ).fetchone()["n"]
@@ -1206,8 +1244,8 @@ def delete_my_band(conn, ctx, ws_id):
     obbligare a svuotarla prima."""
     if ctx.email and not is_member(conn, ws_id, ctx.email):
         raise ApiError(404, "Band non trovata")
-    if ctx.email and member_role(conn, ws_id, ctx.email) != "owner":
-        raise ApiError(403, "Solo chi ha creato la band può eliminarla")
+    if ctx.email and member_role(conn, ws_id, ctx.email) != "leader":
+        raise ApiError(403, "Solo un Leader può eliminare la band")
     n = conn.execute(
         "SELECT COUNT(*) AS n FROM locations WHERE workspace_id = ?", (ws_id,)
     ).fetchone()["n"]
@@ -1593,6 +1631,11 @@ def _h_list_members(conn, match, query, body, ctx):
     return 200, fetch_members(conn, require_ws(ctx))
 
 
+def _h_set_member_role(conn, match, query, body, ctx):
+    set_member_role(conn, require_ws(ctx), ctx.email, unquote(match.group(1)), body.get("role"))
+    return 200, fetch_members(conn, ctx.ws)
+
+
 def _h_remove_member(conn, match, query, body, ctx):
     target = unquote(match.group(1))
     remove_member(conn, require_ws(ctx), ctx.email, target)
@@ -1687,6 +1730,7 @@ ROUTES = [
     ("GET", re.compile(r"^/api/workspaces$"), _h_list_my_bands),
     ("PUT", re.compile(r"^/api/workspaces/active$"), _h_switch_workspace),
     ("GET", re.compile(r"^/api/workspaces/members$"), _h_list_members),
+    ("PUT", re.compile(r"^/api/workspaces/members/(.+)$"), _h_set_member_role),
     ("DELETE", re.compile(r"^/api/workspaces/members/(.+)$"), _h_remove_member),
     ("GET", re.compile(r"^/api/invites$"), _h_list_invites),
     ("POST", re.compile(r"^/api/invites$"), _h_create_invite),

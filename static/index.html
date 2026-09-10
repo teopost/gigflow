@@ -229,7 +229,14 @@
   .swipe-row::-webkit-scrollbar{display:none;}
   .row-content{flex:0 0 100%;scroll-snap-align:start;min-width:0;}
   .row-actions{flex:0 0 84px;scroll-snap-align:end;display:flex;}
-  .row-actions button{flex:1;border:none;background:var(--destructive);color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  /* due azioni sulla stessa riga: serve il doppio di spazio, altrimenti le
+     etichette non ci stanno e i bersagli diventano troppo stretti da toccare */
+  .row-actions.two{flex:0 0 184px;}
+  .row-actions button{flex:1;border:none;background:var(--destructive);color:#fff;font-size:13px;font-weight:600;cursor:pointer;padding:0 6px;line-height:1.2;}
+  /* var(--tint) e' cremisi come var(--destructive): usarlo qui renderebbe
+     l'azione di promozione indistinguibile da quella di rimozione. Grigio
+     neutro per l'azione benigna, rosso solo per quella che toglie. */
+  .row-actions button.role{background:var(--text-tertiary);}
 
   .row{display:flex;align-items:center;gap:10px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);cursor:pointer;}
   .row:active{background:var(--fill);}
@@ -730,7 +737,7 @@
 
       <div class="section-header">MEMBRI</div>
       <div class="grouped-list" id="membersList"></div>
-      <div class="section-footer">Solo chi ha creato la band può rimuovere gli altri.</div>
+      <div class="section-footer">Scorri a sinistra su una persona per promuoverla a Leader o toglierla dalla band. Solo un Leader può farlo, e sulla tua riga non succede niente.</div>
     </div>
   </section>
 
@@ -3227,17 +3234,25 @@
       return;
     }
     var a = activeBand();
-    var iAmOwner = a && a.role === "owner";
+    var iAmLeader = a && a.role === "leader";
     el.innerHTML = members.map(function(mem){
       var isMe = me && me.email === mem.email;
-      var canRemove = iAmOwner && !isMe && members.length > 1;
+      var isLeader = mem.role === "leader";
+      // Sulla propria riga non compare nessuna azione: senza row-actions lo
+      // swipe non ha dove agganciarsi e la riga resta ferma.
+      var actions = "";
+      if(iAmLeader && !isMe){
+        actions = '<div class="row-actions two">'+
+          '<button class="role" data-set-role="'+esc(mem.email)+'" data-role="'+(isLeader ? "member" : "leader")+'">'+
+            (isLeader ? "Rendi Member" : "Rendi Leader")+'</button>'+
+          '<button data-remove-member="'+esc(mem.email)+'">Rimuovi</button>'+
+        '</div>';
+      }
       return '<div class="swipe-row"><div class="row-content"><div class="row">'+
         '<div class="row-main"><div class="row-title">'+esc(mem.name || mem.email)+(isMe ? " (tu)" : "")+'</div>'+
         '<div class="row-sub">'+esc(mem.email)+'</div></div>'+
-        '<div class="row-trail"><span class="member-role">'+(mem.role === "owner" ? "creatore" : "membro")+'</span></div>'+
-      '</div></div>'+
-      (canRemove ? '<div class="row-actions"><button data-remove-member="'+esc(mem.email)+'">Rimuovi</button></div>' : '')+
-      '</div>';
+        '<div class="row-trail"><span class="member-role">'+(isLeader ? "Leader" : "Member")+'</span></div>'+
+      '</div></div>'+actions+'</div>';
     }).join("");
   }
   function loadInviteScreen(){
@@ -3309,6 +3324,17 @@
   });
 
   document.getElementById("membersList").addEventListener("click", function(e){
+    var role = e.target.closest("[data-set-role]");
+    if(role){
+      var target = role.getAttribute("data-set-role");
+      var next = role.getAttribute("data-role");
+      api("PUT", "/api/workspaces/members/" + encodeURIComponent(target), {role: next})
+        .then(function(list){
+          members = list; renderMembers();
+          toast(next === "leader" ? "Promosso a Leader" : "Ora è Member");
+        }).catch(function(err){ toast(err.message); });
+      return;
+    }
     var rm = e.target.closest("[data-remove-member]");
     if(!rm) return;
     var email = rm.getAttribute("data-remove-member");
