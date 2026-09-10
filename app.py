@@ -617,12 +617,11 @@ def invite_to_dict(row, origin=None):
 
 def create_invite(conn, workspace_id, email, max_uses=None):
     ts = datetime.now(timezone.utc)
-    # Se ne crea uno a ogni apertura della schermata: senza questa pulizia la
-    # tabella crescerebbe all'infinito di link ormai inutilizzabili.
-    conn.execute(
-        "DELETE FROM invites WHERE workspace_id = ? AND expires_at < ?",
-        (workspace_id, ts.isoformat()),
-    )
+    # Una band ha un solo link alla volta. Se ne crea uno a ogni apertura
+    # della schermata, quindi tenere i precedenti significherebbe accumulare
+    # un pulsante "Copia link" in piu' a ogni visita: il nuovo sostituisce il
+    # vecchio, che smette di funzionare da subito.
+    conn.execute("DELETE FROM invites WHERE workspace_id = ?", (workspace_id,))
     token = secrets.token_urlsafe(32)
     conn.execute(
         "INSERT INTO invites (token, workspace_id, created_by, created_at, expires_at, max_uses) "

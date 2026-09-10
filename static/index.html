@@ -3281,8 +3281,11 @@
   document.getElementById("btnInviteBack").addEventListener("click", closeInviteScreen);
 
   document.getElementById("btnCreateInvite").addEventListener("click", function(){
+    // Il nuovo link sostituisce il precedente lato server: la lista va
+    // riletta, non allungata, altrimenti resterebbero in pagina pulsanti
+    // che puntano a link ormai morti.
     api("POST", "/api/invites", {}).then(function(inv){
-      invites.unshift(inv);
+      invites = [inv];
       renderInvites();
       copyInviteLink(inv.url, "Link creato e copiato");
     }).catch(function(err){ toast(err.message); });
