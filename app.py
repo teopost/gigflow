@@ -223,12 +223,6 @@ def migrate_schema(conn):
         conn.execute("ALTER TABLE locations ADD COLUMN category TEXT")
     if "owner_email" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN owner_email TEXT")
-        # dati preesistenti: prima dell'introduzione del proprietario, i palcoscenici
-        # inseriti erano tutti di questo account. Con le multiutenze andrà rivisto.
-        conn.execute(
-            "UPDATE locations SET owner_email = ? WHERE owner_email IS NULL",
-            ("stefano.viciguerra@gmail.com",),
-        )
 
     my_band_cols = {row["name"] for row in conn.execute("PRAGMA table_info(my_bands)").fetchall()}
     if "genre" not in my_band_cols:
