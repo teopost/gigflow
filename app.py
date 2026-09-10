@@ -40,8 +40,10 @@ SESSION_COOKIE = "session_id"
 STATE_COOKIE = "oauth_state"
 SESSION_TTL_DAYS = 30
 INVITE_COOKIE = "invite_token"
-# Il link di invito viene passato a mano (WhatsApp), quindi vive poco.
-INVITE_TTL_DAYS = 7
+# Il link di invito viene passato a mano (WhatsApp) e ne basta uno nuovo a
+# ogni giro: tre ore bastano per mandarlo e farlo aprire, e sono poche
+# abbastanza da non aver bisogno di revocarlo se finisce dove non doveva.
+INVITE_TTL_HOURS = 3
 # Quanto tempo ha chi apre il link per completare il giro su Google.
 INVITE_COOKIE_TTL_SECONDS = 600
 
@@ -615,6 +617,12 @@ def invite_to_dict(row, origin=None):
 
 def create_invite(conn, workspace_id, email, max_uses=None):
     ts = datetime.now(timezone.utc)
+    # Se ne crea uno a ogni apertura della schermata: senza questa pulizia la
+    # tabella crescerebbe all'infinito di link ormai inutilizzabili.
+    conn.execute(
+        "DELETE FROM invites WHERE workspace_id = ? AND expires_at < ?",
+        (workspace_id, ts.isoformat()),
+    )
     token = secrets.token_urlsafe(32)
     conn.execute(
         "INSERT INTO invites (token, workspace_id, created_by, created_at, expires_at, max_uses) "
@@ -622,7 +630,7 @@ def create_invite(conn, workspace_id, email, max_uses=None):
         (
             token, workspace_id, email,
             ts.isoformat(),
-            (ts + timedelta(days=INVITE_TTL_DAYS)).isoformat(),
+            (ts + timedelta(hours=INVITE_TTL_HOURS)).isoformat(),
             max_uses,
         ),
     )
@@ -638,16 +646,6 @@ def fetch_invites(conn, workspace_id, origin=None):
     return [invite_to_dict(r, origin) for r in rows]
 
 
-def revoke_invite(conn, workspace_id, token):
-    cur = conn.execute(
-        "UPDATE invites SET revoked_at = ? WHERE token = ? AND workspace_id = ? AND revoked_at IS NULL",
-        (now_iso(), token, workspace_id),
-    )
-    conn.commit()
-    if cur.rowcount == 0:
-        raise ApiError(404, "Invito non trovato")
-
-
 def check_invite(conn, token):
     """Restituisce (riga_invito, messaggio_errore). Ogni motivo di rifiuto ha
     il suo messaggio: "non valido" da solo non dice a chi lo riceve se deve
@@ -660,7 +658,7 @@ def check_invite(conn, token):
     if row["revoked_at"]:
         return None, "Questo invito è stato annullato da chi te l'ha mandato."
     if row["expires_at"] < now_iso():
-        return None, f"Questo invito è scaduto: i link valgono {INVITE_TTL_DAYS} giorni."
+        return None, f"Questo invito è scaduto: i link valgono {INVITE_TTL_HOURS} ore. Chiedine uno nuovo."
     if row["max_uses"] and row["used_count"] >= row["max_uses"]:
         return None, "Questo invito ha già raggiunto il numero massimo di utilizzi."
     return row, None
@@ -1652,11 +1650,6 @@ def _h_create_invite(conn, match, query, body, ctx):
     return 201, invite_to_dict(row, ctx.origin)
 
 
-def _h_revoke_invite(conn, match, query, body, ctx):
-    revoke_invite(conn, require_ws(ctx), match.group(1))
-    return 200, fetch_invites(conn, ctx.ws, ctx.origin)
-
-
 def _h_list_wa_templates(conn, match, query, body, ctx):
     return 200, fetch_wa_templates(conn, require_ws(ctx))
 
@@ -1734,7 +1727,6 @@ ROUTES = [
     ("DELETE", re.compile(r"^/api/workspaces/members/(.+)$"), _h_remove_member),
     ("GET", re.compile(r"^/api/invites$"), _h_list_invites),
     ("POST", re.compile(r"^/api/invites$"), _h_create_invite),
-    ("DELETE", re.compile(r"^/api/invites/([A-Za-z0-9_-]+)$"), _h_revoke_invite),
     ("GET", re.compile(r"^/api/my_bands$"), _h_list_my_bands),
     ("POST", re.compile(r"^/api/my_bands$"), _h_create_my_band),
     ("PUT", re.compile(r"^/api/my_bands/(\d+)$"), _h_update_my_band),

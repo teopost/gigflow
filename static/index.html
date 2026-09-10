@@ -733,7 +733,7 @@
           <div class="row-title" style="color:var(--tint);font-weight:600;">Crea un link di invito</div>
         </div>
       </div>
-      <div class="section-footer">Il link vale 7 giorni e può essere usato da più persone. Chi lo apre entra in <span id="inviteBandName">questa band</span> e vede gli stessi palcoscenici che vedi tu. Se finisce nelle mani sbagliate, annullalo qui.</div>
+      <div class="section-footer">Ogni volta che apri questa schermata trovi un link nuovo, valido 3 ore e utilizzabile da più persone. Chi lo apre entra in <span id="inviteBandName">questa band</span> e vede gli stessi palcoscenici che vedi tu. Passate le 3 ore smette di funzionare da solo.</div>
 
       <div class="section-header">MEMBRI</div>
       <div class="grouped-list" id="membersList"></div>
@@ -3196,22 +3196,24 @@
   var invites = [];
   var members = [];
 
-  function fmtInviteDate(iso){
-    try{
-      return new Date(iso).toLocaleDateString("it-IT", {day:"numeric", month:"long"});
-    }catch(e){ return iso; }
-  }
+  /* Un link dura 3 ore, quindi scade quasi sempre nella stessa giornata:
+     l'ora e' l'informazione utile, la data lo diventa solo a cavallo della
+     mezzanotte. */
   function inviteStateLabel(inv){
-    if(inv.revoked) return "annullato";
     if(inv.expired) return "scaduto";
     if(inv.exhausted) return "esaurito";
-    return "valido fino al " + fmtInviteDate(inv.expires_at);
+    try{
+      var d = new Date(inv.expires_at);
+      var ora = d.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"});
+      if(d.toDateString() === new Date().toDateString()) return "valido fino alle " + ora;
+      return "valido fino a domani alle " + ora;
+    }catch(e){ return "valido"; }
   }
   function renderInvites(){
     var el = document.getElementById("inviteList");
     var live = invites.filter(function(i){ return i.valid; });
     if(!live.length){
-      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun link attivo. Creane uno e mandalo su WhatsApp.</div>';
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun link attivo.</div>';
       return;
     }
     el.innerHTML = live.map(function(inv){
@@ -3221,7 +3223,6 @@
         '<div class="invite-actions">'+
           '<button data-copy-invite="'+esc(inv.url)+'">Copia link</button>'+
           '<button class="secondary" data-share-invite="'+esc(inv.url)+'">WhatsApp</button>'+
-          '<button class="secondary" data-revoke-invite="'+esc(inv.token)+'">Annulla</button>'+
         '</div>'+
         '<div class="invite-meta">'+inviteStateLabel(inv)+' · '+used+'</div>'+
       '</div>';
@@ -3258,8 +3259,12 @@
   function loadInviteScreen(){
     var a = activeBand();
     document.getElementById("inviteBandName").textContent = a ? a.name : "questa band";
+    // Un link nuovo a ogni apertura: dura 3 ore, quindi quello della volta
+    // scorsa e' quasi sempre gia' scaduto e non avrebbe senso riproporlo.
     return Promise.all([
-      api("GET", "/api/invites").then(function(d){ invites = d; renderInvites(); }),
+      api("POST", "/api/invites", {})
+        .then(function(){ return api("GET", "/api/invites"); })
+        .then(function(d){ invites = d; renderInvites(); }),
       api("GET", "/api/workspaces/members").then(function(d){ members = d; renderMembers(); })
     ]).catch(function(err){ toast(err.message); });
   }
@@ -3282,6 +3287,7 @@
       copyInviteLink(inv.url, "Link creato e copiato");
     }).catch(function(err){ toast(err.message); });
   });
+
 
   function copyInviteLink(url, okMessage){
     // navigator.clipboard esiste solo in contesto sicuro: senza HTTPS si
@@ -3314,12 +3320,6 @@
       var text = "Ti invito su GigFlow" + (a ? " nella band " + a.name : "") + ": " + url;
       window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
       return;
-    }
-    var rev = e.target.closest("[data-revoke-invite]");
-    if(rev){
-      api("DELETE", "/api/invites/" + encodeURIComponent(rev.getAttribute("data-revoke-invite"))).then(function(list){
-        invites = list; renderInvites(); toast("Invito annullato");
-      }).catch(function(err){ toast(err.message); });
     }
   });
 
