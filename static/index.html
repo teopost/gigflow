@@ -192,6 +192,8 @@
   .invite-actions button.secondary{background:var(--fill);color:var(--text);}
   .invite-meta{font-size:12.5px;color:var(--text-tertiary);margin-top:8px;}
   .invite-dead{opacity:.5;}
+  .role-help{margin-bottom:10px;display:flex;flex-direction:column;gap:5px;}
+  .role-help b{color:var(--text);font-weight:600;}
   .member-role{font-size:11px;font-weight:600;padding:2.5px 8px;border-radius:999px;background:var(--fill);color:var(--text-secondary);white-space:nowrap;}
   .admin-warning{margin:4px 16px 6px;padding:12px 14px;border-radius:10px;background:var(--fill);border-left:3px solid var(--orange);font-size:13.5px;line-height:1.5;color:var(--text-secondary);}
   .admin-warning strong{display:block;color:var(--text);margin-bottom:3px;}
@@ -835,7 +837,14 @@
 
       <div class="section-header">MEMBRI</div>
       <div class="grouped-list" id="membersList"></div>
-      <div class="section-footer">Scorri a sinistra su una persona per promuoverla a Leader o toglierla dalla band. Solo un Leader può farlo, e sulla tua riga non succede niente.</div>
+      <div class="section-footer">
+        <div class="role-help">
+          <div><b>Leader</b> — gestisce la band: manda gli inviti, cambia i ruoli, rimuove le persone. Serve almeno un Leader per band.</div>
+          <div><b>Member</b> — lavora sui dati: aggiunge e modifica palcoscenici, note, foto e contatti.</div>
+          <div><b>Slaker</b> — consulta e basta: vede tutto quello che vedono gli altri, ma non può modificare niente.</div>
+        </div>
+        Scorri a sinistra su una persona per cambiarle ruolo o toglierla dalla band. Solo un Leader può farlo, e sulla tua riga non succede niente.
+      </div>
     </div>
   </section>
 
@@ -3357,6 +3366,34 @@
       '</div>';
     }).join("");
   }
+  var ROLE_LABELS = {leader: "Leader", member: "Member", slaker: "Slaker"};
+  var ROLE_OPTIONS = [
+    {value: "leader", label: "Leader", hint: "Gestisce la band: invita, cambia i ruoli, rimuove le persone"},
+    {value: "member", label: "Member", hint: "Lavora sui dati: aggiunge e modifica i palcoscenici"},
+    {value: "slaker", label: "Slaker", hint: "Consulta e basta: vede tutto, non modifica niente"}
+  ];
+
+  function setMemberRole(email, role){
+    api("PUT", "/api/workspaces/members/" + encodeURIComponent(email), {role: role})
+      .then(function(list){
+        members = list; renderMembers();
+        toast("Ruolo aggiornato: " + ROLE_LABELS[role]);
+      }).catch(function(err){ toast(err.message); });
+  }
+
+  function openRolePicker(mem){
+    openSheet({
+      title: mem.name || mem.email,
+      options: ROLE_OPTIONS.map(function(o){
+        return {
+          label: o.label + " — " + o.hint,
+          checkmark: mem.role === o.value,
+          onSelect: function(){ if(mem.role !== o.value) setMemberRole(mem.email, o.value); }
+        };
+      })
+    });
+  }
+
   function renderMembers(){
     var el = document.getElementById("membersList");
     if(!members.length){
@@ -3367,21 +3404,21 @@
     var iAmLeader = a && a.role === "leader";
     el.innerHTML = members.map(function(mem){
       var isMe = me && me.email === mem.email;
-      var isLeader = mem.role === "leader";
       // Sulla propria riga non compare nessuna azione: senza row-actions lo
       // swipe non ha dove agganciarsi e la riga resta ferma.
       var actions = "";
       if(iAmLeader && !isMe){
+        // Tre ruoli non stanno in un pulsante che alterna: il primo apre il
+        // selettore, il secondo toglie dalla band.
         actions = '<div class="row-actions two">'+
-          '<button class="role" data-set-role="'+esc(mem.email)+'" data-role="'+(isLeader ? "member" : "leader")+'">'+
-            (isLeader ? "Rendi Member" : "Rendi Leader")+'</button>'+
+          '<button class="role" data-pick-role="'+esc(mem.email)+'">Ruolo</button>'+
           '<button data-remove-member="'+esc(mem.email)+'">Rimuovi</button>'+
         '</div>';
       }
       return '<div class="swipe-row"><div class="row-content"><div class="row">'+
         '<div class="row-main"><div class="row-title">'+esc(mem.name || mem.email)+(isMe ? " (tu)" : "")+'</div>'+
         '<div class="row-sub">'+esc(mem.email)+'</div></div>'+
-        '<div class="row-trail"><span class="member-role">'+(isLeader ? "Leader" : "Member")+'</span></div>'+
+        '<div class="row-trail"><span class="member-role">'+esc(ROLE_LABELS[mem.role] || mem.role)+'</span></div>'+
       '</div></div>'+actions+'</div>';
     }).join("");
   }
@@ -3456,15 +3493,11 @@
   });
 
   document.getElementById("membersList").addEventListener("click", function(e){
-    var role = e.target.closest("[data-set-role]");
-    if(role){
-      var target = role.getAttribute("data-set-role");
-      var next = role.getAttribute("data-role");
-      api("PUT", "/api/workspaces/members/" + encodeURIComponent(target), {role: next})
-        .then(function(list){
-          members = list; renderMembers();
-          toast(next === "leader" ? "Promosso a Leader" : "Ora è Member");
-        }).catch(function(err){ toast(err.message); });
+    var pick = e.target.closest("[data-pick-role]");
+    if(pick){
+      var email = pick.getAttribute("data-pick-role");
+      var mem = members.find(function(x){ return x.email === email; });
+      if(mem) openRolePicker(mem);
       return;
     }
     var rm = e.target.closest("[data-remove-member]");
@@ -3910,6 +3943,9 @@
       // una comodita' dell'interfaccia: il controllo vero e' sul server, che
       // rifiuta le rotte /api/admin a chiunque altro.
       document.getElementById("tabBtnAdmin").hidden = !me.is_admin;
+      // Uno Slaker non puo' scrivere: il "+" lo porterebbe solo a un errore.
+      // La barriera vera resta sul server, questo e' per non farlo sbattere.
+      document.getElementById("fabAdd").hidden = (me.can_write === false);
       if(me.email && me.needs_workspace) openWizard();
       return me;
     });

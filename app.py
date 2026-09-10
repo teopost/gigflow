@@ -578,6 +578,11 @@ def fetch_members(conn, workspace_id):
     return [dict(r) for r in rows]
 
 
+# Leader amministra la band, Member lavora sui dati, Slaker li consulta e
+# basta. L'ordine conta solo per l'interfaccia.
+MEMBER_ROLES = ("leader", "member", "slaker")
+
+
 def count_leaders(conn, workspace_id):
     return conn.execute(
         "SELECT COUNT(*) AS n FROM workspace_members WHERE workspace_id = ? AND role = 'leader'",
@@ -588,7 +593,7 @@ def count_leaders(conn, workspace_id):
 def set_member_role(conn, workspace_id, actor_email, target_email, role):
     """Promuove a Leader o riporta a Member. Il Leader e' chi puo' gestire la
     band: inviti, ruoli e rimozioni."""
-    if role not in ("leader", "member"):
+    if role not in MEMBER_ROLES:
         raise ApiError(400, "Ruolo non valido")
     if not is_member(conn, workspace_id, target_email):
         raise ApiError(404, "Questa persona non fa parte della band")
@@ -764,6 +769,8 @@ def fetch_me(conn, email):
     # Con il login spento non c'e' un utente da riconoscere: l'app gira in
     # locale per una persona sola, che e' anche l'amministratore.
     d["is_admin"] = (not auth_enabled()) or is_admin(email)
+    d["role"] = member_role(conn, active, email) if (active and email) else "leader"
+    d["can_write"] = d["role"] != "slaker"
     return d
 
 
@@ -1892,6 +1899,19 @@ def _h_create_invite(conn, match, query, body, ctx):
     return 201, invite_to_dict(row, ctx.origin)
 
 
+def require_writer(conn, ctx):
+    """Uno Slaker consulta ma non tocca. Il controllo sta qui, in un punto
+    solo attraversato da ogni scrittura: nascondere i pulsanti nell'app non
+    fermerebbe una chiamata fatta a mano."""
+    if not ctx.email or ctx.ws is None:
+        return
+    if member_role(conn, ctx.ws, ctx.email) == "slaker":
+        raise ApiError(
+            403,
+            "Sei Slaker in questa band: puoi consultare i dati ma non modificarli",
+        )
+
+
 def require_admin(ctx):
     """L'amministratore e' definito nel .env di questa installazione. Se
     ADMIN_EMAILS e' vuoto non c'e' nessun amministratore: meglio nessuno che
@@ -1973,6 +1993,11 @@ def _h_delete_venue_category(conn, match, query, body, ctx):
     delete_venue_category(conn, require_ws(ctx), int(match.group(1)))
     return 204, {}
 
+
+# Scritture che uno Slaker puo' comunque fare: cambiare la band attiva e'
+# una preferenza sua, e creare una band nuova non tocca quella in cui e'
+# Slaker — nella band nuova sara' Leader.
+SLAKER_ALLOWED = {_h_switch_workspace, _h_create_my_band}
 
 ROUTES = [
     ("GET", re.compile(r"^/api/locations$"), _h_list_locations),
@@ -2404,6 +2429,7 @@ class Handler(BaseHTTPRequestHandler):
                 ws = resolve_active_workspace(conn, owner_email)
                 if ws is None:
                     raise ApiError(409, "Nessuna band attiva: creane una o accetta un invito")
+                require_writer(conn, RequestContext(owner_email, ws, self._request_origin()))
                 payload = create_location(conn, ws, self._read_json_body(), owner_email=owner_email)
                 self._send_json(201, payload)
             except ApiError as e:
@@ -2494,6 +2520,8 @@ class Handler(BaseHTTPRequestHandler):
                     ctx = RequestContext(
                         email, resolve_active_workspace(conn, email), self._request_origin()
                     )
+                    if method != "GET" and fn not in SLAKER_ALLOWED:
+                        require_writer(conn, ctx)
                     status, payload = fn(conn, match, parse_qs(parsed.query), body, ctx)
                 finally:
                     conn.close()
