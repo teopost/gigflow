@@ -40,6 +40,7 @@
     --blue:#007aff;    --blue-soft:#d9ecff;
     --orange:#ff9500;  --orange-soft:#ffedd1;
     --green:#34c759;   --green-soft:#dcf5e2;
+    --pick:#dba63f;    --pick-bg:#10181f;
     --purple:#af52de;  --purple-soft:#f1e0f9;
     --red:#ff3b30;     --red-soft:#ffe5e3;
   }
@@ -267,8 +268,15 @@
   .row-chevron{flex:none;color:var(--text-tertiary);}
   .row-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
 
+  /* Il plettro e' il marchio di GigFlow: e' quello che sta nell'icona
+     dell'app, ed e' quello che deve comparire dove prima c'era un
+     microfono preso a prestito dalle emoji. Ambra su blu notte come
+     l'icona, cosi' la cosa che vedi sul telefono e quella che vedi
+     dentro l'app sono la stessa. */
+  .pick{width:1em;height:1em;display:block;color:var(--pick);}
+  .pick-badge{width:72px;height:72px;border-radius:18px;background:var(--pick-bg);margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:38px;}
   .empty-state{padding:64px 32px;text-align:center;color:var(--text-secondary);}
-  .empty-state .glyph{font-size:38px;margin-bottom:12px;filter:grayscale(1) opacity(.55);}
+  .empty-state .glyph{font-size:38px;margin-bottom:12px;filter:grayscale(1) opacity(.55);display:flex;justify-content:center;}
   .empty-state h2{font-size:17px;font-weight:600;color:var(--text);margin:0 0 6px;}
   .empty-state p{font-size:14px;line-height:1.5;max-width:32ch;margin:0 auto;}
 
@@ -1037,7 +1045,7 @@
     </header>
     <div class="screen-scroll">
       <div style="text-align:center;padding:32px 16px 8px;">
-        <div style="width:72px;height:72px;border-radius:18px;background:var(--tint-soft);margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:32px;">🎤</div>
+        <div class="pick-badge"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div>
         <div style="font-size:20px;font-weight:700;">GigFlow</div>
         <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Versione 1.0</div>
       </div>
@@ -1139,7 +1147,7 @@
     </header>
     <div class="screen-scroll">
       <div style="text-align:center;padding:28px 24px 4px;">
-        <div style="font-size:34px;margin-bottom:10px;">🎤</div>
+        <div style="font-size:34px;margin-bottom:10px;display:flex;justify-content:center;"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div>
         <div style="font-size:20px;font-weight:700;">Benvenuto su GigFlow</div>
         <div style="font-size:14px;color:var(--text-secondary);margin-top:6px;">Crea la tua band per iniziare da zero. Se invece devi unirti a una band che esiste già, chiudi qui e apri il link di invito che ti hanno mandato.</div>
       </div>
@@ -2314,7 +2322,7 @@
       var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
-          ? '<div class="glyph">🎤</div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
+          ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
           : '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare filtro o termine di ricerca.</p>')+
         '</div>';
       return;
@@ -2752,7 +2760,7 @@
   function renderAgendaGigs(){
     var rows = datedGigRows();
     if(!rows.length){
-      elAgendaGigs.innerHTML = '<div class="empty-state"><div class="glyph">🎤</div><h2>Nessuna serata in calendario</h2>'+
+      elAgendaGigs.innerHTML = '<div class="empty-state"><div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessuna serata in calendario</h2>'+
         '<p>Quando un locale ti dà una data, scrivila nella serata dalla scheda del palcoscenico: da qui vedi tutte quelle fissate e tutte quelle già suonate.</p></div>';
       return;
     }
