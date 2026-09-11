@@ -352,8 +352,12 @@
   .gig-main{flex:1;min-width:0;}
   .gig-date{font-size:16px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .gig-sub{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
-  .gig-panel{background:var(--bg);border-top:.5px solid var(--separator);}
-  .gig-panel .field-row{background:var(--bg);}
+  /* Il pannello fa parte della cella che sta modificando, non e' un buco
+     scavato dentro: con lo sfondo della pagina la riga, i campi e i due
+     pulsanti sembravano due celle separate da uno spazio vuoto. Stesso
+     fondo chiaro di tutte le altre righe, e a dividere bastano i capelli
+     di separatore come dentro qualunque elenco raggruppato. */
+  .gig-panel{background:var(--bg-elevated);border-top:.5px solid var(--separator);}
   /* flex-basis su una riga in colonna diventa ALTEZZA, non larghezza: senza
      :not(.stacked) l'etichetta di "Com'e' andata" si prendeva 104px di vuoto
      e spingeva la riga scrivibile in fondo al box. */
@@ -408,6 +412,7 @@
   .year-head{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center;}
   .year-head .row-chevron{color:var(--text-tertiary);transition:transform .2s;}
   .year-head.open .row-chevron{transform:rotate(90deg);}
+  .gig-card + .gig-card{margin-top:10px;}
   .gig-confirm{display:flex;gap:8px;padding:0 16px 11px;background:var(--bg-elevated);}
   .gig-confirm button{flex:1;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;padding:9px 4px;cursor:pointer;}
   .gig-confirm .yes{background:var(--green-soft);color:#1f8b3d;}
@@ -2761,9 +2766,13 @@
     var toConfirm = past.filter(function(x){ return x.g.status === "confermato"; });
     var html = "";
     if(toConfirm.length){
-      html += '<div class="agenda-group">Da confermare<span class="group-count">'+toConfirm.length+'</span></div><div class="grouped-list">' +
+      // Una cella per serata invece di un elenco unico: ognuna e' alta tre
+      // righe piu' i pulsanti, e messe in fila dentro la stessa scheda si
+      // leggerebbero come un blocco solo.
+      html += '<div class="agenda-group">Da confermare<span class="group-count">'+toConfirm.length+'</span></div>' +
         toConfirm.map(function(x){
-          return '<div class="row" data-open-id="'+x.v.id+'">'+
+          return '<div class="grouped-list gig-card">'+
+          '<div class="row" data-open-id="'+x.v.id+'">'+
             '<div class="row-main"><div class="row-title">'+esc(x.v.name||"Senza nome")+'</div>'+
             '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+' · stagione '+esc(x.g.season)+'</div></div>'+
           '</div>'+
@@ -2777,8 +2786,9 @@
           '<div class="gig-confirm">'+
             '<button type="button" class="yes" data-played="'+x.g.id+'">Ho suonato</button>'+
             '<button type="button" class="no" data-cancelled="'+x.g.id+'">Annullata</button>'+
-          '</div>';
-        }).join("") + '</div>';
+          '</div>'+
+        '</div>';
+        }).join("");
     }
     // "Prossime serate" vuol dire quello che suonerai: solo le confermate.
     // Una data segnata su una trattativa ancora aperta e' una proposta, non
