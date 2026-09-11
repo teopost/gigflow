@@ -19,7 +19,7 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs, urlencode, unquote
+from urllib.parse import urlparse, parse_qs, urlencode, unquote, quote
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "crm.db")
@@ -60,6 +60,9 @@ INVITE_COOKIE = "invite_token"
 INVITE_TTL_HOURS = 3
 # Quanto tempo ha chi apre il link per completare il giro su Google.
 INVITE_COOKIE_TTL_SECONDS = 600
+# secrets.token_urlsafe() non produce mai un punto, quindi separa le due
+# parti dello stato senza possibilita' di equivoci.
+STATE_INVITE_SEP = "."
 
 # Tabelle i cui dati appartengono a una band e non devono mai attraversare i
 # confini del workspace. notes e photos non sono qui: seguono la location.
@@ -81,6 +84,13 @@ PUBLIC_PATHS = {
     # /join/<token> e' pubblico per forza: chi apre il link non ha ancora una
     # sessione, ed e' proprio il link a dargli il diritto di entrare.
 }
+
+
+def invite_from_state(state):
+    """Il token di invito che era stato agganciato allo stato di OAuth."""
+    if not state or STATE_INVITE_SEP not in state:
+        return None
+    return state.split(STATE_INVITE_SEP, 1)[1] or None
 
 
 def auth_enabled():
@@ -240,6 +250,9 @@ def init_db():
             artist_name TEXT,
             genre TEXT,
             city TEXT,
+            band_roles TEXT,
+            last_seen_at TEXT,
+            profile_completed_at TEXT,
             onboarded_at TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -357,6 +370,27 @@ def migrate_schema(conn):
     profile_cols = {row["name"] for row in conn.execute("PRAGMA table_info(user_profiles)").fetchall()}
     if "active_workspace_id" not in profile_cols:
         conn.execute("ALTER TABLE user_profiles ADD COLUMN active_workspace_id INTEGER")
+    if "band_roles" not in profile_cols:
+        conn.execute("ALTER TABLE user_profiles ADD COLUMN band_roles TEXT")
+    if "profile_completed_at" not in profile_cols:
+        conn.execute("ALTER TABLE user_profiles ADD COLUMN profile_completed_at TEXT")
+        # Il modulo di benvenuto serve a chi arriva adesso: a chi usa gia'
+        # l'app comparirebbe come un fastidio a sorpresa. Si segnano tutti
+        # come gia' passati di li'.
+        conn.execute(
+            "UPDATE user_profiles SET profile_completed_at = COALESCE(onboarded_at, created_at) "
+            "WHERE profile_completed_at IS NULL"
+        )
+
+    if "last_seen_at" not in profile_cols:
+        conn.execute("ALTER TABLE user_profiles ADD COLUMN last_seen_at TEXT")
+        # Chi era gia' dentro non e' mai stato visto: il dato piu' vicino al
+        # vero e' l'ultimo login, che e' scritto sulla sessione.
+        conn.execute(
+            "UPDATE user_profiles SET last_seen_at = ("
+            "SELECT MAX(s.created_at) FROM sessions s WHERE s.email = user_profiles.email"
+            ") WHERE last_seen_at IS NULL"
+        )
 
     # "owner" era il nome interno del primo giro; il ruolo si chiama Leader.
     conn.execute("UPDATE workspace_members SET role = 'leader' WHERE role = 'owner'")
@@ -374,6 +408,11 @@ def migrate_schema(conn):
         "AND NOT EXISTS (SELECT 1 FROM gigs g WHERE g.location_id = locations.id)",
         (now_iso(),),
     )
+
+    # Svuotare il promemoria scriveva stringa vuota invece di NULL: due modi
+    # di dire "nessuna data" che le query devono distinguere. Qui restano in
+    # uno solo, ed e' idempotente.
+    conn.execute("UPDATE locations SET next_contact_date = NULL WHERE next_contact_date = ''")
 
 
 def migrate_to_gigs(conn):
@@ -495,6 +534,27 @@ def create_session(conn, email):
     return session_id
 
 
+# Ogni richiesta passa di qui, anche le immagini: senza freno sarebbe una
+# scrittura su SQLite per ogni icona caricata. Un minuto di risoluzione e'
+# abbastanza per "attivo ora", e la riga viene toccata al massimo una volta
+# al minuto per persona.
+LAST_SEEN_THROTTLE_SECONDS = 60
+
+
+def touch_last_seen(conn, email):
+    now = datetime.now(timezone.utc)
+    soglia = (now - timedelta(seconds=LAST_SEEN_THROTTLE_SECONDS)).isoformat()
+    cur = conn.execute(
+        "UPDATE user_profiles SET last_seen_at = ? "
+        "WHERE email = ? AND (last_seen_at IS NULL OR last_seen_at < ?)",
+        (now.isoformat(), email, soglia),
+    )
+    # updated_at resta fermo: essersi fatti vedere non e' una modifica al
+    # profilo, e sporcarlo confonderebbe chi guarda quando e' cambiato cosa.
+    if cur.rowcount:
+        conn.commit()
+
+
 def get_session_email(conn, session_id):
     if not session_id:
         return None
@@ -506,6 +566,7 @@ def get_session_email(conn, session_id):
         conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         conn.commit()
         return None
+    touch_last_seen(conn, row["email"])
     return row["email"]
 
 
@@ -664,7 +725,8 @@ def create_workspace(conn, email, name, genre=None, city=None):
 
 def fetch_members(conn, workspace_id):
     rows = conn.execute(
-        "SELECT m.email, m.role, m.joined_at, m.invited_by, p.name, p.picture "
+        "SELECT m.email, m.role, m.joined_at, m.invited_by, p.name, p.picture, "
+        "p.band_roles, p.last_seen_at "
         "FROM workspace_members m LEFT JOIN user_profiles p ON p.email = m.email "
         "WHERE m.workspace_id = ? ORDER BY m.joined_at ASC",
         (workspace_id,),
@@ -748,12 +810,23 @@ def invite_to_dict(row, origin=None):
     return d
 
 
-def create_invite(conn, workspace_id, email, max_uses=None):
+# Un invito e' per una persona: il link vale un ingresso e poi e' carta
+# straccia. Un link che resta buono dopo essere stato usato e' un link
+# che gira su WhatsApp e fa entrare nella band chi non hai invitato tu.
+def create_invite(conn, workspace_id, email, max_uses=1):
     ts = datetime.now(timezone.utc)
-    # Una band ha un solo link alla volta. Se ne crea uno a ogni apertura
-    # della schermata, quindi tenere i precedenti significherebbe accumulare
-    # un pulsante "Copia link" in piu' a ogni visita: il nuovo sostituisce il
-    # vecchio, che smette di funzionare da subito.
+    # Una band ha un solo link alla volta, ma se ce n'e' gia' uno buono si
+    # riusa quello. Prima se ne creava uno a ogni apertura della schermata, e
+    # il link appena mandato su WhatsApp moriva nel momento in cui tornavi a
+    # guardarlo: chi lo apriva finiva su una pagina di accesso qualsiasi e si
+    # registrava senza band. Il link nuovo si fa quando il vecchio e'
+    # scaduto, esaurito o annullato.
+    esistente = conn.execute(
+        "SELECT * FROM invites WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1",
+        (workspace_id,),
+    ).fetchone()
+    if esistente and invite_to_dict(esistente)["valid"]:
+        return esistente
     conn.execute("DELETE FROM invites WHERE workspace_id = ?", (workspace_id,))
     token = secrets.token_urlsafe(32)
     conn.execute(
@@ -819,17 +892,61 @@ def accept_invite(conn, token, email):
 
 # --- profilo utente (wizard di benvenuto + dati Google) -----------------
 
-ME_FIELDS = ["artist_name", "genre", "city"]
+ME_FIELDS = ["name", "artist_name", "genre", "city", "band_roles"]
+
+# Cosa suoni nella band. Sono piu' di uno perche' quasi sempre lo sono:
+# chi canta suona anche la chitarra. Lista chiusa e non libera: e'
+# l'informazione che si legge a colpo d'occhio nella lista dei membri,
+# e venti modi di scrivere "voce" la renderebbero illeggibile.
+BAND_ROLES = (
+    "Cantante", "Chitarrista", "Bassista", "Batterista",
+    "Percussionista", "Tastierista", "Violinista", "Altro",
+)
+
+
+def clean_band_roles(value):
+    """Arrivano come lista dall'app; una stringa separata da virgole e'
+    accettata lo stesso perche' e' cosi' che stanno nel database."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.split(",")
+    if not isinstance(value, list):
+        raise ApiError(400, "Ruolo nella band non valido")
+    out = []
+    for item in value:
+        label = str(item or "").strip()
+        if not label:
+            continue
+        if label not in BAND_ROLES:
+            raise ApiError(400, "Ruolo nella band non valido: " + label)
+        if label not in out:
+            out.append(label)
+    # L'ordine e' quello della lista, non quello in cui si e' toccato:
+    # cosi' la stessa persona si legge sempre uguale.
+    out.sort(key=BAND_ROLES.index)
+    return ", ".join(out) or None
 
 
 def upsert_profile_from_google(conn, email, name, picture):
     ts = now_iso()
-    existing = conn.execute("SELECT email FROM user_profiles WHERE email = ?", (email,)).fetchone()
+    existing = conn.execute(
+        "SELECT email, name FROM user_profiles WHERE email = ?", (email,)
+    ).fetchone()
     if existing:
-        conn.execute(
-            "UPDATE user_profiles SET name = ?, picture = ?, updated_at = ? WHERE email = ?",
-            (name, picture, ts, email),
-        )
+        # La foto arriva sempre da Google, il nome no: chi lo corregge nel
+        # proprio profilo se lo vedrebbe tornare indietro al primo accesso.
+        # Google lo scrive solo finche' non c'e' niente.
+        if (existing["name"] or "").strip():
+            conn.execute(
+                "UPDATE user_profiles SET picture = ?, updated_at = ? WHERE email = ?",
+                (picture, ts, email),
+            )
+        else:
+            conn.execute(
+                "UPDATE user_profiles SET name = ?, picture = ?, updated_at = ? WHERE email = ?",
+                (name, picture, ts, email),
+            )
     else:
         conn.execute(
             "INSERT INTO user_profiles (email, name, picture, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
@@ -843,7 +960,7 @@ def fetch_me(conn, email):
     workspaces = fetch_workspaces_for(conn, email, active)
     base = {
         "email": email, "name": None, "picture": None,
-        "artist_name": None, "genre": None, "city": None,
+        "artist_name": None, "genre": None, "city": None, "band_roles": None,
     }
     if not email:
         d = dict(base, onboarded=True)
@@ -854,6 +971,9 @@ def fetch_me(conn, email):
         else:
             d = dict(row)
             d["onboarded"] = bool(d.get("onboarded_at"))
+    # Senza login non c'e' un profilo da completare: l'app e' di chi ce l'ha
+    # sul computer, e il modulo non avrebbe niente da chiedere.
+    d["profile_completed"] = (not email) or bool(d.get("profile_completed_at"))
     d["workspaces"] = workspaces
     d["active_workspace_id"] = active
     d["active_workspace"] = next((w for w in workspaces if w["id"] == active), None)
@@ -874,7 +994,17 @@ def update_me(conn, email, body):
         if f not in body:
             continue
         value = body[f]
+        if f == "band_roles":
+            value = clean_band_roles(value)
+        elif f == "name":
+            value = (value or "").strip()
+            if not value:
+                raise ApiError(400, "Il nome è obbligatorio")
         fields[f] = value.strip() if isinstance(value, str) else value
+    # Il modulo di benvenuto si chiude una volta sola: da li' in poi il
+    # profilo si modifica dalle Impostazioni, non all'avvio.
+    if body.get("profile_completed"):
+        fields["profile_completed_at"] = now_iso()
     if fields:
         ts = now_iso()
         existing = conn.execute("SELECT email FROM user_profiles WHERE email = ?", (email,)).fetchone()
@@ -1293,6 +1423,17 @@ def create_gig(conn, ws, loc_id, body):
     placeholders = ",".join("?" for _ in fields)
     conn.execute(f"INSERT INTO gigs ({','.join(fields)}) VALUES ({placeholders})", values)
     refresh_location_status(conn, loc_id)
+    # Aprire una stagione senza promemoria faceva sparire il palcoscenico
+    # dall'Agenda: fuori dal riquadro "Riproponi" perche' ormai una trattativa
+    # aperta ce l'ha, e fuori da "Da ricontattare" che va a data. Aprire una
+    # stagione vuol dire che da adesso li devi richiamare, quindi se un
+    # promemoria non c'e' la data e' oggi. Se ce n'era gia' uno non si tocca:
+    # "richiamali a febbraio" resta febbraio.
+    conn.execute(
+        "UPDATE locations SET next_contact_date = ?, updated_at = ? "
+        "WHERE id = ? AND COALESCE(next_contact_date, '') = ''",
+        (date.today().isoformat(), now_iso(), loc_id),
+    )
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 
@@ -1479,6 +1620,13 @@ def clean_location_payload(body, partial):
             value = value or "da_contattare"
         elif field == "favorite":
             value = 1 if value else 0
+        elif field == "next_contact_date":
+            # Vuoto vuol dire "non ricontattarli": si scrive NULL, non "",
+            # cosi' e' lo stesso niente con cui nasce un palcoscenico e le
+            # query che cercano il promemoria non devono sapere di due vuoti.
+            value = (value or "").strip() or None
+            if value and not GIG_DATE_RE.match(value):
+                raise ApiError(400, "Data di ricontatto non valida")
         elif isinstance(value, str):
             value = value.strip()
         data[field] = value
@@ -2305,8 +2453,9 @@ def _h_list_invites(conn, match, query, body, ctx):
 
 
 def _h_create_invite(conn, match, query, body, ctx):
-    max_uses = body.get("max_uses")
-    row = create_invite(conn, require_ws(ctx), ctx.email, to_number_or_none(max_uses, int))
+    # Senza indicazioni il link vale per una persona sola.
+    max_uses = to_number_or_none(body.get("max_uses"), int) or 1
+    row = create_invite(conn, require_ws(ctx), ctx.email, max_uses)
     return 201, invite_to_dict(row, ctx.origin)
 
 
@@ -2722,7 +2871,18 @@ class Handler(BaseHTTPRequestHandler):
             if not auth_enabled():
                 self._send_json(503, {"error": "Login con Google non configurato"})
                 return True
+            # Il cookie dell'invito e' la strada normale, ma e' anche l'unica
+            # cosa che puo' non tornare indietro dal giro su Google (browser
+            # che li limitano, app installata che apre il link in un'altra
+            # scheda, cookie di terze parti bloccati). Chi lo perdeva si
+            # ritrovava registrato senza band, con il wizard che gli chiedeva
+            # nome, genere e citta' della band in cui era stato invitato.
+            # Lo stato di OAuth invece Google lo restituisce identico: il
+            # token viaggia li' dentro, il cookie resta come riserva.
             state = secrets.token_urlsafe(24)
+            invito = (parse_qs(parsed.query).get("invite") or [None])[0] or self._cookie(INVITE_COOKIE)
+            if invito:
+                state = state + STATE_INVITE_SEP + invito
             redirect_uri = self._request_origin() + "/auth/google/callback"
             url = google_auth_url(redirect_uri, state)
             self._send_redirect(url, set_cookie=(STATE_COOKIE, state), max_age=600)
@@ -2750,7 +2910,7 @@ class Handler(BaseHTTPRequestHandler):
             # Nessuna lista chiusa di indirizzi: l'accesso e' aperto, ma chi
             # entra senza invito trova un'app vuota e non vede i dati di
             # nessun altro. Sono i workspace a fare da confine, non il login.
-            invite_token = self._cookie(INVITE_COOKIE)
+            invite_token = self._cookie(INVITE_COOKIE) or invite_from_state(state)
             conn = get_conn()
             try:
                 upsert_profile_from_google(conn, email, userinfo.get("name"), userinfo.get("picture"))
@@ -2796,8 +2956,12 @@ class Handler(BaseHTTPRequestHandler):
             # Non ancora loggato: il token non sopravviverebbe al giro su
             # Google, quindi va parcheggiato in un cookie di breve durata e
             # ripreso nel callback.
+            # Il token viaggia nell'indirizzo, non solo nel cookie: da qui
+            # finisce dentro lo stato di OAuth, che Google restituisce
+            # identico. Cosi' l'invito arriva in fondo anche a un browser che
+            # i cookie non li tiene. Il cookie resta come seconda strada.
             self._send_redirect(
-                "/auth/google",
+                "/auth/google?invite=" + quote(token),
                 set_cookie=(INVITE_COOKIE, token),
                 max_age=INVITE_COOKIE_TTL_SECONDS,
             )

@@ -194,6 +194,11 @@
   .invite-dead{opacity:.5;}
   .role-help{margin-bottom:10px;display:flex;flex-direction:column;gap:5px;}
   .role-help b{color:var(--text);font-weight:600;}
+  /* L'ultimo accesso e' un'informazione di servizio: si legge se la
+     cerchi, non compete col nome. Il pallino verde solo per chi e'
+     dentro adesso, altrimenti sarebbe una decorazione. */
+  .member-seen{font-size:12px;color:var(--text-tertiary);margin-top:2px;display:flex;align-items:center;gap:5px;}
+  .seen-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none;}
   .member-role{font-size:11px;font-weight:600;padding:2.5px 8px;border-radius:999px;background:var(--fill);color:var(--text-secondary);white-space:nowrap;}
   .admin-warning{margin:4px 16px 6px;padding:12px 14px;border-radius:10px;background:var(--fill);border-left:3px solid var(--orange);font-size:13.5px;line-height:1.5;color:var(--text-secondary);}
   .admin-warning strong{display:block;color:var(--text);margin-bottom:3px;}
@@ -274,6 +279,11 @@
   .field-row input, .field-row select{flex:1;min-width:0;border:none;background:transparent;font-size:16px;color:var(--text);text-align:right;padding:0;font-family:inherit;}
   .field-row input::placeholder{color:var(--text-tertiary);}
   .field-row input:focus{outline:none;}
+  /* Un <input type="date"> sul telefono non si svuota: il calendario
+     nativo sa solo scegliere un giorno. Senza questo pulsante una data
+     messa per sbaglio restava li' per sempre. */
+  .date-clear{flex:none;border:none;background:transparent;color:var(--tint);font-size:15px;font-family:inherit;padding:0 0 0 12px;cursor:pointer;}
+  .date-clear:active{opacity:.5;}
   .field-row.stacked{flex-direction:column;align-items:stretch;gap:6px;}
   .field-row.stacked label{flex:none;font-size:13px;color:var(--text-secondary);}
   .field-row.stacked textarea{border:none;background:transparent;font-size:16px;color:var(--text);font-family:inherit;resize:vertical;min-height:44px;padding:0;}
@@ -363,8 +373,41 @@
   .nudge-text{font-size:13px;color:var(--text-secondary);line-height:1.45;margin-top:3px;}
   .nudge-btn{margin-top:10px;border:none;border-radius:8px;background:var(--tint);color:#fff;font-size:14px;font-weight:600;font-family:inherit;padding:9px 15px;cursor:pointer;}
   .nudge-btn:active{opacity:.7;}
+  .nudge-head{display:flex;align-items:flex-start;gap:10px;}
+  .nudge-main{flex:1;min-width:0;}
+  .nudge-head .nudge-btn{margin-top:2px;flex:none;}
+  .renew-list{margin-top:8px;}
+  .renew-btn{border:none;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:9px 13px;cursor:pointer;}
+  .renew-btn:active{opacity:.7;}
+  /* ---- Home: tessere e grafici. Nessuna libreria: barre in CSS, cosi'
+     seguono i temi chiaro/scuro come tutto il resto e non c'e' niente da
+     scaricare su un telefono in giro per locali. ---- */
+  .home-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0 16px;}
+  .tile{background:var(--bg-elevated);border-radius:10px;padding:13px 14px;min-width:0;}
+  .tile.wide{grid-column:1 / -1;}
+  .tile-value{font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tile-label{font-size:12.5px;color:var(--text-secondary);margin-top:2px;}
+  .tile-sub{font-size:12px;color:var(--text-tertiary);margin-top:3px;}
+  .chart-card{background:var(--bg-elevated);border-radius:10px;margin:0 16px;padding:14px;}
+  .chart-row{display:flex;align-items:center;gap:10px;margin-top:9px;}
+  .chart-row:first-child{margin-top:0;}
+  .chart-key{flex:none;width:34px;font-size:13px;color:var(--text-secondary);font-variant-numeric:tabular-nums;}
+  .chart-track{flex:1;height:12px;background:var(--fill);border-radius:3px;}
+  .chart-fill{height:100%;background:var(--tint);border-radius:3px;}
+  .chart-val{flex:none;min-width:54px;text-align:right;font-size:13px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
+  .chart-note{font-size:12.5px;color:var(--text-secondary);line-height:1.45;margin-top:12px;}
+  .months{display:flex;align-items:flex-end;gap:3px;height:76px;}
+  .month{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;}
+  .month-val{font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;font-variant-numeric:tabular-nums;}
+  .month-bar{width:100%;background:var(--tint);border-radius:3px 3px 0 0;}
+  .month-bar.empty{background:var(--fill);}
+  .month-labels{display:flex;gap:3px;margin-top:6px;}
+  .month-labels span{flex:1;text-align:center;font-size:10.5px;color:var(--text-tertiary);}
   .agenda-group{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
   .group-count{font-weight:600;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
+  .year-head{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center;}
+  .year-head .row-chevron{color:var(--text-tertiary);transition:transform .2s;}
+  .year-head.open .row-chevron{transform:rotate(90deg);}
   .gig-confirm{display:flex;gap:8px;padding:0 16px 11px;background:var(--bg-elevated);}
   .gig-confirm button{flex:1;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;padding:9px 4px;cursor:pointer;}
   .gig-confirm .yes{background:var(--green-soft);color:#1f8b3d;}
@@ -425,7 +468,24 @@
 <div id="app">
 
   <!-- ============ TAB: PALCOSCENICI ============ -->
-  <section class="screen tab-screen" id="tabList" data-tab="list">
+  <!-- ============ TAB: HOME ============
+       La prima cosa che vedi aprendo l'app: come sta andando la stagione.
+       Si calcola tutto dalle serate che arrivano dentro /api/locations, come
+       l'Agenda: nessun endpoint nuovo e nessun conto lato server. -->
+  <section class="screen tab-screen" id="tabHome" data-tab="home">
+    <header class="navbar" id="navHome">
+      <div class="navbar-row"><span class="inline-title" id="homeTitleSmall">Home</span></div>
+      <div class="large-title-wrap">
+        <h1 class="large-title" id="homeTitle">Home</h1>
+        <div class="subtitle-count" id="homeSub"></div>
+      </div>
+    </header>
+    <div class="screen-scroll" id="scrollHome">
+      <div id="homeContent"></div>
+    </div>
+  </section>
+
+  <section class="screen tab-screen" id="tabList" data-tab="list" hidden>
     <header class="navbar" id="navList">
       <div class="navbar-row">
         <span class="nav-btn" style="visibility:hidden;">Filtri</span>
@@ -557,18 +617,26 @@
   </section>
 
   <!-- ============ TAB: IMPOSTAZIONI ============ -->
-  <section class="screen tab-screen" id="tabAdmin" data-tab="admin" hidden>
+  <!-- ============ PUSHED: ADMIN ============
+       Era un tab: con la Home le voci nella tabbar erano troppe, ed e' una
+       funzione che vede solo chi amministra l'app. Si apre dalle Impostazioni. -->
+  <section class="screen pushed" id="adminScreen" hidden>
     <header class="navbar">
-      <div class="navbar-row"><span class="inline-title">Admin</span></div>
-      <div class="large-title-wrap"><h1 class="large-title">Admin</h1>
-      <div class="subtitle-count">Configurazione dell'app</div></div>
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnAdminBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Admin</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
     </header>
     <div class="screen-scroll">
       <div class="admin-warning">
-        <strong>Non sono le impostazioni della tua band.</strong>
+        <strong>⚠️ Funzione amministrativa, non sono le impostazioni della tua band.</strong>
         Qui si modificano i template con cui vengono precaricate le band
         <em>nuove</em>: cambiarli non tocca le band che esistono già, comprese le tue.
-        Vedi questa scheda perché il tuo indirizzo è fra gli amministratori dell'app.
+        Vedi questa schermata perché il tuo indirizzo è fra gli amministratori dell'app.
       </div>
 
       <div class="section-header">TEMPLATE PER LE BAND NUOVE</div>
@@ -591,15 +659,6 @@
       </div>
       <div class="section-footer">Nei modelli WhatsApp puoi usare <code>{band}</code>, <code>{genere}</code> e <code>{nome}</code>: vengono sostituiti con i dati della band al momento della creazione. Quello che scrivi fra parentesi quadre resta com'è, da compilare a mano.</div>
 
-      <div class="section-header">ASPETTO</div>
-      <div class="grouped-list">
-        <div class="row" id="rowAdminTheme">
-          <div class="row-main"><div class="row-title">Tema</div></div>
-          <div class="row-trail"><span id="adminThemeValue" style="color:var(--text-secondary);font-size:15px;">Automatico</span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-      </div>
-      <div class="section-footer">Il tema vale solo per questo dispositivo, non per gli altri utenti.</div>
     </div>
   </section>
 
@@ -664,6 +723,7 @@
           <img id="settingsProfileAvatar" class="avatar" alt="" hidden>
           <div class="row-main">
             <div class="row-title" id="settingsProfileName">Profilo</div>
+            <div class="row-sub" id="settingsProfileRoles" hidden></div>
             <div class="row-sub" id="settingsProfileEmail"></div>
           </div>
           <div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
@@ -677,6 +737,8 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
+      <div class="section-footer">Il tema è memorizzato in questo browser, non nell'account: su un altro telefono o computer riparte da «Automatico», che segue l'impostazione del sistema.</div>
+
       <div class="section-header">PALCOSCENICI</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsTypes">
@@ -713,6 +775,17 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
+      <div class="section-header" id="sectionAdminHeader" hidden>AMMINISTRAZIONE DELL'APP</div>
+      <div class="grouped-list" id="rowSettingsAdminWrap" hidden>
+        <div class="row" id="rowSettingsAdmin">
+          <div class="row-main"><div class="row-title">Admin</div>
+          <div class="row-sub">Template per le band nuove</div></div>
+          <div class="row-trail"><span class="row-badge" style="background:var(--orange-soft);color:#a35a00;">solo admin</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer" id="sectionAdminFooter" hidden>Funzione amministrativa: quello che si cambia lì vale per le band che verranno create da qui in avanti, non per la tua e non per quelle che esistono già. Vedi questa voce perché il tuo indirizzo è fra gli amministratori dell'app.</div>
+
       <div class="section-header">INFORMAZIONI</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsAbout">
@@ -999,9 +1072,56 @@
         <div style="font-size:20px;font-weight:700;" id="profileName"></div>
         <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;" id="profileEmail"></div>
       </div>
+      <div class="section-header">CHI SEI</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="profileNameInput">Nome e cognome</label><input id="profileNameInput" type="text" placeholder="Nome e cognome"></div>
+      </div>
+
+      <div class="section-header">NELLA BAND</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowProfileBandRoles">
+          <label>Ruolo</label>
+          <div class="picker-value"><span id="profileBandRolesValue" style="color:var(--text-tertiary);">Scegli uno o più ruoli</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">Che cosa suoni: lo vedono gli altri della band nell'elenco dei membri.</div>
+
       <div class="grouped-list" style="margin-top:24px;">
         <div class="row" id="btnLogout" style="cursor:pointer;justify-content:center;">
           <div class="row-title" style="color:var(--red);font-weight:600;">Esci</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MODULO: COMPLETA IL PROFILO ============
+       Chi arriva da un link di invito entra in una band dove gli altri
+       devono riconoscerlo: senza questo modulo comparirebbe nell'elenco
+       membri come un indirizzo email e basta. Si vede una volta sola. -->
+  <section class="screen pushed" id="profileSetupScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row"><span class="inline-title">Il tuo profilo</span></div>
+    </header>
+    <div class="screen-scroll">
+      <div style="text-align:center;padding:28px 24px 4px;">
+        <img id="setupAvatar" class="avatar-lg" alt="" hidden>
+        <div style="font-size:20px;font-weight:700;">Presentati</div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-top:6px;" id="setupSubtitle"></div>
+      </div>
+      <div class="section-header">CHI SEI</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="setupName">Nome e cognome</label><input id="setupName" type="text" placeholder="es. Carlo Tonelli"></div>
+        <div class="field-row picker" id="rowSetupRoles">
+          <label>Ruolo</label>
+          <div class="picker-value"><span id="setupRolesValue" style="color:var(--text-tertiary);">Scegli uno o più ruoli</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">Il nome arriva da Google: se nella band ti chiamano in un altro modo, cambialo. È quello che vedranno gli altri.</div>
+      <div class="grouped-list" style="margin-top:20px;">
+        <div class="row" id="btnSetupContinue" style="justify-content:center;opacity:.4;pointer-events:none;">
+          <div class="row-title" style="color:var(--tint);font-weight:600;">Continua</div>
         </div>
       </div>
     </div>
@@ -1042,7 +1162,11 @@
 
   <!-- ============ TAB BAR ============ -->
   <nav class="tabbar" id="tabbar">
-    <button class="tab active" data-tab="list">
+    <button class="tab active" data-tab="home">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.4 12 3.5l8.5 6.9"/><path d="M5.8 9.4V20h12.4V9.4"/><path d="M9.8 20v-5.4h4.4V20"/></svg>
+      <span class="tab-label">Home</span>
+    </button>
+    <button class="tab" data-tab="list">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
       <span class="tab-label">Palcoscenici</span>
     </button>
@@ -1064,10 +1188,6 @@
     <button class="tab" data-tab="bands" hidden>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="17" r="2.6"/><circle cx="17" cy="15" r="2.6"/><path d="M9.6 17V6.5L19.6 4.5V15" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-label">Bands</span>
-    </button>
-    <button class="tab" data-tab="admin" id="tabBtnAdmin" hidden>
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l7.5 3v6c0 4.4-3.1 8.2-7.5 10-4.4-1.8-7.5-5.6-7.5-10v-6z"/><path d="M9 12l2 2 4-4"/></svg>
-      <span class="tab-label">Admin</span>
     </button>
     <button class="tab" data-tab="settings">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="18" r="2"/></svg>
@@ -1256,7 +1376,7 @@
 
       <div class="section-header">QUANDO RICONTATTARE</div>
       <div class="grouped-list">
-        <div class="field-row"><label for="fNextContact">Prossimo contatto</label><input id="fNextContact" type="date"></div>
+        <div class="field-row"><label for="fNextContact">Prossimo contatto</label><input id="fNextContact" type="date"><button type="button" class="date-clear" id="btnClearNextContact" aria-label="Togli il promemoria" hidden>Togli</button></div>
         <div class="field-row stacked">
           <label for="fPlanningNote">Nota sulla pianificazione</label>
           <input id="fPlanningNote" type="text" placeholder="es. Pianificano il cartellone a feb/mar" style="text-align:left;">
@@ -1563,7 +1683,7 @@
   }
 
   /* ---------------- navbar scroll collapse ---------------- */
-  [["scrollList","navList"],["scrollFavorites","navFavorites"],["scrollRecontact","navRecontact"],["scrollAd","navAd"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
+  [["scrollHome","navHome"],["scrollList","navList"],["scrollFavorites","navFavorites"],["scrollRecontact","navRecontact"],["scrollAd","navAd"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
     var scroller = document.getElementById(pair[0]);
     var nav = document.getElementById(pair[1]);
     scroller.addEventListener("scroll", function(){
@@ -1572,7 +1692,7 @@
   });
 
   /* ---------------- tab navigation ---------------- */
-  var tabs = {list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), admin: document.getElementById("tabAdmin"), settings: document.getElementById("tabSettings")};
+  var tabs = {home: document.getElementById("tabHome"), list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), recontact: document.getElementById("tabRecontact"), ad: document.getElementById("tabAd"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
   document.getElementById("tabbar").addEventListener("click", function(e){
     var btn = e.target.closest(".tab");
     if(!btn) return;
@@ -1581,8 +1701,195 @@
       tabs[k].hidden = k !== name;
     });
     document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.getAttribute("data-tab")===name); });
+    if(name === "home") renderHome();
     if(name === "recontact") renderRecontact();
     if(name === "favorites") renderFavorites();
+  });
+
+  /* ---------------- Home: come sta andando la stagione ----------------
+     Si calcola tutto dalle serate che arrivano dentro /api/locations, come
+     l'Agenda: nessun endpoint nuovo. I grafici sono barre in CSS — niente
+     libreria da scaricare su un telefono in giro per locali, e i colori
+     seguono il tema chiaro/scuro come il resto dell'app. */
+  var MESI_INIZIALI = ["G","F","M","A","M","G","L","A","S","O","N","D"];
+
+  function playedGigs(){
+    var out = [];
+    venues.forEach(function(v){
+      if(v.deleted_at) return;
+      venueGigs(v).forEach(function(g){ if(g.status === "suonato") out.push({v:v, g:g}); });
+    });
+    return out;
+  }
+  /* L'anno di una serata e' quello della sua data. Le stagioni vecchie messe
+     a mano spesso la data non ce l'hanno: li' vale l'anno scritto nella
+     stagione, che e' il meglio che si sa di quella riga. */
+  function gigYear(g){
+    var d = (g.gig_date || "").slice(0, 4);
+    if(d) return d;
+    var m = String(g.season || "").match(/(\d{4})/);
+    return m ? m[1] : "";
+  }
+  /* Migliaia col punto senza passare da toLocaleString: la stessa app gira su
+     telefoni con localizzazioni diverse e qui basta la regola italiana. */
+  function fmtEuro(n){
+    var cifre = String(Math.round(Math.abs(n))), out = "";
+    for(var i = 0; i < cifre.length; i++){
+      if(i > 0 && (cifre.length - i) % 3 === 0) out += ".";
+      out += cifre.charAt(i);
+    }
+    return (n < 0 ? "-€ " : "€ ") + out;
+  }
+  function gigFee(g){ return Number(g.fee) || 0; }
+  function byYear(rows, value){
+    var map = {};
+    rows.forEach(function(x){
+      var y = gigYear(x.g); if(!y) return;
+      map[y] = (map[y] || 0) + value(x);
+    });
+    // Anno piu' recente in cima: la stagione che ti interessa e' quella in
+    // corso, e la leggi per prima senza scorrere fino in fondo.
+    return Object.keys(map).sort().reverse().map(function(y){ return {key:y, value:map[y]}; });
+  }
+  /* Barre orizzontali con l'anno a sinistra e il numero sempre scritto a
+     destra: con quattro o cinque barre l'etichetta diretta si legge meglio di
+     un asse, e su un telefono non c'e' nessun passaggio del mouse che possa
+     scoprire i valori. */
+  function barsHtml(pairs, fmt){
+    var max = pairs.reduce(function(m, p){ return Math.max(m, p.value); }, 0);
+    return pairs.map(function(p){
+      var w = max > 0 ? Math.max(2, Math.round(p.value / max * 100)) : 0;
+      return '<div class="chart-row"><div class="chart-key">'+esc(p.key)+'</div>'+
+        '<div class="chart-track"><div class="chart-fill" style="width:'+w+'%"></div></div>'+
+        '<div class="chart-val">'+esc(fmt(p.value))+'</div></div>';
+    }).join("");
+  }
+  function tileHtml(value, label, sub, wide){
+    return '<div class="tile'+(wide ? " wide" : "")+'">'+
+      '<div class="tile-value">'+esc(value)+'</div>'+
+      '<div class="tile-label">'+esc(label)+'</div>'+
+      (sub ? '<div class="tile-sub">'+esc(sub)+'</div>' : '')+
+    '</div>';
+  }
+  /* In cima alla Home c'e' il nome della band con cui stai lavorando:
+     "Home" e' vero per tutte e non dice niente, e con piu' workspace
+     sapere subito in quale sei e' meta' del problema. Finche' le bands
+     non sono arrivate dal server si ripiega sulla band attiva del
+     profilo, e in mancanza di tutto resta "Home". */
+  function activeBandName(){
+    var a = (typeof activeBand === "function") ? activeBand() : null;
+    if(a && a.name) return a.name;
+    if(me && me.active_workspace && me.active_workspace.name) return me.active_workspace.name;
+    return "Home";
+  }
+  function renderHomeTitle(){
+    var nome = activeBandName();
+    document.getElementById("homeTitle").textContent = nome;
+    document.getElementById("homeTitleSmall").textContent = nome;
+  }
+  function renderHome(){
+    var el = document.getElementById("homeContent");
+    if(!el) return;
+    var anno = currentSeason();
+    var played = playedGigs();
+    var quest = played.filter(function(x){ return gigYear(x.g) === anno; });
+    var incasso = quest.reduce(function(t, x){ return t + gigFee(x.g); }, 0);
+    var conFee = quest.filter(function(x){ return gigFee(x.g) > 0; });
+    document.getElementById("homeSub").textContent = "Stagione " + anno;
+    renderHomeTitle();
+
+    // Le stesse due cose che conta l'Agenda, cosi' i numeri non litigano:
+    // le confermate col calendario davanti e chi va richiamato a giorni.
+    var oggi = todayStr(), prossime = [];
+    venues.forEach(function(v){
+      if(v.deleted_at) return;
+      venueGigs(v).forEach(function(g){
+        if(g.status === "confermato" && g.gig_date && g.gig_date >= oggi) prossime.push(g);
+      });
+    });
+    prossime.sort(function(a, b){ return a.gig_date < b.gig_date ? -1 : 1; });
+    var daFare = venuesToRecontact().filter(function(v){ return daysUntil(v.next_contact_date) <= 7; }).length;
+
+    var html = '<div class="home-tiles">'+
+      tileHtml(String(quest.length), (quest.length === 1 ? "serata suonata" : "serate suonate") + " nel " + anno) +
+      tileHtml(fmtEuro(incasso), "incassati nel " + anno,
+        conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "") +
+      tileHtml(conFee.length ? fmtEuro(incasso / conFee.length) : "—", "media a serata") +
+      tileHtml(String(prossime.length), prossime.length === 1 ? "serata in calendario" : "serate in calendario",
+        prossime.length ? ("la prima il " + fmtDateShort(prossime[0].gig_date)) : "nessuna confermata") +
+      tileHtml(String(daFare), "da ricontattare entro una settimana", daFare ? "li trovi in Agenda" : "", true) +
+    '</div>';
+
+    if(!played.length){
+      el.innerHTML = html + '<div class="empty-state"><div class="glyph">📈</div>'+
+        '<h2>Ancora nessuna serata suonata</h2>'+
+        '<p>Quando segni una serata come suonata — dall\'Agenda o dalla scheda del palcoscenico — qui vedi quante ne hai fatte, quanto hai incassato e in che mesi dell\'anno.</p></div>';
+      return;
+    }
+
+    var perAnno = byYear(played, function(){ return 1; });
+    var perIncasso = byYear(played, function(x){ return gigFee(x.g); });
+    var nota = perAnno.length < 2
+      ? '<div class="chart-note">Hai una stagione sola: il confronto con gli anni precedenti si forma da sé, appena ci saranno le serate del '+(Number(anno)+1)+'.</div>'
+      : "";
+    html += '<div class="section-header">SERATE SUONATE PER ANNO</div><div class="chart-card">'+
+      barsHtml(perAnno, function(n){ return String(n); }) + nota + '</div>';
+
+    var senzaCompensi = perIncasso.every(function(p){ return p.value === 0; });
+    html += '<div class="section-header">INCASSO PER ANNO</div><div class="chart-card">'+
+      barsHtml(perIncasso, fmtEuro) +
+      (senzaCompensi
+        ? '<div class="chart-note">Nessun compenso segnato: scrivilo nella serata e l\'incasso compare qui.</div>'
+        : nota) + '</div>';
+
+    var mesi = [0,0,0,0,0,0,0,0,0,0,0,0], conData = 0;
+    quest.forEach(function(x){
+      if(!x.g.gig_date) return;
+      conData++;
+      var m = Number(x.g.gig_date.slice(5, 7)) - 1;
+      if(m >= 0 && m < 12) mesi[m]++;
+    });
+    var maxMese = Math.max.apply(null, mesi);
+    html += '<div class="section-header">QUANDO SUONI · '+esc(anno)+'</div><div class="chart-card">'+
+      '<div class="months">'+ mesi.map(function(n){
+        // I mesi vuoti restano come tacca grigia: senza, non si capisce
+        // quali colonne stai guardando.
+        var h = (n && maxMese) ? Math.max(4, Math.round(n / maxMese * 52)) : 2;
+        return '<div class="month">'+(n ? '<div class="month-val">'+n+'</div>' : '')+
+          '<div class="month-bar'+(n ? '' : ' empty')+'" style="height:'+h+'px"></div></div>';
+      }).join("") +'</div>'+
+      '<div class="month-labels">'+ MESI_INIZIALI.map(function(m){ return '<span>'+m+'</span>'; }).join("") +'</div>'+
+      (conData < quest.length
+        ? '<div class="chart-note">'+(quest.length - conData)+' senza data non compaiono in questo grafico.</div>' : '')+
+      '</div>';
+
+    var perPosto = {};
+    played.forEach(function(x){
+      var r = perPosto[x.v.id] || (perPosto[x.v.id] = {v: x.v, n: 0, fee: 0});
+      r.n++; r.fee += gigFee(x.g);
+    });
+    var classifica = Object.keys(perPosto).map(function(k){ return perPosto[k]; })
+      .sort(function(a, b){
+        return b.n - a.n || b.fee - a.fee || (a.v.name||"").localeCompare(b.v.name||"");
+      }).slice(0, 8);
+    var totale = played.reduce(function(t, x){ return t + gigFee(x.g); }, 0);
+    html += '<div class="section-header">DOVE HAI SUONATO DI PIÙ</div><div class="grouped-list">'+
+      classifica.map(function(r){
+        var trail = r.n + (r.n === 1 ? " serata" : " serate") + (r.fee ? " · " + fmtEuro(r.fee) : "");
+        return '<div class="row" data-open-id="'+r.v.id+'">'+
+          '<div class="row-main"><div class="row-title">'+esc(r.v.name||"Senza nome")+'</div>'+
+          (r.v.city ? '<div class="row-sub">'+esc(r.v.city)+'</div>' : '')+'</div>'+
+          '<div class="row-trail"><span class="row-badge" style="background:transparent;color:var(--text-secondary);">'+esc(trail)+'</span>'+
+          CHEVRON+'</div></div>';
+      }).join("") +'</div>'+
+      '<div class="section-footer">In tutto '+played.length+(played.length === 1 ? " serata" : " serate")+
+      (totale ? " e "+fmtEuro(totale)+" incassati" : "")+", da quando usi GigFlow.</div>";
+
+    el.innerHTML = html;
+  }
+  document.getElementById("homeContent").addEventListener("click", function(e){
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
   });
 
   /* ---------------- sheet component ---------------- */
@@ -1717,6 +2024,7 @@
   }
   function renderAll(){
     updateFilterActiveDot();
+    renderHome();
     renderList();
     renderFavorites();
     renderRecontact();
@@ -2346,31 +2654,75 @@
       return gigs.some(function(g){ return g.status === "suonato"; });
     });
   }
+  /* Il pulsante cumulativo agisce su un insieme che non e' quello elencato
+     sotto: prima il riquadro ne nominava tre con "e altri 2", sopra una lista
+     di palcoscenici scelti con un criterio diverso, e non si capiva su quali
+     dei due si stesse premendo. Adesso i candidati sono una lista vera, ogni
+     riga dice la stagione che aprirebbe — non e' la stessa per tutti — e si
+     puo' riproporre anche uno solo. */
+  function lastPlayedGig(v){
+    // Le serate arrivano gia' ordinate dal server (stagione e data DESC):
+    // la prima suonata e' la piu' recente.
+    return venueGigs(v).filter(function(g){ return g.status === "suonato"; })[0] || null;
+  }
+  function renewRowHtml(v){
+    var g = lastPlayedGig(v);
+    var quando = g ? (g.gig_date ? fmtDateShort(g.gig_date) : ("stagione " + g.season)) : "";
+    var sub = (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
+    return '<div class="row" data-open-id="'+v.id+'">'+
+      '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+      '<div class="row-sub">'+sub+'</div></div>'+
+      '<div class="row-trail"><button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button></div>'+
+    '</div>';
+  }
+  function renewVenue(v){
+    return api("POST", "/api/locations/" + v.id + "/gigs", {season: nextSeasonFor(v)})
+      .then(applyUpdatedVenue);
+  }
   function renderRenewNudge(){
     var el = document.getElementById("renewNudge");
     var cands = renewCandidates();
     if(!cands.length){ el.innerHTML = ""; return; }
-    var names = cands.slice(0, 3).map(function(v){ return v.name || "Senza nome"; }).join(", ");
-    var rest = cands.length > 3 ? (" e altri " + (cands.length - 3)) : "";
-    el.innerHTML = '<div class="nudge">'+
-      '<div class="nudge-title">'+cands.length+(cands.length===1 ? " palcoscenico dove hai suonato" : " palcoscenici dove hai suonato")+', senza trattativa aperta</div>'+
-      '<div class="nudge-text">'+esc(names + rest)+'. Riproporsi apre una serata nuova per la stagione prossima: quelle degli anni scorsi restano dove sono.</div>'+
-      '<button class="nudge-btn" id="btnRenewAll">Riproponi'+(cands.length > 1 ? " tutti" : "")+'</button>'+
-    '</div>';
-    document.getElementById("btnRenewAll").addEventListener("click", function(){
+    // Con un solo candidato il pulsante in testa direbbe la stessa cosa del
+    // pulsante della sua unica riga.
+    var bulk = cands.length > 1
+      ? '<button class="nudge-btn" id="btnRenewAll">Riproponi tutti</button>' : '';
+    el.innerHTML = '<div class="nudge"><div class="nudge-head"><div class="nudge-main">'+
+        '<div class="nudge-title">'+cands.length+(cands.length===1 ? " palcoscenico dove hai suonato" : " palcoscenici dove hai suonato")+', senza trattativa aperta</div>'+
+        '<div class="nudge-text">Riproporre apre una serata nuova per la stagione scritta qui sotto, in stato «da contattare» e senza data. Le serate degli anni scorsi restano dove sono e non parte nessun messaggio.</div>'+
+      '</div>'+bulk+'</div></div>'+
+      '<div class="grouped-list renew-list">'+cands.map(renewRowHtml).join("")+'</div>';
+    var all = document.getElementById("btnRenewAll");
+    if(!all) return;
+    all.addEventListener("click", function(){
       withButtonBusy(this, function(){
         return cands.reduce(function(chain, v){
-          return chain.then(function(){
-            return api("POST", "/api/locations/" + v.id + "/gigs", {season: nextSeasonFor(v)})
-              .then(applyUpdatedVenue);
-          });
+          return chain.then(function(){ return renewVenue(v); });
         }, Promise.resolve());
       }).then(function(){
         renderAll();
-        toast(cands.length + (cands.length===1 ? " serata aperta" : " serate aperte"));
+        // Dire dove sono finiti: escono da questo riquadro appena hanno una
+        // trattativa aperta, e senza saperlo sembrano spariti.
+        toast(cands.length + (cands.length===1 ? " serata aperta" : " serate aperte") + " · ora in Da ricontattare");
       }).catch(function(err){ toast(err.message); });
     });
   }
+  document.getElementById("renewNudge").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-renew]");
+    if(btn){
+      var id = btn.getAttribute("data-renew");
+      var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
+      if(!v) return;
+      var stagione = nextSeasonFor(v), nome = v.name || "Senza nome";
+      withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
+        renderAll();
+        toast("Serata " + stagione + " aperta · " + nome + " ora è in Da ricontattare");
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
+  });
 
   function gigAgendaRowHtml(x, tag, tagColor){
     var sub = [fmtDateShort(x.g.gig_date)];
@@ -2385,6 +2737,13 @@
     '</div>';
   }
 
+  /* Quali anni sono aperti. L'anno in corso nasce aperto, gli altri chiusi;
+     la scelta dura finche' l'app resta aperta, non si salva. */
+  var pastYearsOpen = {};
+  function pastYearOpen(y){
+    if(!(y in pastYearsOpen)) pastYearsOpen[y] = (y === currentSeason());
+    return pastYearsOpen[y];
+  }
   function renderAgendaGigs(){
     var rows = datedGigRows();
     if(!rows.length){
@@ -2412,7 +2771,8 @@
             '<div class="field-row stacked"><label>Com\'è andata</label>'+
               '<textarea rows="2" id="conf-note-'+x.g.id+'" placeholder="es. serata piena, ci richiamano">'+esc(x.g.outcome_note || "")+'</textarea></div>'+
             '<div class="field-row"><label>Prossimo contatto</label>'+
-              '<input type="date" id="conf-date-'+x.g.id+'" value="'+esc(proposedNextContact(x.v, x.g))+'"></div>'+
+              '<input type="date" id="conf-date-'+x.g.id+'" value="'+esc(proposedNextContact(x.v, x.g))+'">'+
+              '<button type="button" class="date-clear" data-clear-date="'+x.g.id+'" aria-label="Togli il promemoria">Togli</button></div>'+
           '</div>'+
           '<div class="gig-confirm">'+
             '<button type="button" class="yes" data-played="'+x.g.id+'">Ho suonato</button>'+
@@ -2443,16 +2803,48 @@
           return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
         }).join("") + '</div>';
     }
+    /* Le passate si accumulano per sempre: una decina l'anno diventano cento
+       in dieci anni. Raggruppate per anno, con l'anno in corso aperto e i
+       precedenti chiusi: niente si perde, e l'elenco resta corto. Il totale
+       nell'intestazione fa capire l'anno anche da chiuso. */
     var pastDone = past.filter(function(x){ return x.g.status !== "confermato"; });
     if(pastDone.length){
-      html += '<div class="agenda-group">Già passate<span class="group-count">'+pastDone.length+'</span></div><div class="grouped-list">' +
-        pastDone.map(function(x){
-          return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
-        }).join("") + '</div>';
+      html += '<div class="agenda-group">Già passate<span class="group-count">'+pastDone.length+'</span></div>';
+      var perAnno = {};
+      pastDone.forEach(function(x){
+        var y = (x.g.gig_date || "").slice(0, 4) || "—";
+        (perAnno[y] || (perAnno[y] = [])).push(x);
+      });
+      Object.keys(perAnno).sort().reverse().forEach(function(y){
+        var righe = perAnno[y];
+        // Solo le suonate fanno incasso: una data passata con la trattativa
+        // ancora aperta e' un compenso sperato, non incassato — e cosi' il
+        // totale qui e quello della Home dicono la stessa cifra.
+        var tot = righe.reduce(function(t, x){
+          return t + (x.g.status === "suonato" ? gigFee(x.g) : 0);
+        }, 0);
+        var aperto = pastYearOpen(y);
+        html += '<div class="agenda-group year-head'+(aperto ? " open" : "")+'" data-year="'+esc(y)+'">'+
+          '<span>'+esc(y)+' · '+righe.length+(righe.length === 1 ? " serata" : " serate")+
+          (tot ? " · " + fmtEuro(tot) : "")+'</span>'+CHEVRON+'</div>';
+        if(aperto){
+          html += '<div class="grouped-list">'+ righe.map(function(x){
+            return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
+          }).join("") +'</div>';
+        }
+      });
     }
     elAgendaGigs.innerHTML = html;
   }
   elAgendaGigs.addEventListener("click", function(e){
+    // Qui basta svuotare il campo: la data parte con la conferma, e
+    // vuota vuol dire gia' "non ricontattarli".
+    var clr = e.target.closest("[data-clear-date]");
+    if(clr){
+      var clrEl = document.getElementById("conf-date-" + clr.getAttribute("data-clear-date"));
+      if(clrEl) clrEl.value = "";
+      return;
+    }
     var yes = e.target.closest("[data-played]");
     var no = yes ? null : e.target.closest("[data-cancelled]");
     if(yes || no){
@@ -2470,6 +2862,13 @@
         toast((yes ? "Segnata come suonata" : "Segnata come annullata") +
           (updated.next_contact_date ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
       }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var anno = e.target.closest("[data-year]");
+    if(anno){
+      var y = anno.getAttribute("data-year");
+      pastYearsOpen[y] = !pastYearOpen(y);
+      renderAgendaGigs();
       return;
     }
     var row = e.target.closest("[data-open-id]");
@@ -2537,6 +2936,25 @@
   bindField(fEmail, "email");
   bindField(fWebsite, "website");
   bindField(fNextContact, "next_contact_date");
+  /* Il pulsante compare solo se una data c'e': su un campo gia' vuoto
+     "Togli" non vuol dire niente. Il salvataggio e' immediato, non a
+     350ms come gli altri campi: qui non stai digitando, hai deciso. */
+  var elClearNextContact = document.getElementById("btnClearNextContact");
+  function syncClearNextContact(){
+    elClearNextContact.hidden = !fNextContact.value;
+  }
+  fNextContact.addEventListener("input", syncClearNextContact);
+  elClearNextContact.addEventListener("click", function(){
+    if(!currentId) return;
+    clearTimeout(saveTimers["next_contact_date"]);
+    fNextContact.value = "";
+    syncClearNextContact();
+    patchVenue("next_contact_date", "").then(function(updated){
+      applyUpdatedVenue(updated);
+      renderAll();
+      toast("Promemoria tolto");
+    }).catch(function(err){ toast(err.message); });
+  });
   bindField(fPlanningNote, "planning_note");
 
   function renderPhotosStrip(v){
@@ -2908,6 +3326,7 @@
   function syncNextContactField(updated){
     if(String(updated.id) !== String(currentId)) return;
     fNextContact.value = updated.next_contact_date || "";
+    syncClearNextContact();
   }
   function applyGigResponse(updated, rerender){
     applyUpdatedVenue(updated);
@@ -3191,6 +3610,7 @@
     fEmail.value = v.email || "";
     fWebsite.value = v.website || "";
     fNextContact.value = v.next_contact_date || "";
+    syncClearNextContact();
     fPlanningNote.value = v.planning_note || "";
     elSaveIndicatorTitle.textContent = v.name || "Nuovo palcoscenico";
     renderPhotosStrip(v);
@@ -3868,8 +4288,14 @@
     document.getElementById("settingsMyBandsCount").textContent = myBands.length;
     var a = activeBand();
     document.getElementById("settingsActiveBand").textContent = a ? a.name : "Nessuna band attiva";
+    renderHomeTitle();
     document.getElementById("settingsMembersCount").textContent = a ? (a.member_count || "") : "";
   }
+  /* Toccare la riga cambia band: e' quello che si fa dieci volte al
+     giorno, mentre il nome si corregge una volta sola. La modifica
+     resta quindi un bersaglio a parte — la matita in fondo alla riga,
+     o "Modifica" strisciando come per eliminare — perche' la stessa
+     riga non puo' fare due cose con lo stesso tocco. */
   function renderMyBandsList(){
     var elMyBandsList = document.getElementById("myBandsList");
     if(!myBands.length){
@@ -3890,9 +4316,12 @@
         '<div class="row-main"><div class="row-title">'+esc(b.name)+'</div>'+
         '<div class="row-sub">'+subParts.join(" · ")+'</div></div>'+
         '<div class="row-trail"><button class="ws-edit" data-open-myband="'+b.id+'" aria-label="Modifica band">'+
-        '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.6" r="1"/></svg>'+
+        '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'+
         '</button></div>'+
-      '</div></div><div class="row-actions"><button data-del-myband="'+b.id+'">Elimina</button></div></div>';
+      '</div></div><div class="row-actions two">'+
+        '<button class="role" data-open-myband="'+b.id+'">Modifica</button>'+
+        '<button data-del-myband="'+b.id+'">Elimina</button>'+
+      '</div></div>';
     }).join("");
   }
   function switchToBand(id){
@@ -4037,7 +4466,12 @@
       return;
     }
     el.innerHTML = live.map(function(inv){
-      var used = inv.used_count === 1 ? "1 persona è entrata" : inv.used_count + " persone sono entrate";
+      // Il link vale un ingresso solo: appena qualcuno entra sparisce da
+      // questo elenco (non e' piu' valido), quindi qui il conteggio direbbe
+      // sempre zero. Meglio dire cosa vale.
+      var used = inv.max_uses === 1
+        ? "vale per una persona sola"
+        : (inv.used_count === 1 ? "1 persona è entrata" : inv.used_count + " persone sono entrate");
       return '<div class="field-row" style="display:block;">'+
         '<div class="invite-link">'+esc(inv.url)+'</div>'+
         '<div class="invite-actions">'+
@@ -4076,6 +4510,24 @@
     });
   }
 
+  /* "Attivo ora" vuol dire che l'app ha parlato col server nell'ultimo
+     minuto scarso: piu' preciso di cosi' sarebbe finto, perche' un
+     telefono in tasca con lo schermo spento non manda niente. */
+  function lastSeenText(iso){
+    if(!iso) return "";
+    var t = new Date(iso);
+    if(isNaN(t)) return "";
+    var min = Math.floor((Date.now() - t.getTime()) / 60000);
+    if(min < 0) min = 0;
+    if(min < 2) return "attivo ora";
+    if(min < 60) return min + " min fa";
+    var ore = Math.floor(min / 60);
+    if(ore < 24) return ore === 1 ? "un'ora fa" : (ore + " ore fa");
+    var giorni = Math.floor(ore / 24);
+    if(giorni === 1) return "ieri";
+    if(giorni < 7) return giorni + " giorni fa";
+    return "il " + fmtDateShort(iso.slice(0, 10));
+  }
   function renderMembers(){
     var el = document.getElementById("membersList");
     if(!members.length){
@@ -4097,9 +4549,18 @@
           '<button data-remove-member="'+esc(mem.email)+'">Rimuovi</button>'+
         '</div>';
       }
+      // Il ruolo nella band sta in cima al sottotitolo: e' quello che
+      // cerchi guardando l'elenco ("chi e' il batterista?"), l'email
+      // serve solo a distinguere due omonimi.
+      var strumenti = (mem.band_roles || "").trim();
+      var visto = lastSeenText(mem.last_seen_at);
+      var attivo = visto === "attivo ora";
       return '<div class="swipe-row"><div class="row-content"><div class="row">'+
         '<div class="row-main"><div class="row-title">'+esc(mem.name || mem.email)+(isMe ? " (tu)" : "")+'</div>'+
-        '<div class="row-sub">'+esc(mem.email)+'</div></div>'+
+        (strumenti ? '<div class="row-sub">'+esc(strumenti)+'</div>' : '')+
+        '<div class="row-sub">'+esc(mem.email)+'</div>'+
+        (visto ? '<div class="member-seen">'+(attivo ? '<span class="seen-dot"></span>' : '')+esc(visto)+'</div>' : '')+
+        '</div>'+
         '<div class="row-trail"><span class="member-role">'+esc(ROLE_LABELS[mem.role] || mem.role)+'</span></div>'+
       '</div></div>'+actions+'</div>';
     }).join("");
@@ -4107,8 +4568,9 @@
   function loadInviteScreen(){
     var a = activeBand();
     document.getElementById("inviteBandName").textContent = a ? a.name : "questa band";
-    // Un link nuovo a ogni apertura: dura 3 ore, quindi quello della volta
-    // scorsa e' quasi sempre gia' scaduto e non avrebbe senso riproporlo.
+    // Il server risponde col link che la band ha gia', se e' ancora buono,
+    // e ne fa uno nuovo solo quando e' scaduto o esaurito: tornare qui a
+    // controllare non deve spegnere il link appena mandato.
     return Promise.all([
       api("POST", "/api/invites", {})
         .then(function(){ return api("GET", "/api/invites"); })
@@ -4364,7 +4826,6 @@
     var opt = THEME_OPTIONS.find(function(o){ return o.value === current; });
     var label = opt ? opt.label : "Automatico";
     document.getElementById("settingsThemeValue").textContent = label;
-    document.getElementById("adminThemeValue").textContent = label;
   }
   function openThemePicker(){
     var current = currentTheme();
@@ -4376,11 +4837,22 @@
     });
   }
   document.getElementById("rowSettingsTheme").addEventListener("click", openThemePicker);
-  document.getElementById("rowAdminTheme").addEventListener("click", openThemePicker);
 
   /* ---------------- scheda Admin: i template delle band nuove ----------------
      Sono impostazioni di questa installazione, non del workspace: cambiarle
      non tocca le band che esistono gia', solo quelle che verranno create. */
+  var elAdminScreen = document.getElementById("adminScreen");
+  function openAdminScreen(){
+    elAdminScreen.hidden = false;
+    requestAnimationFrame(function(){ elAdminScreen.classList.add("in"); });
+  }
+  function closeAdminScreen(){
+    elAdminScreen.classList.remove("in");
+    setTimeout(function(){ elAdminScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsAdmin").addEventListener("click", openAdminScreen);
+  document.getElementById("btnAdminBack").addEventListener("click", closeAdminScreen);
+
   var elAdminListScreen = document.getElementById("adminListScreen");
   var elAdminEditScreen = document.getElementById("adminEditScreen");
   var templates = {venue_type: [], venue_category: [], wa_template: []};
@@ -4520,6 +4992,12 @@
     var avatar = document.getElementById("settingsProfileAvatar");
     if(me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
     document.getElementById("settingsProfileName").textContent = me.name || me.email;
+    // Nello stesso ordine della lista dei membri: nome, cosa suoni,
+    // indirizzo. La riga e' la propria scheda vista da fuori, e deve
+    // somigliare a come ti vedono gli altri.
+    var ruoli = document.getElementById("settingsProfileRoles");
+    ruoli.textContent = (me.band_roles || "").trim();
+    ruoli.hidden = !ruoli.textContent;
     document.getElementById("settingsProfileEmail").textContent = me.email;
   }
 
@@ -4529,6 +5007,8 @@
     if(me && me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
     document.getElementById("profileName").textContent = (me && me.name) || "";
     document.getElementById("profileEmail").textContent = (me && me.email) || "";
+    document.getElementById("profileNameInput").value = (me && me.name) || "";
+    renderProfileBandRoles();
     elProfileScreen.hidden = false;
     requestAnimationFrame(function(){ elProfileScreen.classList.add("in"); });
   }
@@ -4536,6 +5016,80 @@
     elProfileScreen.classList.remove("in");
     setTimeout(function(){ elProfileScreen.hidden = true; }, 320);
   }
+
+  /* Quasi nessuno fa una cosa sola: chi canta suona anche la chitarra,
+     quindi si sceglie a piu' voci come per i generi. Lista chiusa e la
+     stessa del server (BAND_ROLES in app.py): scritti a mano sarebbero
+     dieci modi di dire "voce" e nella lista dei membri non si
+     leggerebbe piu' niente. */
+  var BAND_ROLES = [
+    "Cantante", "Chitarrista", "Bassista", "Batterista",
+    "Percussionista", "Tastierista", "Violinista", "Altro"
+  ];
+  /* Il nome non arriva piu' da Google a ogni accesso: da quando si puo'
+     correggere, il server tiene quello scritto qui. Quindi qui dev'esserci
+     anche il modo di correggerlo di nuovo. */
+  var profileNameInput = document.getElementById("profileNameInput");
+  var profileNameTimer = null;
+  profileNameInput.addEventListener("input", function(){
+    clearTimeout(profileNameTimer);
+    var valore = profileNameInput.value.trim();
+    if(!valore) return;  // vuoto il server lo rifiuta: si aspetta che scriva
+    profileNameTimer = setTimeout(function(){
+      api("PUT", "/api/me", {name: valore}).then(function(updated){
+        me = updated;
+        document.getElementById("profileName").textContent = me.name || "";
+        renderSettingsProfile();
+        syncMyMemberRow();
+      }).catch(function(err){ toast(err.message); });
+    }, 400);
+  });
+  function myBandRoles(){
+    return String((me && me.band_roles) || "").split(",")
+      .map(function(x){ return x.trim(); }).filter(Boolean);
+  }
+  /* L'elenco membri arriva dal server: se e' gia' stato caricato, la
+     propria riga mostrerebbe ancora i dati di prima. */
+  function syncMyMemberRow(){
+    if(!members.length || !me) return;
+    members = members.map(function(x){
+      return x.email === me.email
+        ? Object.assign({}, x, {name: me.name, band_roles: me.band_roles})
+        : x;
+    });
+    renderMembers();
+  }
+  function renderProfileBandRoles(){
+    var el = document.getElementById("profileBandRolesValue");
+    var ruoli = myBandRoles();
+    el.textContent = ruoli.length ? ruoli.join(", ") : "Scegli uno o più ruoli";
+    el.style.color = ruoli.length ? "" : "var(--text-tertiary)";
+  }
+  function openBandRolesPicker(selected, onDone){
+    var chosen = selected.slice();
+    openSheet({
+      title: "Ruolo nella band",
+      multiSelect: true,
+      options: BAND_ROLES.map(function(r){
+        return {label: r, checkmark: chosen.indexOf(r) > -1, onToggle: function(checked){
+          if(checked){ chosen.push(r); }
+          else { chosen = chosen.filter(function(x){ return x !== r; }); }
+        }};
+      }),
+      onDone: function(){ onDone(chosen); }
+    });
+  }
+  document.getElementById("rowProfileBandRoles").addEventListener("click", function(){
+    openBandRolesPicker(myBandRoles(), function(chosen){
+      api("PUT", "/api/me", {band_roles: chosen}).then(function(updated){
+        me = updated;
+        renderProfileBandRoles();
+        renderSettingsProfile();
+        syncMyMemberRow();
+        toast("Ruolo aggiornato");
+      }).catch(function(err){ toast(err.message); });
+    });
+  });
   document.getElementById("rowSettingsProfile").addEventListener("click", openProfileScreen);
   document.getElementById("btnProfileBack").addEventListener("click", closeProfileScreen);
   document.getElementById("btnLogout").addEventListener("click", function(){
@@ -4564,6 +5118,72 @@
       onDone: function(){ onDone(chosen); }
     });
   }
+
+  /* ---------------- modulo di benvenuto: chi sei ----------------
+     Si apre una volta sola, a chi si registra adesso o entra da un link
+     di invito. Chiede le due cose che servono agli altri della band per
+     riconoscerti: come ti chiami e cosa suoni. La band vera e propria,
+     per chi non ne ha nessuna, la crea il wizard subito dopo. */
+  var elProfileSetupScreen = document.getElementById("profileSetupScreen");
+  var setupName = document.getElementById("setupName");
+  var setupRolesValue = document.getElementById("setupRolesValue");
+  var btnSetupContinue = document.getElementById("btnSetupContinue");
+  var setupRoles = [];
+  function renderSetupRoles(){
+    setupRolesValue.textContent = setupRoles.length ? setupRoles.join(", ") : "Scegli uno o più ruoli";
+    setupRolesValue.style.color = setupRoles.length ? "" : "var(--text-tertiary)";
+  }
+  function updateSetupContinueState(){
+    // Il ruolo e' obbligatorio quanto il nome: e' il motivo del modulo, e
+    // "Altro" e' li' apposta per chi non si riconosce nella lista.
+    var ok = setupName.value.trim() && setupRoles.length;
+    btnSetupContinue.style.opacity = ok ? "1" : ".4";
+    btnSetupContinue.style.pointerEvents = ok ? "auto" : "none";
+  }
+  setupName.addEventListener("input", updateSetupContinueState);
+  document.getElementById("rowSetupRoles").addEventListener("click", function(){
+    openBandRolesPicker(setupRoles, function(chosen){
+      setupRoles = chosen;
+      renderSetupRoles();
+      updateSetupContinueState();
+    });
+  });
+  function openProfileSetup(){
+    var avatar = document.getElementById("setupAvatar");
+    if(me && me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
+    setupName.value = (me && me.name) || "";
+    setupRoles = myBandRoles();
+    var banda = me && me.active_workspace ? me.active_workspace.name : null;
+    document.getElementById("setupSubtitle").textContent = banda
+      ? ("Sei entrato in " + banda + ": questi dati li vedono gli altri membri.")
+      : "Due cose sole, poi si parte.";
+    renderSetupRoles();
+    updateSetupContinueState();
+    elProfileSetupScreen.hidden = false;
+    requestAnimationFrame(function(){ elProfileSetupScreen.classList.add("in"); });
+  }
+  function closeProfileSetup(){
+    elProfileSetupScreen.classList.remove("in");
+    setTimeout(function(){ elProfileSetupScreen.hidden = true; }, 320);
+  }
+  btnSetupContinue.addEventListener("click", function(){
+    if(btnSetupContinue.style.pointerEvents === "none") return;
+    withButtonBusy(this, function(){
+      return api("PUT", "/api/me", {
+        name: setupName.value.trim(),
+        band_roles: setupRoles,
+        profile_completed: true
+      });
+    }).then(function(updated){
+      me = updated;
+      closeProfileSetup();
+      renderSettingsProfile();
+      syncMyMemberRow();
+      // Chi arriva da un invito una band ce l'ha gia'. Chi si e'
+      // registrato da solo no, e senza non c'e' niente da mostrargli.
+      if(me.needs_workspace) openWizard();
+    }).catch(function(err){ toast(err.message); });
+  });
 
   var elWizardScreen = document.getElementById("wizardScreen");
   var wzArtistName = document.getElementById("wzArtistName");
@@ -4621,14 +5241,19 @@
       // Il wizard non serve piu' a "presentarsi": serve a dare una band a chi
       // non ne ha nessuna, altrimenti l'app non ha dati da mostrare ne' un
       // posto dove scriverne.
-      // La scheda Admin compare solo a chi e' elencato in ADMIN_EMAILS. E'
-      // una comodita' dell'interfaccia: il controllo vero e' sul server, che
-      // rifiuta le rotte /api/admin a chiunque altro.
-      document.getElementById("tabBtnAdmin").hidden = !me.is_admin;
+      // La voce Admin nelle Impostazioni compare solo a chi e' elencato in
+      // ADMIN_EMAILS. E' una comodita' dell'interfaccia: il controllo vero e'
+      // sul server, che rifiuta le rotte /api/admin a chiunque altro.
+      document.getElementById("sectionAdminHeader").hidden = !me.is_admin;
+      document.getElementById("rowSettingsAdminWrap").hidden = !me.is_admin;
+      document.getElementById("sectionAdminFooter").hidden = !me.is_admin;
       // Uno Slaker non puo' scrivere: il "+" lo porterebbe solo a un errore.
       // La barriera vera resta sul server, questo e' per non farlo sbattere.
       document.getElementById("fabAdd").hidden = (me.can_write === false);
-      if(me.email && me.needs_workspace) openWizard();
+      // Prima chi sei, poi la band: presentarsi viene prima di
+      // qualunque dato, e chi entra da un invito la band ce l'ha gia'.
+      if(me.email && !me.profile_completed) openProfileSetup();
+      else if(me.email && me.needs_workspace) openWizard();
       return me;
     });
   }
