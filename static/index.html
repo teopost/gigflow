@@ -368,9 +368,21 @@
   .add-note-row button{flex:none;background:none;border:none;color:var(--tint);font-weight:600;font-size:16px;cursor:pointer;padding:2px 0 0;}
   .add-note-row button:disabled{color:var(--text-tertiary);}
   /* ---------- serate ---------- */
-  .gig-row{display:flex;align-items:center;gap:10px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);cursor:pointer;}
+  /* La sezione Serate non è un campo del modulo come gli altri: è quello per
+     cui la scheda esiste, e in mezzo a Dove, Info, Contatti e Note si
+     confondeva. Il bordo la marca, e basta: dire com'è andata resta compito
+     della pastiglia a destra, che il colore ce l'ha già. Colorare anche il
+     bordo secondo lo stato direbbe due volte la stessa cosa.
+     Il padding scende da 16 a 13 perché i 3px del bordo lo rimpiazzino: così
+     il testo resta incolonnato dov'era. */
+  .gig-row{display:flex;align-items:center;gap:10px;padding:11px 16px 11px 13px;min-height:44px;background:var(--bg-elevated);cursor:pointer;border-left:3px solid var(--tint);}
   .gig-row:active{background:var(--fill);}
-  .grouped-list > .swipe-row:not(:first-child) .row-content .gig-row{border-top:.5px solid var(--separator);}
+  /* Il separatore non è un bordo ma un'ombra interna: un border-top farebbe
+     angolo con il bordo rosso qui sopra e glielo taglierebbe a ogni riga,
+     lasciando una barra spezzata invece che continua. L'ombra interna parte
+     dopo il bordo, quindi la linea grigia resta rientrata — che è poi come
+     si comportano gli elenchi di sistema. */
+  .grouped-list > .swipe-row:not(:first-child) .row-content .gig-row{box-shadow:inset 0 .5px 0 var(--separator);}
   .gig-season{flex:none;min-width:52px;font-size:13px;font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums;}
   .gig-main{flex:1;min-width:0;}
   .gig-date{font-size:16px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
