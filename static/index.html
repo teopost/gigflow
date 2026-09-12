@@ -448,6 +448,10 @@
   .tab-badge-wrap{position:relative;}
   .tab-dot{position:absolute;top:-2px;right:-6px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg-tabbar);}
   .filter-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--tint);margin-left:4px;vertical-align:middle;}
+  /* L'esito del controllo versione, sotto il riquadro della build. */
+  .about-update{margin-top:12px;font-size:13px;color:var(--text-secondary);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
+  .about-update.nuova{color:var(--tint);font-weight:600;}
+  .about-update button{border:0;background:var(--tint);color:#fff;font:inherit;font-weight:600;font-size:13px;padding:7px 14px;border-radius:10px;cursor:pointer;}
   /* Il pallino sta sopra l'angolo dell'icona invece che accanto: di fianco
      allargherebbe il bottone e sposterebbe il titolo. */
   .navbar-trailing .nav-btn{position:relative;}
@@ -1225,6 +1229,7 @@
         <div id="aboutBuild" translate="no" class="notranslate"
              style="display:inline-block;margin-top:10px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
                     color:var(--text-secondary);background:var(--fill);padding:6px 12px;border-radius:9px;cursor:pointer;">build …</div>
+        <div class="about-update" id="aboutUpdate" hidden></div>
       </div>
       <div class="section-footer" style="text-align:center;padding:8px 32px 24px;">
         Gestionale live per tenere traccia dei posti dove far suonare la band: locali, feste di paese, bagni al mare e altro — con anagrafica art director e promemoria di ricontatto.
@@ -5821,17 +5826,50 @@
 
   var elAboutScreen = document.getElementById("aboutScreen");
   var elAboutBuild = document.getElementById("aboutBuild");
-  // La build viene chiesta al server, non ricordata dall'app: se quello che
-  // stai guardando e' una copia vecchia rimasta in cache, e' proprio questo
-  // il numero che deve smascherarla.
+  var elAboutUpdate = document.getElementById("aboutUpdate");
+  /* Aprire questa schermata è un modo esplicito di chiedere "sono
+     aggiornato?", quindi qui il controllo si fa davvero: si interroga il
+     server e si chiede al service worker quale versione sta servendo. Il
+     numero mostrato è quello in uso, non quello del server — mostrare la
+     build del server mentre giri su una copia vecchia sarebbe il modo
+     perfetto per non accorgersene mai. */
   function renderBuild(){
-    fetch("/api/version", {cache:"no-store", credentials:"same-origin"})
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(d){
-        if(!d) return;
-        elAboutBuild.textContent = "build " + (d.build || "?") + " · " + (d.version || "");
-      })
-      .catch(function(){ elAboutBuild.textContent = "build non raggiungibile (sei offline?)"; });
+    elAboutBuild.textContent = "controllo la versione…";
+    elAboutUpdate.hidden = true;
+    elAboutUpdate.className = "about-update";
+    var motore = window.gigflowUpdate;
+    if(!motore){ elAboutBuild.textContent = "build non disponibile"; return; }
+    Promise.all([motore.versioneInUso(), motore.controlla()]).then(function(esito){
+      var inUso = esito[0], server = esito[1];
+      if(!server){
+        elAboutBuild.textContent = "build non raggiungibile (sei offline?)";
+        elAboutUpdate.textContent = "Riprova quando torni in rete.";
+        elAboutUpdate.hidden = false;
+        return;
+      }
+      var nuova = motore.inAttesa() || (inUso && server.version && inUso !== server.version);
+      if(nuova){
+        elAboutBuild.textContent = "in uso " + (inUso || "?");
+        elAboutUpdate.className = "about-update nuova";
+        elAboutUpdate.innerHTML = "";
+        var testo = document.createElement("span");
+        // Anche l'impronta, non solo l'etichetta: due build fatte nello
+        // stesso minuto hanno la stessa etichetta, e "c'è la build X" mentre
+        // stai su una build che si chiama X si legge come un errore.
+        testo.textContent = "C'è una versione più recente: " +
+          (server.build || "?") + " · " + (server.version || "");
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "Aggiorna";
+        btn.addEventListener("click", function(){ motore.applica(); });
+        elAboutUpdate.appendChild(testo);
+        elAboutUpdate.appendChild(btn);
+      } else {
+        elAboutBuild.textContent = "build " + (server.build || "?") + " · " + (server.version || "");
+        elAboutUpdate.textContent = "È la versione più recente.";
+      }
+      elAboutUpdate.hidden = false;
+    });
   }
   elAboutBuild.addEventListener("click", function(){
     var t = elAboutBuild.textContent;
@@ -6483,23 +6521,60 @@
   // caricata all'avvio è anche l'unico avviso possibile dove il service
   // worker non c'è (es. http:// su un IP di rete locale).
   function checkVersion(){
-    fetch("/api/version", {cache:"no-store", credentials:"same-origin"})
+    return fetch("/api/version", {cache:"no-store", credentials:"same-origin"})
       .then(function(res){ return res.ok ? res.json() : null; })
       .then(function(data){
-        if(!data || !data.version) return;
-        if(loadedBuild === null){ loadedBuild = data.version; return; }
+        if(!data || !data.version) return null;
+        if(loadedBuild === null){ loadedBuild = data.version; return data; }
         if(data.version !== loadedBuild) announceUpdate(null);
+        return data;
       })
-      .catch(function(){ /* offline: si riprova al prossimo giro */ });
+      .catch(function(){ return null; /* offline: si riprova al prossimo giro */ });
   }
 
-  function checkForUpdate(){
+  function checkForUpdate(subito){
     var now = Date.now();
-    if(updating || now - lastCheck < 60000) return; // niente raffiche al server
+    if(updating) return Promise.resolve(null);
+    // La strozzatura serve contro i ricontrolli automatici. Quando è
+    // l'utente ad aprire "Informazioni sull'app" per sapere se c'è una
+    // versione nuova, rispondergli "ho già guardato un minuto fa" sarebbe
+    // esattamente il contrario di quello che ha chiesto.
+    if(!subito && now - lastCheck < 60000) return Promise.resolve(null);
     lastCheck = now;
     if(registration) registration.update().catch(function(){});
-    checkVersion();
+    return checkVersion();
   }
+
+  /* Che versione sta servendo questa pagina, davvero. Non quella che il
+     server ha adesso — quella la sa chiunque — ma quella del service worker
+     che sta rispondendo: è l'unico modo per accorgersi di stare guardando
+     una copia vecchia. */
+  function versioneInUso(){
+    var sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if(!sw) return Promise.resolve(loadedBuild);
+    return new Promise(function(risolvi){
+      var canale = new MessageChannel(), risposto = false;
+      canale.port1.onmessage = function(e){
+        risposto = true;
+        risolvi((e.data && e.data.build) || loadedBuild);
+      };
+      try { sw.postMessage({type:"GET_BUILD"}, [canale.port2]); }
+      catch(err){ return risolvi(loadedBuild); }
+      // Un service worker di una versione vecchia non conosce GET_BUILD e
+      // non risponderà mai: non si resta appesi ad aspettarlo.
+      setTimeout(function(){ if(!risposto) risolvi(loadedBuild); }, 1500);
+    });
+  }
+
+  /* Il resto dell'app vive in un'altra chiusura e non vede niente di
+     quello che c'è qui dentro. Questo è l'unico punto di contatto, tenuto
+     stretto apposta: lo usa la schermata "Informazioni sull'app". */
+  window.gigflowUpdate = {
+    controlla: function(){ return checkForUpdate(true); },
+    versioneInUso: versioneInUso,
+    inAttesa: function(){ return !!(waitingWorker || (registration && registration.waiting)); },
+    applica: function(){ elUpdateBtn.click(); }
+  };
 
   // L'app installata non fa quasi mai un avvio a freddo: senza questi
   // ricontrolli il browser potrebbe non accorgersi mai che sw.js è cambiato.
