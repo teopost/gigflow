@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>GigFlow — diario dei problemi e delle soluzioni</title>
+<link rel="icon" href="../icon-192.png">
+<meta name="description" content="Resoconto tecnico interno: cosa si è rotto, perché, e come è stato risolto.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --paper:#f5f1e6; --paper-raised:#ffffff; --ink:#191410; --ink-dim:#6b6255;
+    --line:#e3dac6; --amber:#b8730f; --amber-deep:#8a560a; --amber-soft:#f1dfae;
+    --stage-1:#141225; --stage-2:#0a0e17;
+    --spot-amber:#ffb347; --spot-magenta:#ff3cac;
+    --bad:#a3341f; --bad-soft:#f7e0da; --good:#2f6b43; --good-soft:#dcecdf;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.65;}
+  h1,h2,h3,h4{text-wrap:balance;margin:0;line-height:1.25;}
+  p{margin:0;}
+  a{color:var(--amber-deep);}
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px;}
+
+  header.top{background:radial-gradient(120% 140% at 50% 0%, var(--stage-1) 0%, var(--stage-2) 100%);
+    color:#f4f1ea;padding:56px 0 48px;}
+  .wordmark{font-family:"Bebas Neue",sans-serif;font-size:20px;letter-spacing:.06em;
+    display:inline-flex;align-items:center;gap:8px;color:var(--spot-amber);text-decoration:none;}
+  .wordmark svg{width:19px;height:19px;}
+  header.top h1{font-family:"Bebas Neue",sans-serif;font-size:clamp(38px,8vw,64px);letter-spacing:.03em;
+    margin-top:26px;
+    background:linear-gradient(90deg,var(--spot-amber),var(--spot-magenta));
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  header.top .sub{color:#cfd3de;font-size:16.5px;max-width:58ch;margin-top:14px;}
+  .stamp{display:inline-block;margin-top:22px;font-size:12px;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;color:#cfd3de;background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.2);padding:7px 13px;border-radius:999px;}
+
+  main{padding:8px 0 80px;}
+  .toc{background:var(--paper-raised);border:1px solid var(--line);border-radius:16px;
+    padding:22px 26px;margin:44px 0 8px;}
+  .toc h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--amber-deep);margin-bottom:12px;}
+  .toc ol{margin:0;padding-left:20px;}
+  .toc li{margin:5px 0;font-size:15px;}
+  .toc a{text-decoration:none;font-weight:600;}
+  .toc a:hover{text-decoration:underline;}
+
+  section.chapter{margin-top:60px;}
+  .chapter-num{font-family:"Bebas Neue",sans-serif;font-size:15px;letter-spacing:.12em;
+    color:var(--amber-deep);}
+  section.chapter > h2{font-size:clamp(24px,4.4vw,33px);font-weight:800;letter-spacing:-.015em;margin-top:4px;}
+  section.chapter > p, .case > p, .case ul, .case ol{font-size:16px;color:#2b241d;}
+  section.chapter > p{margin-top:16px;max-width:64ch;}
+
+  .case{background:var(--paper-raised);border:1px solid var(--line);border-radius:16px;
+    padding:26px 28px;margin-top:26px;}
+  .case h3{font-size:19px;font-weight:750;letter-spacing:-.01em;}
+  .case h4{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--amber-deep);margin-top:22px;}
+  .case p{margin-top:9px;line-height:1.62;}
+  .case ul,.case ol{margin:10px 0 0;padding-left:22px;}
+  .case li{margin:6px 0;line-height:1.6;}
+
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;padding:4px 10px;border-radius:999px;margin-bottom:10px;}
+  .tag.mio{background:var(--bad-soft);color:var(--bad);}
+  .tag.trappola{background:var(--amber-soft);color:var(--amber-deep);}
+  .tag.ambiente{background:#dfe6f2;color:#31496f;}
+
+  code{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:.88em;background:#efe8d8;padding:2px 6px;border-radius:5px;}
+  pre{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.55;
+    background:#1d1a24;color:#e8e3d6;padding:16px 18px;border-radius:12px;
+    overflow-x:auto;margin-top:14px;}
+  pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+
+  .verdict{display:flex;gap:12px;align-items:flex-start;border-radius:12px;padding:14px 16px;margin-top:18px;
+    font-size:15px;line-height:1.55;}
+  .verdict.fix{background:var(--good-soft);border:1px solid #bcd8c4;color:#22402c;}
+  .verdict.warn{background:var(--bad-soft);border:1px solid #e8c5ba;color:#6d2313;}
+  .verdict .mark{font-weight:800;flex:none;}
+
+  .tablewrap{overflow-x:auto;margin-top:16px;}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:420px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);font-weight:700;}
+  td.num{font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+
+  .lesson{border-left:3px solid var(--amber);padding:2px 0 2px 18px;margin-top:20px;}
+  .lesson p{font-size:15.5px;font-style:italic;color:#3a322a;}
+
+  footer{border-top:1px solid var(--line);margin-top:70px;padding:28px 0 46px;
+    font-size:13.5px;color:var(--ink-dim);}
+  footer p{margin-top:8px;max-width:64ch;}
+
+  @media (max-width:560px){
+    .case{padding:20px 18px;}
+    .wrap{padding:0 18px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="wordmark" href="../">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c5 0 9 3.2 9 7.4 0 4.6-4.2 8.5-7.2 11.6a2.4 2.4 0 0 1-3.6 0C7.2 17.9 3 14 3 9.4 3 5.2 7 2 12 2z"/></svg>
+      GIGFLOW
+    </a>
+    <h1>Diario dei problemi</h1>
+    <p class="sub">Che cosa si è rotto durante lo sviluppo, perché si è rotto,
+       e che cosa è stato fatto per rimetterlo a posto. Compresi gli errori
+       commessi mentre si cercava di risolvere gli altri.</p>
+    <span class="stamp">Documento interno · 12 settembre 2026</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <nav class="toc">
+    <h2>Indice</h2>
+    <ol>
+      <li><a href="#pwa">La PWA installata che non si aggiornava mai</a></li>
+      <li><a href="#deploy">«Non vedo l'aggiornamento»: non era il codice</a></li>
+      <li><a href="#liste">Tre liste nuove senza scrivere tre volte lo stesso codice</a></li>
+      <li><a href="#import">L'import di 472 righe: nove trappole</a></li>
+      <li><a href="#lezioni">Quello che resta</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================================================= -->
+  <section class="chapter" id="pwa">
+    <div class="chapter-num">CAPITOLO 1</div>
+    <h2>La PWA installata che non si aggiornava mai</h2>
+    <p>Chi installa l'app sul telefono non ha una barra degli indirizzi da
+       ricaricare, e spesso non la chiude mai davvero. Il risultato era che
+       restava per sempre sulla versione con cui l'aveva installata:
+       l'unico modo per vedere le novità era disinstallare e reinstallare.</p>
+
+    <div class="case">
+      <span class="tag trappola">Tre cause insieme</span>
+      <h3>Non era un bug solo, erano tre</h3>
+
+      <h4>1. Il numero di versione si alzava a mano</h4>
+      <p>Il service worker teneva il nome della cache in una costante
+         (<code>…-v26</code>, <code>…-v27</code>) che andava incrementata a
+         ogni rilascio. Il browser sostituisce un service worker
+         <em>solo</em> se i byte del file sono cambiati: bastava dimenticarsi
+         di alzare quel numero e tutti restavano fermi, senza che nulla lo
+         segnalasse.</p>
+
+      <h4>2. Nessun header di cache</h4>
+      <p><code>/</code> e <code>/sw.js</code> uscivano senza
+         <code>Cache-Control</code>. La cache HTTP del browser poteva quindi
+         riproporre le copie vecchie anche quando il server ne aveva di nuove.</p>
+
+      <h4>3. Nessun avviso</h4>
+      <p>Anche quando la versione nuova arrivava, restava «in attesa» e
+         nessuno lo sapeva.</p>
+
+      <h4>Come è stata risolta</h4>
+      <ul>
+        <li><strong>La versione si calcola da sola.</strong> Il server produce
+            l'impronta del <em>contenuto</em> dei file statici e la incolla
+            dentro <code>sw.js</code> mentre lo serve. Ogni rilascio con
+            modifiche genera da sé un file diverso, e l'aggiornamento parte
+            senza che nessuno debba ricordarsi niente.</li>
+        <li><strong>L'impronta è del contenuto, non della data.</strong>
+            Scelta deliberata: una ricostruzione che non cambia niente deve
+            lasciare la stessa versione, altrimenti a ogni <code>docker
+            build</code> tutti si vedrebbero proporre un aggiornamento che non
+            aggiorna niente.</li>
+        <li><strong><code>Cache-Control: no-cache</code></strong> su documento
+            e service worker.</li>
+        <li><strong>Niente <code>skipWaiting()</code> automatico.</strong> La
+            versione nuova resta in attesa e la pagina mostra una barra
+            «C'è una versione nuova · Aggiorna». È il tocco su quel bottone a
+            far subentrare la versione nuova, così l'app non cambia da sotto
+            mentre qualcuno sta compilando un modulo.</li>
+        <li><strong>Ricontrolli periodici</strong>: all'avvio, al ritorno in
+            primo piano e ogni mezz'ora, con una strozzatura per non
+            tempestare il server. È il pezzo decisivo per l'app installata,
+            che un avvio a freddo non lo fa quasi mai.</li>
+        <li><strong>Una rete di sicurezza</strong>: un endpoint che espone solo
+            l'impronta della build. Se il service worker non c'è proprio —
+            per esempio su <code>http://</code> verso un indirizzo di rete
+            locale, dove il browser lo rifiuta — l'app confronta comunque le
+            versioni e propone il ricarico.</li>
+      </ul>
+
+      <div class="verdict warn">
+        <span class="mark">!</span>
+        <div>Il primo rilascio dopo questa modifica resta comunque cieco: chi
+        ha l'app installata ha ancora il service worker vecchio, quello che
+        non sa avvisare di niente. Se ne va da solo appena il browser si
+        accorge che il file è cambiato, ma quel giro lì non si può
+        recuperare. Da lì in avanti è automatico.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="chapter" id="deploy">
+    <div class="chapter-num">CAPITOLO 2</div>
+    <h2>«Non vedo l'aggiornamento»: non era il codice</h2>
+    <p>Finito tutto il lavoro del capitolo 1, la risposta è stata: non vedo
+       l'aggiornamento. Il riflesso sbagliato sarebbe stato rimettere mano al
+       service worker.</p>
+
+    <div class="case">
+      <span class="tag ambiente">Ambiente, non codice</span>
+      <h3>Il container girava un'immagine di due ore prima</h3>
+      <p>I file erano stati modificati sul disco, ma l'applicazione gira in un
+         container e <code>static/</code> viene copiato <em>dentro</em>
+         l'immagine in fase di build. Senza ricostruire l'immagine, le
+         modifiche restano invisibili — per sempre.</p>
+
+      <h4>Il sintomo che l'ha rivelato</h4>
+      <p>L'endpoint della versione, appena aggiunto, rispondeva
+         <code>401 Unauthorized</code> invece di esistere. Non è un errore di
+         autenticazione: è la prova che quella rotta nel codice in esecuzione
+         non c'era proprio, e la richiesta finiva nel controllo generico
+         d'accesso. Un <code>401</code> dove ci si aspetta un <code>404</code>
+         o un <code>200</code> è un ottimo indizio di codice vecchio.</p>
+
+      <div class="verdict fix">
+        <span class="mark">✓</span>
+        <div>Backup del database, ricostruzione dell'immagine, riavvio. Il
+        controllo giusto prima di toccare il codice è sempre: <em>quello che
+        sto guardando è davvero quello che sto eseguendo?</em></div>
+      </div>
+
+      <div class="lesson"><p>Quando un utente dice «non funziona» subito dopo
+        una modifica, la prima ipotesi non è che la modifica sia sbagliata: è
+        che non sia mai arrivata dove doveva.</p></div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="chapter" id="liste">
+    <div class="chapter-num">CAPITOLO 3</div>
+    <h2>Tre liste nuove senza scrivere tre volte lo stesso codice</h2>
+    <p>Servivano tre nuovi elenchi di valori configurabili dall'utente,
+       «esattamente come» quello già esistente. La strada ovvia era il
+       copia-incolla. Era anche la strada sbagliata.</p>
+
+    <div class="case">
+      <span class="tag trappola">Duplicazione</span>
+      <h3>Il copia-incolla avrebbe prodotto 1.100 righe gemelle</h3>
+      <p>L'elenco già presente costava da solo circa 165 righe di server e 200
+         di interfaccia — ed era <em>a sua volta</em> una copia di un elenco
+         ancora precedente. Replicarlo tre volte significava mettere in casa
+         cinque copie della stessa logica, che poi vanno corrette tutte e
+         cinque ogni volta che se ne corregge una.</p>
+
+      <h4>Cosa è stato fatto</h4>
+      <ul>
+        <li>Un <strong>registro</strong> che descrive solo ciò che cambia da
+            una lista all'altra, e un <strong>motore unico</strong> che le fa
+            girare tutte: dati, API, rotte, precaricamento delle
+            configurazioni, filtri.</li>
+        <li><strong>Due schermate condivise</strong> invece di sei: i testi
+            arrivano dal registro.</li>
+        <li>Una lista in più, domani, è una voce nel registro.</li>
+      </ul>
+
+      <h4>Il dettaglio che di solito si sbaglia: l'italiano</h4>
+      <p>Con un motore generico la tentazione è comporre i messaggi a pezzi, e
+         il risultato sono frasi come «Nessuna stagionalità configurato».
+         Genere e numero non sono un dettaglio estetico: sono la differenza
+         fra un'app scritta e un'app tradotta male da sé stessa. Ogni lista
+         dichiara il proprio genere, e le parole che cambiano stanno in una
+         tabella sola.</p>
+
+      <h4>Un bug preso al volo prima che nascesse</h4>
+      <p>Il precaricamento delle configurazioni si interrompeva se la tabella
+         non era vuota. Aggiungendo i valori nuovi <em>prima</em> di quel
+         controllo, su un database appena creato il precaricamento si sarebbe
+         fermato subito, lasciando senza configurazione tutti i tipi
+         preesistenti. È stato evitato riempiendo solo il buco di chi ha già
+         dei dati, e lasciando al precaricamento normale il caso del database
+         nuovo.</p>
+
+      <div class="verdict fix">
+        <span class="mark">✓</span>
+        <div>Verificato facendo partire la pagina vera in un DOM simulato
+        contro il server vero, guidandola a clic: apertura delle schermate,
+        aggiunta, rinomina con propagazione, eliminazione, duplicato
+        rifiutato, filtri accesi e azzerati. Nessun errore.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="chapter" id="import">
+    <div class="chapter-num">CAPITOLO 4</div>
+    <h2>L'import di 472 righe: nove trappole</h2>
+    <p>Un foglio di calcolo con 472 contatti da fondere con un archivio che
+       ne conteneva già 360, sapendo che molti erano gli stessi. Qui si
+       concentrano quasi tutti i problemi della sessione — e tutti e tre gli
+       errori commessi.</p>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 1</span>
+      <h3>La città scritta in due formati diversi</h3>
+      <p>L'archivio salva la città come <code>Comune (PR)</code>, con la sigla
+         della provincia fra parentesi. Il foglio teneva comune e provincia in
+         due colonne separate. Il confronto «stesso nome + stessa città»
+         quindi non trovava <em>mai</em> niente, e le corrispondenze cadevano
+         su un criterio più debole.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Ricomposte le due colonne nel formato dell'archivio prima del
+        confronto. Sette corrispondenze recuperate.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 2</span>
+      <h3>Gli accenti</h3>
+      <p>La normalizzazione dei nomi toglieva tutto ciò che non fosse una
+         lettera semplice. Una città con l'accento finale diventava così una
+         stringa più corta della stessa città scritta senza accento: due
+         chiavi diverse per lo stesso posto. Il conteggio dei duplicati
+         cambiava di sette unità a seconda di come veniva scritta una vocale.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Normalizzazione Unicode che <em>scompone</em> l'accento e scarta
+        solo il segno diacritico, invece di buttare via la lettera. Solo dopo
+        questa correzione i numeri sono diventati stabili.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 3</span>
+      <h3>«Il foglio vince sempre» ha due letture, e una distrugge i dati</h3>
+      <p>La regola concordata era che, sui record già esistenti, il foglio
+         avesse la precedenza. Ma il foglio aveva centinaia di celle vuote.
+         Presa alla lettera, quella regola avrebbe cancellato 62 numeri di
+         telefono, 7 indirizzi email e altri dati presenti in archivio
+         semplicemente perché la cella corrispondente era vuota.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>«Il foglio vince» interpretato come: <em>un valore scritto nel
+        foglio sostituisce quello vecchio</em>. Una cella vuota non cancella
+        mai niente. Nessuno, dicendo «il foglio è più aggiornato», intende
+        «svuota i campi che non ho compilato».</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 4</span>
+      <h3>Quando la fonte «più aggiornata» è peggiore dell'archivio</h3>
+      <p>Una prova a vuoto prima di scrivere ha mostrato che su due campi il
+         foglio non era più fresco: era semplicemente peggiore.</p>
+      <div class="tablewrap">
+      <table>
+        <thead><tr><th>Campo</th><th>Cosa sarebbe successo</th><th class="num">Record</th></tr></thead>
+        <tbody>
+          <tr><td>Nome</td><td>Accenti persi e nomi troncati: versioni più corte e meno riconoscibili di quelle già in archivio. Tutti i cambiamenti erano peggioramenti.</td><td class="num">19</td></tr>
+          <tr><td>Città</td><td>Sei sigle di provincia semplicemente <strong>sbagliate</strong> (comuni attribuiti alla provincia sbagliata), più accenti persi.</td><td class="num">24</td></tr>
+          <tr><td>Indirizzo</td><td>Nessuna sovrascrittura: 191 caselle vuote riempite. Guadagno puro.</td><td class="num">191</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Nome e città esclusi dalla sovrascrittura e riempiti solo dove
+        mancavano. Tutti gli altri campi seguono la regola concordata. La
+        decisione è stata riportata all'utente con le prove, perché resti
+        sua.</div></div>
+      <div class="lesson"><p>Una prova a vuoto non serve a controllare che il
+        programma giri: serve a scoprire che la regola che ti hanno dato,
+        applicata ai dati veri, fa un danno che nessuno aveva previsto —
+        perché nessuno aveva ancora guardato i dati.</p></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 5</span>
+      <h3>Il numero di telefono non è la chiave unica che sembra</h3>
+      <p>Il telefono era il criterio d'identità più affidabile. Salvo che nel
+         foglio comparivano <strong>locali diversi con lo stesso cellulare</strong>:
+         stesso gestore con due attività, oppure un numero copiato per
+         sbaglio. Fidandosi solo del numero, i dati di un locale sarebbero
+         finiti sopra quelli di un altro.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Il contatto coincidente vale solo se anche i nomi sono
+        compatibili: uno contenuto nell'altro, abbastanza simili, o con almeno
+        una parola significativa in comune — scartando le parole generiche
+        («bar», «pub», «ristorante») che non distinguono un locale
+        dall'altro. Tre casi sono stati isolati e consegnati all'utente per
+        una verifica a mano, senza lasciare che sovrascrivessero nulla.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag mio">Errore mio · 1</span>
+      <h3>Il controllo scartato non ricadeva su quello successivo</h3>
+      <p>Quando un abbinamento per telefono veniva rifiutato perché i nomi non
+         erano compatibili, il record veniva dichiarato «nuovo»
+         <strong>senza provare il confronto per nome</strong>. Risultato: un
+         locale che era già in archivio è stato inserito una seconda volta.</p>
+      <div class="verdict warn"><span class="mark">!</span>
+        <div>Un duplicato creato su 242 inserimenti. Scoperto controllando i
+        record inseriti contro i nomi preesistenti, non per caso.</div></div>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Anziché correggerlo a mano, è stato ripristinato il backup
+        pre-import e rieseguito tutto con il controllo sistemato: uno
+        scarto ora <em>ricade</em> sui criteri successivi invece di saltare
+        alla conclusione. Zero duplicati nel risultato finale.</div></div>
+      <div class="lesson"><p>Una catena di controlli «prova A, altrimenti B,
+        altrimenti C» va scritta pensando anche al caso in cui A trovi
+        qualcosa e poi lo si scarti. Scartare non è la stessa cosa che non
+        aver trovato.</p></div>
+    </div>
+
+    <div class="case">
+      <span class="tag mio">Errore mio · 2</span>
+      <h3>Rilanciare lo script ha duplicato tutte le note</h3>
+      <p>Lo script era idempotente sui dati — rilanciandolo, zero inserimenti
+         e zero aggiornamenti — ma non sulle note: l'inserimento delle note
+         non aveva nessun controllo di esistenza. Rilanciandolo per rileggere
+         il riepilogo a schermo, sono state scritte 69 note in doppio.</p>
+      <div class="verdict warn"><span class="mark">!</span>
+        <div>«Lo script è idempotente» era vero solo per la parte che era
+        stata verificata. La parte accessoria non lo era, e non era stata
+        controllata.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag mio">Errore mio · 3</span>
+      <h3>La pulizia dei duplicati ha cancellato dati veri</h3>
+      <p>Per rimediare all'errore precedente è stata eseguita una
+         deduplicazione che teneva una sola nota per ogni combinazione di
+         scheda e testo. Ma nell'archivio esistevano <strong>tre note
+         identiche legittime</strong> sulla stessa scheda — tre registrazioni
+         separate della stessa attività, fatte in momenti diversi. La pulizia
+         ne ha cancellate due.</p>
+      <div class="verdict warn"><span class="mark">!</span>
+        <div>Testo identico non significa duplicato. In un registro di
+        attività, la ripetizione <em>è</em> l'informazione: dice che quella
+        cosa è successa tre volte.</div></div>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Le due note sono state rimesse dal backup con i loro dati
+        originali, e verificato che ogni nota preesistente fosse di nuovo al
+        suo posto confrontando gli identificativi prima e dopo.</div></div>
+      <div class="lesson"><p>Prima di una cancellazione di massa, la domanda
+        non è «questi record sono uguali?» ma «esistevano già prima del mio
+        errore?». Il backup non serve solo a tornare indietro: serve a
+        distinguere il danno che hai fatto tu da quello che non hai fatto.</p></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 6</span>
+      <h3>Numeri fissi parcheggiati nel campo del cellulare</h3>
+      <p>Alcuni record avevano un numero di rete fissa salvato nel campo
+         cellulare — l'unico campo telefono esistente prima. Il foglio
+         correggeva la cosa mettendo il numero giusto nel campo giusto, ma
+         sostituendolo quel vecchio numero sarebbe semplicemente sparito.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Un cellulare sostituito che non ricompare da nessun'altra parte
+        viene spostato sul campo del telefono fisso invece di essere buttato:
+        18 numeri veri salvati. E dove il foglio dichiara come fisso lo stesso
+        numero che era nel campo cellulare, il campo cellulare viene liberato
+        invece di tenere lo stesso numero due volte.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 7</span>
+      <h3>Il foglio conteneva duplicati di sé stesso</h3>
+      <p>Due righe descrivevano lo stesso posto con il nome scritto in ordine
+         diverso, stessa città, stesso contatto. Ma il primo tentativo di
+         deduplicazione interna usava il solo telefono come chiave, e così
+         <em>fondeva</em> locali diversi che condividevano un numero
+         (trappola 5), facendone sparire uno.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>La deduplicazione interna usa lo stesso criterio di compatibilità
+        dei nomi del confronto con l'archivio. Un solo duplicato reale
+        scartato, nessun locale legittimo perso.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 8</span>
+      <h3>Un vocabolario che non copriva i dati</h3>
+      <p>Tre colonne dovevano confluire in elenchi di valori già esistenti.
+         Due combaciavano alla perfezione. La terza no: un valore del foglio
+         copriva da solo il 60% delle righe e poteva finire in due categorie
+         diverse dell'archivio, e altri tre valori non avevano alcun
+         corrispondente.</p>
+      <p>Lo storico non aiutava a decidere: fra i record già presenti con quel
+         valore, la grande maggioranza aveva il campo vuoto e i pochi
+         compilati si dividevano quasi a metà fra le due interpretazioni.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Non è stata una decisione tecnica e non è stata presa
+        autonomamente: le opzioni sono state presentate con i numeri di
+        ciascuna, e la scelta è tornata a chi conosce il dominio.</div></div>
+    </div>
+
+    <div class="case">
+      <span class="tag trappola">Trappola 9</span>
+      <h3>Dati senza una casa</h3>
+      <p>Due colonne del foglio non avevano alcun campo corrispondente
+         nell'applicazione, e una terza conteneva informazioni di due nature
+         diverse mescolate: annotazioni reali e residui tecnici di un
+         precedente travaso.</p>
+      <div class="verdict fix"><span class="mark">✓</span>
+        <div>Segnalate esplicitamente <em>prima</em> di importare, invece di
+        scartarle in silenzio o di inventare un posto dove metterle. Una delle
+        due era comunque ricavabile da un'altra colonna; l'altra riguardava
+        una manciata di record fuori dai confini nazionali, dove il formato
+        previsto non si applica.</div></div>
+    </div>
+
+    <div class="case">
+      <h3>Il risultato</h3>
+      <div class="tablewrap">
+      <table>
+        <thead><tr><th>Campo popolato</th><th class="num">Prima</th><th class="num">Dopo</th></tr></thead>
+        <tbody>
+          <tr><td>Schede totali</td><td class="num">360</td><td class="num">601</td></tr>
+          <tr><td>Tipo</td><td class="num">111</td><td class="num">524</td></tr>
+          <tr><td>Indirizzo</td><td class="num">11</td><td class="num">323</td></tr>
+          <tr><td>Email</td><td class="num">243</td><td class="num">380</td></tr>
+          <tr><td>Telefono fisso</td><td class="num">0</td><td class="num">121</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="margin-top:16px;">241 schede nuove, 230 aggiornate, un
+         duplicato interno scartato, zero duplicati creati, zero dati
+         preesistenti persi.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="chapter" id="lezioni">
+    <div class="chapter-num">CAPITOLO 5</div>
+    <h2>Quello che resta</h2>
+
+    <div class="case">
+      <ol>
+        <li><strong>«Non funziona» dopo una modifica vuol dire prima di tutto
+            «non è arrivato».</strong> Verificare che il codice in esecuzione
+            sia quello che si sta guardando costa trenta secondi e fa
+            risparmiare un pomeriggio.</li>
+        <li><strong>La prova a vuoto serve a guardare i dati, non il
+            codice.</strong> Le due decisioni più importanti dell'import sono
+            nate da lì: nessuna delle due era prevedibile a tavolino.</li>
+        <li><strong>Una regola data da chi conosce il dominio va applicata
+            allo spirito, non alla lettera</strong> — e quando la lettera fa
+            danni, si torna a chiedere mostrando le prove, invece di decidere
+            da soli o di eseguire alla cieca.</li>
+        <li><strong>Idempotente per metà vuol dire non idempotente.</strong>
+            Se una parte di uno script non ha un controllo di esistenza, quel
+            pezzo lì raddoppierà.</li>
+        <li><strong>Prima di cancellare, distinguere il proprio danno da
+            quello che c'era già.</strong> Il backup non serve solo a tornare
+            indietro, serve a sapere che cosa è tuo.</li>
+        <li><strong>Dalla terza copia in poi, si descrive invece di
+            riscrivere.</strong> Ma il generico non giustifica messaggi
+            sgrammaticati: genere e numero fanno parte della funzionalità.</li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><strong>Documento interno.</strong> Volutamente privo di nomi di
+       locali, numeri di telefono e indirizzi email: questo repository è
+       pubblico, e quei dati non devono uscire. Gli esempi sono descritti,
+       non citati.</p>
+    <p>L'indirizzo di questa pagina non è indicizzabile e non è collegato da
+       nessun'altra parte del sito, ma resta comunque raggiungibile da chi lo
+       conosce.</p>
+  </div>
+</footer>
+
+</body>
+</html>

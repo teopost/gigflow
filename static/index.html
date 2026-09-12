@@ -474,6 +474,11 @@
 
   .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:rgba(28,28,30,.92);color:#fff;padding:10px 18px;border-radius:14px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .18s, transform .18s;z-index:80;text-align:center;max-width:80vw;}
   .toast.show{opacity:1;transform:translate(-50%,0);}
+  /* Avviso di versione nuova: stessa posizione del toast ma non sparisce
+     da solo, perché chiede un gesto (e resta leggibile mentre si legge). */
+  .update-bar{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,12px);display:flex;align-items:center;gap:12px;background:rgba(28,28,30,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:#fff;padding:9px 9px 9px 18px;border-radius:17px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .18s, transform .18s;z-index:85;max-width:calc(100vw - 32px);}
+  .update-bar.show{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
+  .update-bar button{flex:none;border:0;background:var(--tint);color:#fff;font:inherit;font-weight:600;padding:8px 15px;border-radius:12px;cursor:pointer;white-space:nowrap;}
 </style>
 <script>
   (function(){
@@ -672,6 +677,21 @@
           <div class="row-trail"><span class="row-badge" id="adminCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="row" id="rowAdminContext">
+          <div class="row-main"><div class="row-title">Contesto</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminContextCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowAdminSeasonality">
+          <div class="row-main"><div class="row-title">Stagionalità</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminSeasonalityCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowAdminLivePeriod">
+          <div class="row-main"><div class="row-title">Periodo</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminLivePeriodCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="row" id="rowAdminWa">
           <div class="row-main"><div class="row-title">Modelli WhatsApp</div></div>
           <div class="row-trail"><span class="row-badge" id="adminWaCount" style="background:var(--fill);color:var(--text-secondary);"></span>
@@ -781,6 +801,21 @@
         <div class="row" id="rowSettingsCategories">
           <div class="row-main"><div class="row-title">Categorie</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsContext">
+          <div class="row-main"><div class="row-title">Contesto</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsContextCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsSeasonality">
+          <div class="row-main"><div class="row-title">Stagionalità</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsSeasonalityCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsLivePeriod">
+          <div class="row-main"><div class="row-title">Periodo</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsLivePeriodCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
@@ -917,6 +952,51 @@
     <div class="screen-scroll">
       <div class="d-title-name"><input id="categoryEditName" placeholder="Nome categoria" /></div>
       <div class="section-footer" id="categoryEditUsage"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: LISTA VALORI (contesto, stagionalità, periodo) ============
+       Una schermata sola per tutte e tre: cambiano solo i testi, che arrivano
+       da VENUE_LISTS. Tipologie e categorie hanno ancora le loro, nate prima. -->
+  <section class="screen pushed" id="venueListScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnVenueListBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title" id="venueListTitle">Lista</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header" id="venueListHeader"></div>
+      <div class="grouped-list" id="venueListItems"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="newVenueListInput" autocomplete="off">
+          <button id="btnAddVenueListValue">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer" id="venueListFooter"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA VALORE DI LISTA ============ -->
+  <section class="screen pushed" id="venueListEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnVenueListEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <span id="venueListEditBackLabel">Indietro</span>
+        </button>
+        <span class="inline-title" id="venueListEditTitle">Valore</span>
+        <button class="nav-btn primary" id="btnVenueListEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="venueListEditName" /></div>
+      <div class="section-footer" id="venueListEditUsage"></div>
     </div>
   </section>
 
@@ -1317,6 +1397,21 @@
           <div class="picker-value"><span id="filterCategoryValue">Tutte</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowFilterContext">
+          <label>Contesto</label>
+          <div class="picker-value"><span id="filterContextValue">Tutti</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowFilterSeasonality">
+          <label>Stagionalità</label>
+          <div class="picker-value"><span id="filterSeasonalityValue">Tutte</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowFilterLivePeriod">
+          <label>Periodo</label>
+          <div class="picker-value"><span id="filterLivePeriodValue">Tutti</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row picker" id="rowFilterOwner">
           <label>Proprietario</label>
           <div class="picker-value"><span id="filterOwnerValue">Tutti</span>
@@ -1398,6 +1493,11 @@
           <div class="picker-value"><span id="categoryValue">— nessuna —</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowContext">
+          <label>Contesto</label>
+          <div class="picker-value"><span id="contextValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row"><label for="fAddress">Indirizzo</label><input id="fAddress" type="text" placeholder="Via, civico"></div>
         <div class="field-row picker" id="rowFCity">
           <label>Città</label>
@@ -1417,7 +1517,18 @@
           <div class="picker-value"><span id="fGenreValue" style="color:var(--text-tertiary);">Scegli uno o più generi</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowSeasonality">
+          <label>Stagionalità</label>
+          <div class="picker-value"><span id="seasonalityValue">— nessuna —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowLivePeriod">
+          <label>Periodo</label>
+          <div class="picker-value"><span id="livePeriodValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
+      <div class="section-footer">La <strong>stagionalità</strong> è quando il posto è aperto; il <strong>periodo</strong> è quando ci fanno suonare dal vivo. Spesso coincidono, ma non sempre: un locale aperto tutto l'anno può fare musica solo d'estate.</div>
 
       <div class="section-header">ART DIRECTOR</div>
       <div class="grouped-list">
@@ -1431,11 +1542,12 @@
       <div class="section-header">CONTATTI DIRETTI</div>
       <div class="grouped-list">
         <div class="field-row"><label for="fContactName">Titolare</label><input id="fContactName" type="text" placeholder="Nome di chi gestisce il posto"></div>
-        <div class="field-row"><label for="fPhone">Telefono</label><input id="fPhone" type="tel" placeholder="+39…"></div>
+        <div class="field-row"><label for="fLandline">Telefono</label><input id="fLandline" type="tel" placeholder="+39…"></div>
+        <div class="field-row"><label for="fPhone">Cellulare</label><input id="fPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palcoscenico.it"></div>
         <div class="field-row"><label for="fWebsite">Sito / social</label><input id="fWebsite" type="text" placeholder="instagram.com/…"></div>
       </div>
-      <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palcoscenici.</div>
+      <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palcoscenici. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
 
       <div class="section-header">STATO DELLA TRATTATIVA</div>
       <div class="grouped-list">
@@ -1571,6 +1683,10 @@
   </section>
 
   <div class="toast" id="toast"></div>
+  <div class="update-bar" id="updateBar" role="status">
+    <span>C'è una versione nuova</span>
+    <button type="button" id="updateBtn">Aggiorna</button>
+  </div>
   <div class="photo-lightbox" id="photoLightbox" hidden>
     <button class="lightbox-close" id="lightboxClose" aria-label="Chiudi">✕</button>
     <div class="lightbox-track" id="lightboxTrack"></div>
@@ -1697,6 +1813,31 @@
     return String(str==null?"":str).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
+  }
+  /* Un dato e' quello che avete scritto voi: il nome del locale, la citta',
+     la nota, il testo di un modello. Un telefono impostato in inglese offre
+     di tradurre la pagina e, senza un segno, il traduttore si porta dietro
+     anche quelli: "La buca ai confini del mondo" diventa "The hole at the
+     edge of the world" e quel locale non lo riconosce piu' nessuno.
+     translate="no" ferma il traduttore sul dato e lascia che l'interfaccia
+     intorno venga pure tradotta: chi ha il telefono in inglese legge i
+     comandi nella sua lingua e i nomi come sono stati scritti. */
+  function dato(str){
+    return '<span translate="no" class="notranslate">'+esc(str)+'</span>';
+  }
+  /* Lo stesso per le righe gia' in pagina, che si riempiono con textContent.
+     Quando il valore manca resta il segnaposto ("- nessuno -", "Scegli una
+     citta'"): quello e' interfaccia, tradurlo va benissimo, e il segno va
+     tolto. */
+  function setDato(el, valore, segnaposto){
+    if(typeof el === "string") el = document.getElementById(el);
+    if(!el) return;
+    var pieno = valore != null && valore !== "";
+    // Due segni per la stessa cosa: Safari e Chrome nel tempo hanno onorato
+    // ora l'attributo ora la classe, e metterli tutti e due non costa nulla.
+    if(pieno){ el.setAttribute("translate", "no"); el.classList.add("notranslate"); }
+    else { el.removeAttribute("translate"); el.classList.remove("notranslate"); }
+    el.textContent = pieno ? valore : (segnaposto || "");
   }
   function fmtDateTime(iso){
     if(!iso) return "";
@@ -1892,8 +2033,8 @@
   }
   function renderHomeTitle(){
     var nome = activeBandName();
-    document.getElementById("homeTitle").textContent = nome;
-    document.getElementById("homeTitleSmall").textContent = nome;
+    setDato("homeTitle", nome);
+    setDato("homeTitleSmall", nome);
   }
   function renderHome(){
     var el = document.getElementById("homeContent");
@@ -1985,8 +2126,8 @@
       classifica.map(function(r){
         var trail = r.n + (r.n === 1 ? " serata" : " serate") + (r.fee ? " · " + fmtEuro(r.fee) : "");
         return '<div class="row" data-open-id="'+r.v.id+'">'+
-          '<div class="row-main"><div class="row-title">'+esc(r.v.name||"Senza nome")+'</div>'+
-          (r.v.city ? '<div class="row-sub">'+esc(r.v.city)+'</div>' : '')+'</div>'+
+          '<div class="row-main"><div class="row-title">'+dato(r.v.name||"Senza nome")+'</div>'+
+          (r.v.city ? '<div class="row-sub">'+dato(r.v.city)+'</div>' : '')+'</div>'+
           '<div class="row-trail"><span class="row-badge" style="background:transparent;color:var(--text-secondary);">'+esc(trail)+'</span>'+
           CHEVRON+'</div></div>';
       }).join("") +'</div>'+
@@ -2023,7 +2164,7 @@
 
     var customHtml = "";
     if(sheetFreeText && q && !sheetOptions.some(function(o){ return o.label.toLowerCase() === qLower; })){
-      customHtml = '<button class="sheet-option" data-custom="1">Usa "'+esc(q)+'"</button>';
+      customHtml = '<button class="sheet-option" data-custom="1">Usa "'+dato(q)+'"</button>';
     }
 
     if(!filtered.length && !customHtml){
@@ -2039,7 +2180,7 @@
       var o = x.o;
       return '<button class="sheet-option'+(o.destructive?' destructive':'')+'" data-i="'+x.i+'">'+
         (o.color ? '<span class="dot" style="background:'+o.color+'"></span>' : '') +
-        esc(o.label) +
+        (o.dato ? dato(o.label) : esc(o.label)) +
         (o.checkmark ? ' <span class="check">✓</span>' : '') +
         '</button>';
     }).join("") + hintHtml;
@@ -2051,7 +2192,8 @@
   var sheetDoneCallback = null;
 
   function openSheet(opts){
-    // opts: {title?, searchable?, searchPlaceholder?, freeText?, onFreeText?, multiSelect?, onDone?, options:[{label, value, color, checkmark, destructive}]}
+    // opts: {title?, titleDato?, searchable?, searchPlaceholder?, freeText?, onFreeText?, multiSelect?, onDone?, options:[{label, dato, value, color, checkmark, destructive}]}
+    // dato/titleDato: l'etichetta e' roba scritta da voi, il traduttore la lascia stare.
     sheetOptions = opts.options;
     sheetFreeText = opts.freeText ? {onSelect: opts.onFreeText} : null;
     sheetMultiSelect = !!opts.multiSelect;
@@ -2059,7 +2201,12 @@
     var hasTitle = !!opts.title;
     var hasSearch = !!opts.searchable;
     sheetHasSearch = hasSearch;
-    if(hasTitle){ elSheetTitle.hidden = false; elSheetTitle.textContent = opts.title; }
+    // Il titolo di solito e' interfaccia ("Filtra per stato"), ma qualche
+    // foglio si intitola col nome di una persona: quello e' un dato.
+    if(hasTitle){
+      elSheetTitle.hidden = false;
+      setDato(elSheetTitle, opts.titleDato ? opts.title : "", opts.title);
+    }
     else { elSheetTitle.hidden = true; }
     elSheetTitle.style.borderRadius = "14px 14px 0 0";
 
@@ -2178,7 +2325,7 @@
   /* ---------------- schermata Filtri ---------------- */
   var elFiltersScreen = document.getElementById("filtersScreen");
   function updateFilterActiveDot(){
-    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !nearMeEnabled && !showDeletedEnabled);
+    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !nearMeEnabled && !showDeletedEnabled);
   }
   function ownerLabel(email){
     var o = owners.filter(function(x){ return x.email === email; })[0];
@@ -2190,13 +2337,13 @@
     document.getElementById("filterStatusValue").textContent = filterStatus === "all" ? "Tutti" : st.label;
   }
   function renderFilterTypeRow(){
-    document.getElementById("filterTypeValue").textContent = filterType === "all" ? "Tutti i tipi" : filterType;
+    setDato("filterTypeValue", filterType === "all" ? "" : filterType, "Tutti i tipi");
   }
   function renderFilterCategoryRow(){
-    document.getElementById("filterCategoryValue").textContent = filterCategory === "all" ? "Tutte" : filterCategory;
+    setDato("filterCategoryValue", filterCategory === "all" ? "" : filterCategory, "Tutte");
   }
   function renderFilterOwnerRow(){
-    document.getElementById("filterOwnerValue").textContent = filterOwner === "all" ? "Tutti" : ownerLabel(filterOwner);
+    setDato("filterOwnerValue", filterOwner === "all" ? "" : ownerLabel(filterOwner), "Tutti");
   }
   document.getElementById("rowFilterStatus").addEventListener("click", function(){
     var opts = [{label:"Tutti", checkmark: filterStatus==="all", onSelect:function(){
@@ -2214,7 +2361,7 @@
       filterType = "all"; renderFilterTypeRow(); renderAll();
     }}];
     venueTypes.forEach(function(t){
-      opts.push({label:t.name, checkmark: filterType===t.name, onSelect:function(){
+      opts.push({label:t.name, dato:true, checkmark: filterType===t.name, onSelect:function(){
         filterType = t.name; renderFilterTypeRow(); renderAll();
       }});
     });
@@ -2225,7 +2372,7 @@
       filterCategory = "all"; renderFilterCategoryRow(); renderAll();
     }}];
     venueCategories.forEach(function(c){
-      opts.push({label:c.name, checkmark: filterCategory===c.name, onSelect:function(){
+      opts.push({label:c.name, dato:true, checkmark: filterCategory===c.name, onSelect:function(){
         filterCategory = c.name; renderFilterCategoryRow(); renderAll();
       }});
     });
@@ -2236,7 +2383,7 @@
       filterOwner = "all"; renderFilterOwnerRow(); renderAll();
     }}];
     owners.forEach(function(o){
-      opts.push({label:o.name || o.email, checkmark: filterOwner===o.email, onSelect:function(){
+      opts.push({label:o.name || o.email, dato:true, checkmark: filterOwner===o.email, onSelect:function(){
         filterOwner = o.email; renderFilterOwnerRow(); renderAll();
       }});
     });
@@ -2313,6 +2460,7 @@
     renderFilterStatusRow();
     renderFilterTypeRow();
     renderFilterCategoryRow();
+    renderVenueListFilterRows();
     renderFilterOwnerRow();
     renderNearMeRow();
     renderShowDeletedRow();
@@ -2327,8 +2475,9 @@
   document.getElementById("btnFiltersBack").addEventListener("click", closeFiltersScreen);
   document.getElementById("btnFiltersReset").addEventListener("click", function(){
     filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all";
+    resetVenueListFilters();
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
-    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
+    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
     if(showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); loadVenues(); }
     toast("Filtri azzerati");
   });
@@ -2346,6 +2495,7 @@
     if(filterStatus !== "all" && v.status !== filterStatus) return false;
     if(filterType !== "all" && v.type !== filterType) return false;
     if(filterCategory !== "all" && v.category !== filterCategory) return false;
+    if(!venueMatchesVenueLists(v)) return false;
     if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
     if(nearMeEnabled && nearMeCoords){
       if(v.lat == null || v.lng == null) return false;
@@ -2363,10 +2513,10 @@
     var showFav = !opts || opts.showFav !== false;
     var st = statusInfo(v.status);
     var subParts = [];
-    if(v.type) subParts.push('<span class="type-tag">'+esc(v.type)+'</span>');
-    if(v.city) subParts.push(esc(v.city));
-    if(v.contact_name) subParts.push('👤 '+esc(v.contact_name));
-    if(v.art_director_name) subParts.push('🎨 '+esc(v.art_director_name));
+    if(v.type) subParts.push('<span class="type-tag">'+dato(v.type)+'</span>');
+    if(v.city) subParts.push(dato(v.city));
+    if(v.contact_name) subParts.push('👤 '+dato(v.contact_name));
+    if(v.art_director_name) subParts.push('🎨 '+dato(v.art_director_name));
     var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
     var favHtml = '<button class="fav-star fav-star-lead'+(v.favorite ? ' active' : '')+'" data-fav-id="'+v.id+'" aria-label="Preferito">'+
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="'+(v.favorite ? 'currentColor' : 'none')+'" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>'+
@@ -2386,7 +2536,7 @@
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row'+(v.deleted_at ? ' row-deleted' : '')+'" data-open-id="'+v.id+'">'+
         leadingHtml+
-        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+        '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+
           badgeHtml+
@@ -2414,7 +2564,7 @@
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
     var sorted = filtered.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
     if(sorted.length === 0){
-      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !searchText;
+      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
           ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
@@ -2574,8 +2724,8 @@
     var bounds = [];
     withCoords.forEach(function(v){
       var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon()});
-      var popupHtml = '<div class="map-pin-popup"><div class="mp-name">'+esc(v.name||"Senza nome")+'</div>'+
-        (v.city ? '<div class="mp-sub">'+esc(v.city)+'</div>' : '')+
+      var popupHtml = '<div class="map-pin-popup"><div class="mp-name">'+dato(v.name||"Senza nome")+'</div>'+
+        (v.city ? '<div class="mp-sub">'+dato(v.city)+'</div>' : '')+
         '<button data-open-map-id="'+v.id+'">Apri scheda</button></div>';
       marker.bindPopup(popupHtml);
       marker.on("popupopen", function(e){
@@ -2720,8 +2870,8 @@
     var color = d < 0 ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+esc(v.planning_note) : "")+'</div></div>'+
+        '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
+        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+dato(v.planning_note) : "")+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
         CHEVRON+'</div>'+
       '</div></div>'+
@@ -2794,7 +2944,7 @@
     var quando = g ? (g.gig_date ? fmtDateShort(g.gig_date) : ("stagione " + g.season)) : "";
     var sub = (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
     return '<div class="row" data-open-id="'+v.id+'">'+
-      '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+      '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
       '<div class="row-sub">'+sub+'</div></div>'+
       '<div class="row-trail"><button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button></div>'+
     '</div>';
@@ -2850,11 +3000,11 @@
 
   function gigAgendaRowHtml(x, tag, tagColor){
     var sub = [fmtDateShort(x.g.gig_date)];
-    if(x.v.city) sub.push(esc(x.v.city));
+    if(x.v.city) sub.push(dato(x.v.city));
     var fee = fmtFee(x.g.fee);
     if(fee) sub.push(fee);
     return '<div class="row" data-open-id="'+x.v.id+'">'+
-      '<div class="row-main"><div class="row-title">'+esc(x.v.name||"Senza nome")+'</div>'+
+      '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
       '<div class="row-sub">'+sub.join(" · ")+'</div></div>'+
       '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+tagColor+';">'+esc(tag)+'</span>'+
       CHEVRON+'</div>'+
@@ -2892,7 +3042,7 @@
         toConfirm.map(function(x){
           return '<div class="grouped-list gig-card">'+
           '<div class="row" data-open-id="'+x.v.id+'">'+
-            '<div class="row-main"><div class="row-title">'+esc(x.v.name||"Senza nome")+'</div>'+
+            '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
             '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+' · stagione '+esc(x.g.season)+'</div></div>'+
           '</div>'+
           '<div class="gig-panel">'+
@@ -3025,6 +3175,7 @@
       fLng = document.getElementById("fLng"),
       fCapacity = document.getElementById("fCapacity"),
       fContactName = document.getElementById("fContactName"),
+      fLandline = document.getElementById("fLandline"),
       fPhone = document.getElementById("fPhone"),
       fEmail = document.getElementById("fEmail"),
       fWebsite = document.getElementById("fWebsite"),
@@ -3050,7 +3201,7 @@
     var i = venues.findIndex(function(v){ return v.id === updated.id; });
     if(i > -1) venues[i] = updated; else venues.push(updated);
     if(String(updated.id) === String(currentId)){
-      elSaveIndicatorTitle.textContent = updated.name || "Nuovo palcoscenico";
+      setDato(elSaveIndicatorTitle, updated.name, "Nuovo palcoscenico");
     }
   }
   function bindField(el, field, transform){
@@ -3064,6 +3215,7 @@
   bindField(fLng, "lng");
   bindField(fCapacity, "capacity", function(v){ return v ? Number(v) : ""; });
   bindField(fContactName, "contact_name");
+  bindField(fLandline, "landline");
   bindField(fPhone, "phone");
   bindField(fEmail, "email");
   bindField(fWebsite, "website");
@@ -3201,7 +3353,12 @@
 
   function renderQuickActions(v){
     var actions = [];
-    if(v.phone) actions.push({icon:"📞", label:"Chiama", href:"tel:"+v.phone.replace(/\s+/g,"")});
+    // Chiama ripiega sul fisso quando il cellulare manca: un posto che ha
+    // solo il numero fisso resterebbe senza pulsante per chiamare.
+    var numeroDaChiamare = v.phone || v.landline;
+    if(numeroDaChiamare) actions.push({icon:"📞", label:"Chiama", href:"tel:"+numeroDaChiamare.replace(/\s+/g,"")});
+    // WhatsApp no: sul fisso non esiste, e aprirlo su un numero che non lo
+    // ha porta a una schermata d'errore invece che a una conversazione.
     if(v.phone) actions.push({icon:"💬", label:"WhatsApp", waAction:true});
     if(v.email) actions.push({icon:"✉️", label:"Email", mailAction:true});
     if(v.website) actions.push({icon:"🔗", label:"Sito", href:/^https?:\/\//i.test(v.website)?v.website:("https://"+v.website)});
@@ -3294,7 +3451,7 @@
     }
     var opts = [{label:"Apri la posta senza modello", onSelect:function(){ send("", ""); }}];
     mailTemplates.forEach(function(t){
-      opts.push({label:t.name, onSelect:function(){
+      opts.push({label:t.name, dato:true, onSelect:function(){
         send(fillTemplate(t.subject, target), fillTemplate(t.message, target));
       }});
     });
@@ -3326,7 +3483,7 @@
     }
     var opts = [{label:"Apri WhatsApp senza modello", onSelect:function(){ send(""); }}];
     waTemplates.forEach(function(t){
-      opts.push({label:t.name, onSelect:function(){ send(fillTemplate(t.message, target)); }});
+      opts.push({label:t.name, dato:true, onSelect:function(){ send(fillTemplate(t.message, target)); }});
     });
     openSheet({title:"Invia messaggio", options:opts});
   }
@@ -3353,7 +3510,7 @@
   });
 
   function renderTypeRow(v){
-    document.getElementById("typeValue").textContent = v.type || "— nessuno —";
+    setDato("typeValue", v.type, "— nessuno —");
   }
   document.getElementById("rowType").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
@@ -3362,7 +3519,7 @@
     }}];
     venueTypes.forEach(function(vt){
       var t = vt.name;
-      opts.push({label:t, checkmark: v.type===t, onSelect:function(){
+      opts.push({label:t, dato:true, checkmark: v.type===t, onSelect:function(){
         patchVenue("type", t).then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo: "+t); });
       }});
     });
@@ -3379,7 +3536,7 @@
   });
 
   function renderCategoryRow(v){
-    document.getElementById("categoryValue").textContent = v.category || "— nessuna —";
+    setDato("categoryValue", v.category, "— nessuna —");
   }
   document.getElementById("rowCategory").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
@@ -3388,7 +3545,7 @@
     }}];
     venueCategories.forEach(function(vc){
       var c = vc.name;
-      opts.push({label:c, checkmark: v.category===c, onSelect:function(){
+      opts.push({label:c, dato:true, checkmark: v.category===c, onSelect:function(){
         patchVenue("category", c).then(function(updated){ applyUpdatedVenue(updated); renderCategoryRow(updated); renderList(); toast("Categoria: "+c); });
       }});
     });
@@ -3406,7 +3563,7 @@
 
   function renderCityRow(v){
     var el = document.getElementById("fCityValue");
-    el.textContent = v.city || "Scegli una città";
+    setDato(el, v.city, "Scegli una città");
     el.style.color = v.city ? "" : "var(--text-tertiary)";
   }
   document.getElementById("rowFCity").addEventListener("click", function(){
@@ -3418,7 +3575,7 @@
 
   function renderGenreRow(v){
     var el = document.getElementById("fGenreValue");
-    el.textContent = v.genre || "Scegli uno o più generi";
+    setDato(el, v.genre, "Scegli uno o più generi");
     el.style.color = v.genre ? "" : "var(--text-tertiary)";
   }
   document.getElementById("rowFGenre").addEventListener("click", function(){
@@ -3521,7 +3678,7 @@
     var sub = [];
     var fee = fmtFee(g.fee);
     if(fee) sub.push(fee);
-    if(g.outcome_note) sub.push(esc(g.outcome_note));
+    if(g.outcome_note) sub.push(dato(g.outcome_note));
     var dateHtml = g.gig_date
       ? fmtDateShort(g.gig_date)
       : '<span style="color:var(--text-tertiary);">Data da fissare</span>';
@@ -3740,15 +3897,15 @@
 
   function renderArtDirectorRow(v){
     var ad = artDirectors.find(function(a){ return a.id === v.art_director_id; });
-    document.getElementById("artDirectorValue").textContent = ad ? ad.name : "— nessuno —";
+    setDato("artDirectorValue", ad ? ad.name : "", "— nessuno —");
   }
   function renderOwnerRow(v){
-    document.getElementById("ownerValue").textContent = v.owner_email ? ownerLabel(v.owner_email) : "— nessuno —";
+    setDato("ownerValue", v.owner_email ? ownerLabel(v.owner_email) : "", "— nessuno —");
   }
   document.getElementById("rowOwner").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
     var opts = owners.map(function(o){
-      return {label:o.name || o.email, checkmark: v.owner_email===o.email, onSelect:function(){
+      return {label:o.name || o.email, dato:true, checkmark: v.owner_email===o.email, onSelect:function(){
         patchVenue("owner_email", o.email).then(function(updated){ applyUpdatedVenue(updated); renderOwnerRow(updated); renderList(); toast("Proprietario: "+(o.name || o.email)); });
       }};
     });
@@ -3760,7 +3917,7 @@
       patchVenue("art_director_id", null).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); renderList(); });
     }}];
     artDirectors.forEach(function(ad){
-      opts.push({label:ad.name, checkmark: v.art_director_id===ad.id, onSelect:function(){
+      opts.push({label:ad.name, dato:true, checkmark: v.art_director_id===ad.id, onSelect:function(){
         patchVenue("art_director_id", ad.id).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); renderList(); toast("Art director: "+ad.name); });
       }});
     });
@@ -3784,7 +3941,7 @@
       var k = NOTE_KIND_META[n.kind];
       var meta = (k ? k.icon + " " + k.label + " · " : "") + fmtDateTime(n.created_at);
       return '<div class="swipe-row"><div class="row-content"><div class="note-row">'+
-        '<div class="note-meta">'+esc(meta)+'</div><div class="note-text">'+esc(n.text)+'</div>'+
+        '<div class="note-meta">'+esc(meta)+'</div><div class="note-text">'+dato(n.text)+'</div>'+
         '</div></div><div class="row-actions"><button data-del-note="'+n.id+'">Elimina</button></div></div>';
     }).join("");
   }
@@ -3827,6 +3984,7 @@
     fName.value = v.name || "";
     renderTypeRow(v);
     renderCategoryRow(v);
+    VENUE_LISTS.forEach(function(L){ renderVenueListPickerRow(L, v); });
     renderCityRow(v);
     fAddress.value = v.address || "";
     fLat.value = v.lat != null ? v.lat : "";
@@ -3834,13 +3992,14 @@
     fCapacity.value = v.capacity || "";
     renderGenreRow(v);
     fContactName.value = v.contact_name || "";
+    fLandline.value = v.landline || "";
     fPhone.value = v.phone || "";
     fEmail.value = v.email || "";
     fWebsite.value = v.website || "";
     fNextContact.value = v.next_contact_date || "";
     syncClearNextContact();
     fPlanningNote.value = v.planning_note || "";
-    elSaveIndicatorTitle.textContent = v.name || "Nuovo palcoscenico";
+    setDato(elSaveIndicatorTitle, v.name, "Nuovo palcoscenico");
     renderPhotosStrip(v);
     renderQuickActions(v);
     renderStatusRow(v);
@@ -3957,7 +4116,7 @@
       patchAd(field, value).then(function(updated){
         var i = artDirectors.findIndex(function(a){ return a.id === updated.id; });
         if(i>-1) artDirectors[i] = updated;
-        if(currentAdId === updated.id) elAdInlineTitle.textContent = updated.name || "Nuovo art director";
+        if(currentAdId === updated.id) setDato(elAdInlineTitle, updated.name, "Nuovo art director");
       });
     }, 350);
   }
@@ -4007,8 +4166,8 @@
     }
     elAdVenues.innerHTML = assigned.map(function(v){
       return '<div class="swipe-row"><div class="row-content"><div class="row" style="cursor:default;">'+
-        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
-        (v.city ? '<div class="row-sub">'+esc(v.city)+'</div>' : '')+'</div>'+
+        '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
+        (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
       '</div></div><div class="row-actions"><button data-unassign-venue="'+v.id+'">Rimuovi</button></div></div>';
     }).join("");
   }
@@ -4028,7 +4187,7 @@
     var options = venues.filter(function(v){ return v.art_director_id !== ad.id; })
       .slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); })
       .map(function(v){
-        return {label: v.name + (v.city ? " — " + v.city : ""), onSelect:function(){
+        return {label: v.name + (v.city ? " — " + v.city : ""), dato:true, onSelect:function(){
           api("PUT", "/api/locations/" + v.id, {art_director_id: ad.id}).then(function(updated){
             applyUpdatedVenue(updated);
             renderAdVenues(ad);
@@ -4048,7 +4207,7 @@
     adPhone.value = ad.phone || "";
     adEmail.value = ad.email || "";
     adNotes.value = ad.notes || "";
-    elAdInlineTitle.textContent = ad.name || "Nuovo art director";
+    setDato(elAdInlineTitle, ad.name, "Nuovo art director");
     renderAdQuickActions(ad);
     renderAdVenues(ad);
     elAdDetail.hidden = false;
@@ -4127,8 +4286,8 @@
     var sorted = artDirectors.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
     elAdList.innerHTML = '<div class="grouped-list">' + sorted.map(function(ad){
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-ad="'+ad.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(ad.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+(ad.phone?esc(ad.phone):"")+(ad.phone&&ad.email?" · ":"")+(ad.email?esc(ad.email):"")+'</div></div>'+
+        '<div class="row-main"><div class="row-title">'+dato(ad.name||"Senza nome")+'</div>'+
+        '<div class="row-sub">'+(ad.phone?dato(ad.phone):"")+(ad.phone&&ad.email?" · ":"")+(ad.email?dato(ad.email):"")+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+ad.location_count+'</span>'+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-del-ad="'+ad.id+'">Elimina</button></div></div>';
@@ -4177,7 +4336,7 @@
       patchBand(field, value).then(function(updated){
         var i = bands.findIndex(function(b){ return b.id === updated.id; });
         if(i>-1) bands[i] = updated;
-        if(currentBandId === updated.id) elBandInlineTitle.textContent = updated.name || "Nuova band";
+        if(currentBandId === updated.id) setDato(elBandInlineTitle, updated.name, "Nuova band");
       });
     }, 350);
   }
@@ -4212,7 +4371,7 @@
     bandContact.value = band.contact || "";
     bandGigs.value = band.gigs_count != null ? band.gigs_count : "";
     bandNotes.value = band.notes || "";
-    elBandInlineTitle.textContent = band.name || "Nuova band";
+    setDato(elBandInlineTitle, band.name, "Nuova band");
     renderBandQuickActions(band);
     elBandDetail.hidden = false;
     requestAnimationFrame(function(){ elBandDetail.classList.add("in"); });
@@ -4284,10 +4443,10 @@
     var sorted = bands.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
     elBandList.innerHTML = '<div class="grouped-list">' + sorted.map(function(band){
       var subParts = [];
-      if(band.base) subParts.push(esc(band.base));
+      if(band.base) subParts.push(dato(band.base));
       if(band.followers != null) subParts.push(band.followers.toLocaleString("it-IT") + " follower");
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-band="'+band.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(band.name||"Senza nome")+'</div>'+
+        '<div class="row-main"><div class="row-title">'+dato(band.name||"Senza nome")+'</div>'+
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+(band.gigs_count ? '<span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+band.gigs_count+' date</span>' : '')+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
@@ -4323,7 +4482,7 @@
     elTypesList.innerHTML = venueTypes.map(function(t){
       var count = typeUsageCount(t.name);
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-type="'+t.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div></div>'+
+        '<div class="row-main"><div class="row-title">'+dato(t.name)+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+count+'</span>'+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-del-type="'+t.id+'">Elimina</button></div></div>';
@@ -4430,7 +4589,7 @@
     elCategoriesList.innerHTML = venueCategories.map(function(c){
       var count = categoryUsageCount(c.name);
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-category="'+c.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(c.name)+'</div></div>'+
+        '<div class="row-main"><div class="row-title">'+dato(c.name)+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+count+'</span>'+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-del-category="'+c.id+'">Elimina</button></div></div>';
@@ -4522,6 +4681,286 @@
   document.getElementById("rowSettingsCategories").addEventListener("click", openCategoriesScreen);
   document.getElementById("btnCategoriesBack").addEventListener("click", closeCategoriesScreen);
 
+  /* ---------------- liste di valori configurabili ----------------
+     Contesto, stagionalita' e periodo si comportano come la categoria, ma
+     sono tre: invece di tre copie dello stesso codice c'e' una descrizione
+     per ognuna e un motore solo che le fa girare. Anche le schermate sono
+     una sola (venueListScreen / venueListEditScreen): cambiano i testi.
+     Aggiungerne una quarta domani vuol dire aggiungere una voce qui, la
+     colonna nel server e le righe di markup.
+
+     I testi non si incollano a pezzi: l'italiano ha genere e numero, e
+     "Nessuna stagionalita' configurato" si legge subito come una svista.
+     Ogni lista dichiara il suo genere e le parole che cambiano stanno in
+     GENERE, una volta sola. */
+  var GENERE = {
+    m: {nessuno:"— nessuno —", tutti:"Tutti", usato:"Usato", nonUsato:"Non ancora usato",
+        aggiunto:"aggiunto", eliminato:"eliminato", rinominato:"rinominato",
+        rinominandolo:"Rinominandolo", un:"un", personalizzato:"personalizzato",
+        nessunA:"Nessun", configurato:"configurato"},
+    f: {nessuno:"— nessuna —", tutti:"Tutte", usato:"Usata", nonUsato:"Non ancora usata",
+        aggiunto:"aggiunta", eliminato:"eliminata", rinominato:"rinominata",
+        rinominandolo:"Rinominandola", un:"una", personalizzato:"personalizzata",
+        nessunA:"Nessuna", configurato:"configurata"}
+  };
+
+  var VENUE_LISTS = [
+    {
+      key:"context", label:"Contesto", lower:"contesto", genere:"m",
+      adminKind:"venue_context",
+      hint:"Dove si può suonare in quel posto: all'aperto, al chiuso o in tutte e due le situazioni.",
+      ids:{row:"rowContext", value:"contextValue",
+           filterRow:"rowFilterContext", filterValue:"filterContextValue",
+           settingsRow:"rowSettingsContext", settingsCount:"settingsContextCount",
+           adminRow:"rowAdminContext", adminCount:"adminContextCount"}
+    },
+    {
+      key:"seasonality", label:"Stagionalità", lower:"stagionalità", genere:"f",
+      adminKind:"venue_seasonality",
+      hint:"Il periodo dell'anno in cui il locale è aperto.",
+      ids:{row:"rowSeasonality", value:"seasonalityValue",
+           filterRow:"rowFilterSeasonality", filterValue:"filterSeasonalityValue",
+           settingsRow:"rowSettingsSeasonality", settingsCount:"settingsSeasonalityCount",
+           adminRow:"rowAdminSeasonality", adminCount:"adminSeasonalityCount"}
+    },
+    {
+      key:"live_period", label:"Periodo", lower:"periodo", genere:"m",
+      adminKind:"venue_period",
+      hint:"Il periodo in cui ci fanno suonare dal vivo, che non sempre è tutto quello in cui sono aperti.",
+      ids:{row:"rowLivePeriod", value:"livePeriodValue",
+           filterRow:"rowFilterLivePeriod", filterValue:"filterLivePeriodValue",
+           settingsRow:"rowSettingsLivePeriod", settingsCount:"settingsLivePeriodCount",
+           adminRow:"rowAdminLivePeriod", adminCount:"adminLivePeriodCount"}
+    }
+  ];
+
+  // Il valore scelto sta su locations con lo stesso nome della chiave, come
+  // per la categoria: niente mappatura da tenere allineata.
+  VENUE_LISTS.forEach(function(L){
+    var g = GENERE[L.genere];
+    L.g = g;
+    L.field = L.key;
+    L.values = [];
+    L.filter = "all";
+  });
+  function venueListByKey(key){
+    return VENUE_LISTS.filter(function(L){ return L.key === key; })[0];
+  }
+
+  function loadVenueList(L){
+    return api("GET", "/api/venue_lists/" + L.key).then(function(data){
+      L.values = data;
+      updateVenueListCount(L);
+      if(currentVenueList === L) renderVenueListItems();
+    });
+  }
+  function loadVenueLists(){
+    return Promise.all(VENUE_LISTS.map(loadVenueList));
+  }
+
+  function venueListUsageCount(L, name){
+    return venues.filter(function(v){ return v[L.field] === name; }).length;
+  }
+  function venueListUsageText(L, count){
+    if(!count) return L.g.nonUsato + " da nessun palcoscenico.";
+    return L.g.usato + " da " + count + (count === 1
+      ? " palcoscenico. " + L.g.rinominandolo + " si aggiorna anche lui."
+      : " palcoscenici. " + L.g.rinominandolo + " si aggiornano anche loro.");
+  }
+
+  /* --- la riga nella scheda del palcoscenico --- */
+  function renderVenueListPickerRow(L, v){
+    setDato(L.ids.value, v[L.field], L.g.nessuno);
+  }
+  VENUE_LISTS.forEach(function(L){
+    document.getElementById(L.ids.row).addEventListener("click", function(){
+      var v = currentVenue(); if(!v) return;
+      function scegli(value){
+        patchVenue(L.field, value).then(function(updated){
+          applyUpdatedVenue(updated);
+          renderVenueListPickerRow(L, updated);
+          renderList();
+          toast(value ? (L.label + ": " + value) : (L.label + " rimoss" + (L.genere === "f" ? "a" : "o")));
+        }).catch(function(err){ toast(err.message); });
+      }
+      var opts = [{label:L.g.nessuno, checkmark: !v[L.field], onSelect:function(){ scegli(""); }}];
+      L.values.forEach(function(item){
+        opts.push({label:item.name, dato:true, checkmark: v[L.field] === item.name,
+          onSelect:function(){ scegli(item.name); }});
+      });
+      openSheet({
+        title: L.label + " del palcoscenico",
+        searchable: true,
+        searchPlaceholder: "Cerca o scrivi " + L.g.un + " " + L.lower + " " + L.g.personalizzato + "…",
+        freeText: true,
+        onFreeText: scegli,
+        options: opts
+      });
+    });
+  });
+
+  /* --- la riga nei filtri --- */
+  function renderVenueListFilterRow(L){
+    setDato(L.ids.filterValue, L.filter === "all" ? "" : L.filter, L.g.tutti);
+  }
+  function renderVenueListFilterRows(){
+    VENUE_LISTS.forEach(renderVenueListFilterRow);
+  }
+  function anyVenueListFilterOn(){
+    return VENUE_LISTS.some(function(L){ return L.filter !== "all"; });
+  }
+  function resetVenueListFilters(){
+    VENUE_LISTS.forEach(function(L){ L.filter = "all"; });
+  }
+  function venueMatchesVenueLists(v){
+    return VENUE_LISTS.every(function(L){
+      return L.filter === "all" || v[L.field] === L.filter;
+    });
+  }
+  VENUE_LISTS.forEach(function(L){
+    document.getElementById(L.ids.filterRow).addEventListener("click", function(){
+      var opts = [{label:L.g.tutti, checkmark: L.filter === "all", onSelect:function(){
+        L.filter = "all"; renderVenueListFilterRow(L); renderAll();
+      }}];
+      L.values.forEach(function(item){
+        opts.push({label:item.name, dato:true, checkmark: L.filter === item.name, onSelect:function(){
+          L.filter = item.name; renderVenueListFilterRow(L); renderAll();
+        }});
+      });
+      openSheet({title:"Filtra per " + L.lower, searchable: L.values.length > 6,
+                 searchPlaceholder:"Cerca…", options:opts});
+    });
+  });
+
+  /* --- impostazioni: una schermata per tutte e tre --- */
+  function updateVenueListCount(L){
+    var el = document.getElementById(L.ids.settingsCount);
+    if(el) el.textContent = L.values.length;
+  }
+  var currentVenueList = null;
+  var currentVenueListEditId = null;
+  var elVenueListScreen = document.getElementById("venueListScreen");
+  var elVenueListEditScreen = document.getElementById("venueListEditScreen");
+
+  function renderVenueListItems(){
+    var L = currentVenueList; if(!L) return;
+    var el = document.getElementById("venueListItems");
+    if(!L.values.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">' +
+        L.g.nessunA + " " + L.lower + " " + L.g.configurato + '.</div>';
+      return;
+    }
+    el.innerHTML = L.values.map(function(item){
+      var count = venueListUsageCount(L, item.name);
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-value="'+item.id+'">'+
+        '<div class="row-main"><div class="row-title">'+dato(item.name)+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+count+'</span>'+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-value="'+item.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+
+  function openVenueListScreen(L){
+    currentVenueList = L;
+    document.getElementById("venueListTitle").textContent = L.label;
+    document.getElementById("venueListHeader").textContent = (L.label + " del palcoscenico").toUpperCase();
+    document.getElementById("newVenueListInput").placeholder = "Nuov" + (L.genere === "f" ? "a" : "o") + " " + L.lower + "…";
+    document.getElementById("venueListFooter").textContent = L.hint +
+      " Tocca un valore per rinominarlo, scorri a sinistra per eliminarlo. Il numero accanto al nome indica quanti palcoscenici lo usano — un valore in uso non può essere eliminato, ma rinominandolo si aggiornano automaticamente tutti i palcoscenici che lo usano.";
+    renderVenueListItems();
+    elVenueListScreen.hidden = false;
+    requestAnimationFrame(function(){ elVenueListScreen.classList.add("in"); });
+  }
+  function closeVenueListScreen(){
+    elVenueListScreen.classList.remove("in");
+    setTimeout(function(){ elVenueListScreen.hidden = true; }, 320);
+  }
+  VENUE_LISTS.forEach(function(L){
+    document.getElementById(L.ids.settingsRow).addEventListener("click", function(){ openVenueListScreen(L); });
+  });
+  document.getElementById("btnVenueListBack").addEventListener("click", closeVenueListScreen);
+
+  document.getElementById("venueListItems").addEventListener("click", function(e){
+    var L = currentVenueList; if(!L) return;
+    var del = e.target.closest("[data-del-value]");
+    if(del){
+      var id = del.getAttribute("data-del-value");
+      api("DELETE", "/api/venue_lists/" + L.key + "/" + id).then(function(){
+        L.values = L.values.filter(function(x){ return String(x.id) !== String(id); });
+        // Un filtro puntato su un valore che non esiste piu' nasconderebbe
+        // tutto senza spiegare perche'.
+        if(L.values.every(function(x){ return x.name !== L.filter; })) L.filter = "all";
+        renderVenueListItems();
+        updateVenueListCount(L);
+        renderVenueListFilterRow(L);
+        toast(L.label + " " + L.g.eliminato);
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-value]");
+    if(row) openVenueListEditScreen(Number(row.getAttribute("data-open-value")));
+  });
+
+  document.getElementById("btnAddVenueListValue").addEventListener("click", function(){
+    var L = currentVenueList; if(!L) return;
+    var input = document.getElementById("newVenueListInput");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/venue_lists/" + L.key, {name:name}).then(function(created){
+      L.values.push(created);
+      input.value = "";
+      renderVenueListItems();
+      updateVenueListCount(L);
+      toast(L.label + " " + L.g.aggiunto);
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  function openVenueListEditScreen(id){
+    var L = currentVenueList; if(!L) return;
+    var item = L.values.filter(function(x){ return x.id === id; })[0];
+    if(!item) return;
+    currentVenueListEditId = id;
+    document.getElementById("venueListEditTitle").textContent = L.label;
+    document.getElementById("venueListEditBackLabel").textContent = L.label;
+    var input = document.getElementById("venueListEditName");
+    input.placeholder = "Nome " + L.lower;
+    input.value = item.name;
+    document.getElementById("venueListEditUsage").textContent =
+      venueListUsageText(L, venueListUsageCount(L, item.name));
+    elVenueListEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elVenueListEditScreen.classList.add("in"); });
+    setTimeout(function(){ input.focus(); }, 260);
+  }
+  function closeVenueListEditScreen(){
+    elVenueListEditScreen.classList.remove("in");
+    setTimeout(function(){ elVenueListEditScreen.hidden = true; }, 320);
+    currentVenueListEditId = null;
+  }
+  document.getElementById("btnVenueListEditBack").addEventListener("click", closeVenueListEditScreen);
+  document.getElementById("btnVenueListEditSave").addEventListener("click", function(){
+    var L = currentVenueList;
+    if(!L || currentVenueListEditId == null) return;
+    var name = document.getElementById("venueListEditName").value.trim();
+    if(!name){ toast("Il nome è obbligatorio"); return; }
+    var id = currentVenueListEditId;
+    withButtonBusy(this, function(){
+      return api("PUT", "/api/venue_lists/" + L.key + "/" + id, {name:name}).then(function(updated){
+        var i = L.values.findIndex(function(x){ return x.id === updated.id; });
+        if(i > -1) L.values[i] = updated;
+        // Il rinomina si propaga sui palcoscenici lato server: qui li
+        // ricarichiamo solo se ne ha toccato davvero qualcuno.
+        return updated.affected_locations ? loadVenues().then(function(){ return updated; }) : updated;
+      });
+    }).then(function(updated){
+      renderVenueListItems();
+      renderVenueListFilterRow(L);
+      toast(updated.affected_locations
+        ? (L.label + " " + L.g.rinominato + " (" + updated.affected_locations + " palcoscenici aggiornati)")
+        : (L.label + " " + L.g.rinominato));
+      closeVenueListEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
   /* ---------------- Impostazioni: Le mie bands ---------------- */
   var myBands = [];
   function loadMyBands(){
@@ -4537,7 +4976,7 @@
   function updateSettingsMyBandsCount(){
     document.getElementById("settingsMyBandsCount").textContent = myBands.length;
     var a = activeBand();
-    document.getElementById("settingsActiveBand").textContent = a ? a.name : "Nessuna band attiva";
+    setDato("settingsActiveBand", a ? a.name : "", "Nessuna band attiva");
     renderHomeTitle();
     document.getElementById("settingsMembersCount").textContent = a ? (a.member_count || "") : "";
   }
@@ -4554,8 +4993,8 @@
     }
     elMyBandsList.innerHTML = myBands.map(function(b){
       var subParts = [];
-      if(b.genre) subParts.push(esc(b.genre));
-      if(b.city) subParts.push(esc(b.city));
+      if(b.genre) subParts.push(dato(b.genre));
+      if(b.city) subParts.push(dato(b.city));
       subParts.push(b.venue_count + (b.venue_count === 1 ? " palcoscenico" : " palcoscenici"));
       if(b.member_count > 1) subParts.push(b.member_count + " membri");
       var check = b.active
@@ -4563,7 +5002,7 @@
         : '<span class="ws-check"></span>';
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-switch-myband="'+b.id+'">'+
         check+
-        '<div class="row-main"><div class="row-title">'+esc(b.name)+'</div>'+
+        '<div class="row-main"><div class="row-title">'+dato(b.name)+'</div>'+
         '<div class="row-sub">'+subParts.join(" · ")+'</div></div>'+
         '<div class="row-trail"><button class="ws-edit" data-open-myband="'+b.id+'" aria-label="Modifica band">'+
         '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'+
@@ -4619,9 +5058,9 @@
     document.getElementById("myBandEditName").value = b.name;
     myBandEditGenres = (b.genre || "").split(",").map(function(g){ return g.trim(); }).filter(Boolean);
     myBandEditCity = b.city || "";
-    myBandGenreValue.textContent = myBandEditGenres.length ? myBandEditGenres.join(", ") : "Scegli uno o più generi";
+    setDato(myBandGenreValue, myBandEditGenres.join(", "), "Scegli uno o più generi");
     myBandGenreValue.style.color = myBandEditGenres.length ? "" : "var(--text-tertiary)";
-    myBandCityValue.textContent = myBandEditCity || "Scegli una città";
+    setDato(myBandCityValue, myBandEditCity, "Scegli una città");
     myBandCityValue.style.color = myBandEditCity ? "" : "var(--text-tertiary)";
     elMyBandEditScreen.hidden = false;
     requestAnimationFrame(function(){ elMyBandEditScreen.classList.add("in"); });
@@ -4636,14 +5075,14 @@
   document.getElementById("rowMyBandGenre").addEventListener("click", function(){
     openGenrePicker(myBandEditGenres, function(selected){
       myBandEditGenres = selected;
-      myBandGenreValue.textContent = myBandEditGenres.length ? myBandEditGenres.join(", ") : "Scegli uno o più generi";
+      setDato(myBandGenreValue, myBandEditGenres.join(", "), "Scegli uno o più generi");
       myBandGenreValue.style.color = myBandEditGenres.length ? "" : "var(--text-tertiary)";
     });
   });
   document.getElementById("rowMyBandCity").addEventListener("click", function(){
     openCityPicker(myBandEditCity, function(label){
       myBandEditCity = label;
-      myBandCityValue.textContent = label;
+      setDato(myBandCityValue, label);
       myBandCityValue.style.color = "";
     });
   });
@@ -4723,7 +5162,7 @@
         ? "vale per una persona sola"
         : (inv.used_count === 1 ? "1 persona è entrata" : inv.used_count + " persone sono entrate");
       return '<div class="field-row" style="display:block;">'+
-        '<div class="invite-link">'+esc(inv.url)+'</div>'+
+        '<div class="invite-link">'+dato(inv.url)+'</div>'+
         '<div class="invite-actions">'+
           '<button data-copy-invite="'+esc(inv.url)+'">Copia link</button>'+
           '<button class="secondary" data-share-invite="'+esc(inv.url)+'">WhatsApp</button>'+
@@ -4750,6 +5189,7 @@
   function openRolePicker(mem){
     openSheet({
       title: mem.name || mem.email,
+      titleDato: true,
       options: ROLE_OPTIONS.map(function(o){
         return {
           label: o.label + " — " + o.hint,
@@ -4806,9 +5246,9 @@
       var visto = lastSeenText(mem.last_seen_at);
       var attivo = visto === "attivo ora";
       return '<div class="swipe-row"><div class="row-content"><div class="row">'+
-        '<div class="row-main"><div class="row-title">'+esc(mem.name || mem.email)+(isMe ? " (tu)" : "")+'</div>'+
-        (strumenti ? '<div class="row-sub">'+esc(strumenti)+'</div>' : '')+
-        '<div class="row-sub">'+esc(mem.email)+'</div>'+
+        '<div class="row-main"><div class="row-title">'+dato(mem.name || mem.email)+(isMe ? " (tu)" : "")+'</div>'+
+        (strumenti ? '<div class="row-sub">'+dato(strumenti)+'</div>' : '')+
+        '<div class="row-sub">'+dato(mem.email)+'</div>'+
         (visto ? '<div class="member-seen">'+(attivo ? '<span class="seen-dot"></span>' : '')+esc(visto)+'</div>' : '')+
         '</div>'+
         '<div class="row-trail"><span class="member-role">'+esc(ROLE_LABELS[mem.role] || mem.role)+'</span></div>'+
@@ -4817,7 +5257,7 @@
   }
   function loadInviteScreen(){
     var a = activeBand();
-    document.getElementById("inviteBandName").textContent = a ? a.name : "questa band";
+    setDato("inviteBandName", a ? a.name : "", "questa band");
     // Il server risponde col link che la band ha gia', se e' ancora buono,
     // e ne fa uno nuovo solo quando e' scaduto o esaurito: tornare qui a
     // controllare non deve spegnere il link appena mandato.
@@ -4923,8 +5363,8 @@
     }
     elWaTemplatesList.innerHTML = waTemplates.map(function(t){
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-watemplate="'+t.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+
-        '<div class="row-sub">'+esc(t.message)+'</div></div>'+
+        '<div class="row-main"><div class="row-title">'+dato(t.name)+'</div>'+
+        '<div class="row-sub">'+dato(t.message)+'</div></div>'+
         '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-del-watemplate="'+t.id+'">Elimina</button></div></div>';
     }).join("");
@@ -5034,8 +5474,8 @@
     el.innerHTML = mailTemplates.map(function(t){
       var sub = t.subject || t.message || "";
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-mailtemplate="'+t.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+
-        '<div class="row-sub">'+esc(sub)+'</div></div>'+
+        '<div class="row-main"><div class="row-title">'+dato(t.name)+'</div>'+
+        '<div class="row-sub">'+dato(sub)+'</div></div>'+
         '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-del-mailtemplate="'+t.id+'">Elimina</button></div></div>';
     }).join("");
@@ -5157,7 +5597,7 @@
     loadComuni().then(function(list){
       var sheetOpts = list.map(function(c){
         var label = c.nome + " (" + c.sigla + ")";
-        return {label: label, checkmark: currentValue === label, onSelect: function(){ onSelect(label); }};
+        return {label: label, dato:true, checkmark: currentValue === label, onSelect: function(){ onSelect(label); }};
       });
       openSheet({
         title: "Scegli una città",
@@ -5252,14 +5692,28 @@
       vars: null  // riempito con templateVarsHelpHtml(): sono gli stessi
     }
   };
+  // Contesto, stagionalita' e periodo: la schermata admin e' gia' una sola,
+  // qui basta dire come si chiamano. Presi da VENUE_LISTS cosi' una lista
+  // nuova non puo' nascere senza il suo template amministrativo.
+  VENUE_LISTS.forEach(function(L){
+    ADMIN_KINDS[L.adminKind] = {
+      title: L.label,
+      header: (L.label + " di partenza").toUpperCase(),
+      placeholder: "Nuov" + (L.genere === "f" ? "a" : "o") + " " + L.lower + "…",
+      footer: L.hint + " Questi sono i valori che una band nuova si trova già pronti: cambiarli non tocca le band che esistono già. Tocca per rinominare, scorri a sinistra per eliminare.",
+      hasMessage: false, countEl: L.ids.adminCount
+    };
+  });
 
   function loadTemplates(){
     if(!me || !me.is_admin) return Promise.resolve();
     return api("GET", "/api/admin/templates").then(function(rows){
-      templates = {venue_type: [], venue_category: [], wa_template: [], mail_template: []};
+      templates = {};
+      Object.keys(ADMIN_KINDS).forEach(function(k){ templates[k] = []; });
       rows.forEach(function(r){ if(templates[r.kind]) templates[r.kind].push(r); });
       Object.keys(ADMIN_KINDS).forEach(function(k){
-        document.getElementById(ADMIN_KINDS[k].countEl).textContent = templates[k].length;
+        var el = document.getElementById(ADMIN_KINDS[k].countEl);
+        if(el) el.textContent = (templates[k] || []).length;
       });
       if(adminKind) renderAdminList();
     }).catch(function(){
@@ -5278,9 +5732,9 @@
     el.innerHTML = rows.map(function(t){
       var anteprima = cfg.hasSubject ? (t.subject || t.message || "") : (t.message || "");
       var sub = cfg.hasMessage && anteprima
-        ? '<div class="row-sub">'+esc(anteprima.split("\n")[0].slice(0, 60))+'…</div>' : "";
+        ? '<div class="row-sub">'+dato(anteprima.split("\n")[0].slice(0, 60))+'…</div>' : "";
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-admin-open="'+t.id+'">'+
-        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+sub+'</div>'+
+        '<div class="row-main"><div class="row-title">'+dato(t.name)+'</div>'+sub+'</div>'+
         '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-admin-del="'+t.id+'">Elimina</button></div></div>';
     }).join("");
@@ -5304,6 +5758,9 @@
   }
   document.getElementById("rowAdminTypes").addEventListener("click", function(){ openAdminList("venue_type"); });
   document.getElementById("rowAdminCategories").addEventListener("click", function(){ openAdminList("venue_category"); });
+  VENUE_LISTS.forEach(function(L){
+    document.getElementById(L.ids.adminRow).addEventListener("click", function(){ openAdminList(L.adminKind); });
+  });
   document.getElementById("rowAdminWa").addEventListener("click", function(){ openAdminList("wa_template"); });
   document.getElementById("rowAdminMail").addEventListener("click", function(){ openAdminList("mail_template"); });
   document.getElementById("btnAdminListBack").addEventListener("click", closeAdminList);
@@ -5374,22 +5831,22 @@
     if(!show) return;
     var avatar = document.getElementById("settingsProfileAvatar");
     if(me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
-    document.getElementById("settingsProfileName").textContent = me.name || me.email;
+    setDato("settingsProfileName", me.name || me.email);
     // Nello stesso ordine della lista dei membri: nome, cosa suoni,
     // indirizzo. La riga e' la propria scheda vista da fuori, e deve
     // somigliare a come ti vedono gli altri.
     var ruoli = document.getElementById("settingsProfileRoles");
-    ruoli.textContent = (me.band_roles || "").trim();
+    setDato(ruoli, (me.band_roles || "").trim());
     ruoli.hidden = !ruoli.textContent;
-    document.getElementById("settingsProfileEmail").textContent = me.email;
+    setDato("settingsProfileEmail", me.email);
   }
 
   var elProfileScreen = document.getElementById("profileScreen");
   function openProfileScreen(){
     var avatar = document.getElementById("profileAvatar");
     if(me && me.picture){ avatar.src = me.picture; avatar.hidden = false; } else { avatar.hidden = true; }
-    document.getElementById("profileName").textContent = (me && me.name) || "";
-    document.getElementById("profileEmail").textContent = (me && me.email) || "";
+    setDato("profileName", (me && me.name) || "");
+    setDato("profileEmail", (me && me.email) || "");
     document.getElementById("profileNameInput").value = (me && me.name) || "";
     renderProfileBandRoles();
     elProfileScreen.hidden = false;
@@ -5421,7 +5878,7 @@
     profileNameTimer = setTimeout(function(){
       api("PUT", "/api/me", {name: valore}).then(function(updated){
         me = updated;
-        document.getElementById("profileName").textContent = me.name || "";
+        setDato("profileName", me.name || "");
         renderSettingsProfile();
         syncMyMemberRow();
       }).catch(function(err){ toast(err.message); });
@@ -5445,7 +5902,7 @@
   function renderProfileBandRoles(){
     var el = document.getElementById("profileBandRolesValue");
     var ruoli = myBandRoles();
-    el.textContent = ruoli.length ? ruoli.join(", ") : "Scegli uno o più ruoli";
+    setDato(el, ruoli.join(", "), "Scegli uno o più ruoli");
     el.style.color = ruoli.length ? "" : "var(--text-tertiary)";
   }
   function openBandRolesPicker(selected, onDone){
@@ -5454,7 +5911,7 @@
       title: "Ruolo nella band",
       multiSelect: true,
       options: BAND_ROLES.map(function(r){
-        return {label: r, checkmark: chosen.indexOf(r) > -1, onToggle: function(checked){
+        return {label: r, dato:true, checkmark: chosen.indexOf(r) > -1, onToggle: function(checked){
           if(checked){ chosen.push(r); }
           else { chosen = chosen.filter(function(x){ return x !== r; }); }
         }};
@@ -5490,7 +5947,7 @@
   function openGenrePicker(selected, onDone){
     var chosen = selected.slice();
     var opts = MUSIC_GENRES.map(function(g){
-      return {label: g, checkmark: chosen.indexOf(g) > -1, onToggle: function(checked){
+      return {label: g, dato:true, checkmark: chosen.indexOf(g) > -1, onToggle: function(checked){
         if(checked){ chosen.push(g); } else { chosen = chosen.filter(function(x){ return x !== g; }); }
       }};
     });
@@ -5646,7 +6103,7 @@
   function loadAllData(){
     return Promise.all([
       loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
-      loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
+      loadVenueCategories(), loadVenueLists(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates()
     ]).catch(function(){
       // Senza band attiva le API rispondono 409: e' normale per un utente
@@ -5692,6 +6149,8 @@
   addEdgeSwipeBack(elTypeEditScreen, closeTypeEditScreen);
   addEdgeSwipeBack(elCategoriesScreen, closeCategoriesScreen);
   addEdgeSwipeBack(elCategoryEditScreen, closeCategoryEditScreen);
+  addEdgeSwipeBack(elVenueListScreen, closeVenueListScreen);
+  addEdgeSwipeBack(elVenueListEditScreen, closeVenueListEditScreen);
   addEdgeSwipeBack(elProfileScreen, closeProfileScreen);
   addEdgeSwipeBack(elMyBandsScreen, closeMyBandsScreen);
   addEdgeSwipeBack(elMyBandEditScreen, closeMyBandEditScreen);
@@ -5709,14 +6168,114 @@
   loadMe().then(loadAllData).then(showInviteOutcome);
 })();
 
-if("serviceWorker" in navigator){
+/* ---------------- aggiornamenti dell'app ----------------
+   Chi ha installato l'app sul telefono non ha una barra degli indirizzi da
+   ricaricare, e spesso non la chiude mai davvero: senza questo giro
+   resterebbe per sempre sulla versione con cui l'ha installata. Qui l'app si
+   accorge da sola che sul server ce n'è una più recente e lo chiede con un
+   bottone, invece di cambiare da sotto mentre uno sta scrivendo qualcosa. */
+(function(){
+  var elUpdateBar = document.getElementById("updateBar");
+  var elUpdateBtn = document.getElementById("updateBtn");
+  var registration = null;   // la registrazione del service worker, se c'è
+  var waitingWorker = null;  // la versione nuova, installata e in attesa
+  var loadedBuild = null;    // la versione con cui è partita questa pagina
+  var lastCheck = 0;
+  var updating = false;
+  var reloaded = false;
+
+  function announceUpdate(worker){
+    if(worker) waitingWorker = worker;
+    elUpdateBar.classList.add("show");
+  }
+
+  elUpdateBtn.addEventListener("click", function(){
+    if(updating) return;
+    updating = true;
+    elUpdateBtn.textContent = "Aggiorno…";
+    var worker = waitingWorker || (registration && registration.waiting);
+    if(!worker){
+      // Nessun service worker in attesa (o nessun service worker del tutto):
+      // basta ricaricare, l'HTML non viene mai dalla cache del browser.
+      location.reload();
+      return;
+    }
+    // Il service worker nuovo prende il posto del vecchio; al cambio di
+    // controllo ricarichiamo (vedi controllerchange qui sotto).
+    worker.postMessage({type:"SKIP_WAITING"});
+    setTimeout(function(){ if(!reloaded){ reloaded = true; location.reload(); } }, 2500);
+  });
+
+  // Che versione sta servendo il server adesso? Il confronto con quella
+  // caricata all'avvio è anche l'unico avviso possibile dove il service
+  // worker non c'è (es. http:// su un IP di rete locale).
+  function checkVersion(){
+    fetch("/api/version", {cache:"no-store", credentials:"same-origin"})
+      .then(function(res){ return res.ok ? res.json() : null; })
+      .then(function(data){
+        if(!data || !data.version) return;
+        if(loadedBuild === null){ loadedBuild = data.version; return; }
+        if(data.version !== loadedBuild) announceUpdate(null);
+      })
+      .catch(function(){ /* offline: si riprova al prossimo giro */ });
+  }
+
+  function checkForUpdate(){
+    var now = Date.now();
+    if(updating || now - lastCheck < 60000) return; // niente raffiche al server
+    lastCheck = now;
+    if(registration) registration.update().catch(function(){});
+    checkVersion();
+  }
+
+  // L'app installata non fa quasi mai un avvio a freddo: senza questi
+  // ricontrolli il browser potrebbe non accorgersi mai che sw.js è cambiato.
+  function watchForUpdates(){
+    checkForUpdate();
+    setInterval(checkForUpdate, 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", function(){
+      if(document.visibilityState === "visible") checkForUpdate();
+    });
+  }
+
+  if(!("serviceWorker" in navigator)){
+    watchForUpdates();
+    return;
+  }
+
+  navigator.serviceWorker.addEventListener("controllerchange", function(){
+    // Solo se l'aggiornamento l'abbiamo chiesto noi: alla primissima
+    // registrazione il worker prende il controllo da sé (clients.claim) e
+    // ricaricare lì sarebbe un lampo senza motivo.
+    if(!updating || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+
   window.addEventListener("load", function(){
-    navigator.serviceWorker.register("/sw.js").catch(function(){
+    navigator.serviceWorker.register("/sw.js").then(function(reg){
+      registration = reg;
+      // Versione nuova già pronta da una visita precedente.
+      if(reg.waiting && navigator.serviceWorker.controller) announceUpdate(reg.waiting);
+      reg.addEventListener("updatefound", function(){
+        var installing = reg.installing;
+        if(!installing) return;
+        installing.addEventListener("statechange", function(){
+          // "installed" con un controller già attivo vuol dire versione nuova
+          // pronta e in attesa; senza controller è la prima installazione.
+          if(installing.state === "installed" && navigator.serviceWorker.controller){
+            announceUpdate(reg.waiting || installing);
+          }
+        });
+      });
+      watchForUpdates();
+    }).catch(function(){
       // contesto non sicuro (es. http:// su IP di rete locale) o altro errore:
       // l'app funziona comunque, solo senza i vantaggi del service worker.
+      watchForUpdates();
     });
   });
-}
+})();
 </script>
 </body>
 </html>

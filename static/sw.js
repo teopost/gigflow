@@ -7,8 +7,21 @@
 // L'app cambia spesso in questa fase, quindi il documento HTML principale
 // usa una strategia "network-first": se il server risponde si vede sempre
 // l'ultima versione; la cache serve solo come fallback quando sei offline.
+//
+// AGGIORNAMENTI DELL'APP INSTALLATA
+// Il segnaposto della costante BUILD qui sotto viene sostituito dal server
+// (vedi _send_sw in app.py) con
+// l'impronta dei file statici: a ogni deploy questo file cambia da solo e il
+// browser va a scaricare la versione nuova. Qui però NON si chiama
+// skipWaiting() all'installazione: la versione nuova resta in attesa e la
+// pagina avvisa chi sta usando l'app ("Nuova versione · Aggiorna"). È il
+// tocco su quel bottone a mandare SKIP_WAITING e a far subentrare la
+// versione nuova. Così nessuno si ritrova l'app che cambia sotto le mani a
+// metà di una modifica, e soprattutto nessuno deve più disinstallare e
+// reinstallare per vedere le novità.
 
-const CACHE_NAME = "palcoscenici-shell-v26";
+const BUILD = "__BUILD__";
+const CACHE_NAME = "palcoscenici-shell-" + BUILD;
 const SHELL_ASSETS = [
   "/",
   "/manifest.json?v=2",
@@ -18,12 +31,7 @@ const SHELL_ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)));
 });
 
 self.addEventListener("activate", (event) => {
@@ -33,6 +41,16 @@ self.addEventListener("activate", (event) => {
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// La pagina chiede di far subentrare subito la versione in attesa (l'utente
+// ha toccato "Aggiorna"), oppure chiede che versione stiamo servendo.
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  if (data.type === "SKIP_WAITING") self.skipWaiting();
+  if (data.type === "GET_BUILD" && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ build: BUILD });
+  }
 });
 
 function isHtmlDocument(req, url) {

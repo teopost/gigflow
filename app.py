@@ -6,6 +6,7 @@ Avvio:  python3 app.py [porta]
 """
 
 import base64
+import hashlib
 import html
 import http.cookies
 import json
@@ -30,6 +31,54 @@ PHOTO_EXT_CONTENT_TYPE = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg",
     "png": "image/png", "webp": "image/webp", "gif": "image/gif",
 }
+
+# --- versione della build ---------------------------------------------
+# L'impronta dei file statici che il server sta servendo. Cambia da sola a
+# ogni deploy, e questo risolve il problema di chi ha installato l'app sul
+# telefono: il browser scarica un service worker nuovo solo se i byte di
+# sw.js sono cambiati, quindi la versione viene incollata dentro sw.js
+# quando lo serviamo (vedi _send_sw). Cosi' nessuno deve ricordarsi di alzare
+# a mano un numero di versione perche' gli utenti vedano le novita'.
+# /api/version espone la stessa impronta all'app gia' aperta, che puo'
+# accorgersi da sola di essere rimasta indietro.
+STATIC_FINGERPRINT_FILES = ("index.html", "sw.js", "manifest.json")
+_BUILD_VERSION_CACHE = {}
+
+
+def build_version():
+    """L'impronta del contenuto dei file statici.
+
+    E' il contenuto e non la data a decidere: una ricostruzione che non cambia
+    niente deve lasciare la stessa versione, altrimenti tutti si vedrebbero
+    proporre un aggiornamento che non aggiorna niente. Il digesto viene
+    ricalcolato solo quando data o dimensione di un file cambiano, cosi' la
+    richiesta normale non rilegge mezzo megabyte ogni volta.
+    """
+    stamps = []
+    for name in STATIC_FINGERPRINT_FILES:
+        try:
+            st = os.stat(os.path.join(STATIC_DIR, name))
+        except OSError:
+            continue
+        stamps.append((name, st.st_mtime_ns, st.st_size))
+    key = tuple(stamps)
+    cached = _BUILD_VERSION_CACHE.get(key)
+    if cached:
+        return cached
+    digest = hashlib.sha256()
+    for name, _, _ in stamps:
+        digest.update(name.encode("utf-8"))
+        try:
+            with open(os.path.join(STATIC_DIR, name), "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    digest.update(chunk)
+        except OSError:
+            continue
+    version = digest.hexdigest()[:12]
+    _BUILD_VERSION_CACHE.clear()  # tenere solo l'ultima: i file cambiano di rado
+    _BUILD_VERSION_CACHE[key] = version
+    return version
+
 
 # --- login con Google (opzionale) -------------------------------------
 # Se GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET non sono impostate, il login è
@@ -69,6 +118,7 @@ STATE_INVITE_SEP = "."
 WORKSPACE_SCOPED_TABLES = [
     "locations", "art_directors", "bands",
     "wa_templates", "mail_templates", "venue_types", "venue_categories",
+    "venue_list_values",
 ]
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -81,6 +131,11 @@ PUBLIC_PATHS = {
     # scorciatoia al sito invece dell'app vera (icona generica, barra degli
     # indirizzi visibile).
     "/manifest.json", "/sw.js",
+    # /api/version dice solo l'impronta della build: e' l'app installata che
+    # chiede "sul server c'e' qualcosa di piu' recente?". Deve rispondere
+    # anche a sessione scaduta, altrimenti chi rientra dopo giorni resta con
+    # la versione vecchia senza mai saperlo.
+    "/api/version",
     # /join/<token> e' pubblico per forza: chi apre il link non ha ancora una
     # sessione, ed e' proprio il link a dargli il diritto di entrare.
 }
@@ -97,11 +152,60 @@ def auth_enabled():
     return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 LOCATION_FIELDS = [
-    "name", "type", "category", "address", "city", "lat", "lng",
-    "contact_name", "phone", "email", "website", "capacity", "genre",
+    "name", "type", "category", "context", "seasonality", "live_period",
+    "address", "city", "lat", "lng",
+    # Attenzione al nome: "phone" e' il cellulare — c'era prima che i due
+    # numeri fossero distinti, ed e' quello su cui vivono Chiama e WhatsApp.
+    # Rinominare la colonna avrebbe voluto dire spostare i numeri gia'
+    # inseriti, quindi il fisso arriva accanto come "landline".
+    "contact_name", "landline", "phone", "email", "website", "capacity", "genre",
     "art_director_id", "status", "next_contact_date", "planning_note", "favorite",
     "owner_email",
 ]
+
+# --- le liste di valori configurabili --------------------------------
+# Categoria e tipologia sono nate una per una, ognuna con la sua tabella e
+# le sue quattro funzioni. Dalla terza in poi conviene descriverle invece di
+# riscriverle: qui c'e' tutto quello che distingue una lista dall'altra, e
+# CRUD, rotte, seme della band nuova e schermate girano su questa tabella.
+# Aggiungerne un'altra domani vuol dire aggiungere una voce qui (piu' la sua
+# riga di markup nell'app).
+#
+# "field" e' la colonna di locations che tiene il valore scelto. Finisce
+# dentro le query interpolata, e puo' farlo solo perche' esce da qui: la
+# chiave che arriva dalla rete viene sempre validata contro questo dizionario
+# prima di toccare il database (vedi venue_list_cfg).
+VENUE_LISTS = {
+    "context": {
+        "field": "context",
+        "template_kind": "venue_context",
+        "defaults": ["Aperto", "Chiuso", "Aperto e Chiuso"],
+        # Le frasi d'errore in italiano hanno genere e numero: tenerle qui
+        # evita di costruirle a pezzi e di farle uscire sgrammaticate.
+        "name_of": "del contesto",
+        "duplicate": "Questo contesto esiste già",
+        "not_found": "Contesto non trovato",
+        "in_use": "questo contesto",
+    },
+    "seasonality": {
+        "field": "seasonality",
+        "template_kind": "venue_seasonality",
+        "defaults": ["Estivo", "Invernale", "Tutto l'anno"],
+        "name_of": "della stagionalità",
+        "duplicate": "Questa stagionalità esiste già",
+        "not_found": "Stagionalità non trovata",
+        "in_use": "questa stagionalità",
+    },
+    "live_period": {
+        "field": "live_period",
+        "template_kind": "venue_period",
+        "defaults": ["Estivo", "Invernale", "Tutto l'anno"],
+        "name_of": "del periodo",
+        "duplicate": "Questo periodo esiste già",
+        "not_found": "Periodo non trovato",
+        "in_use": "questo periodo",
+    },
+}
 ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
 
@@ -226,6 +330,17 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
+        -- Una riga sola per tutte le liste configurabili: list_key dice a
+        -- quale appartiene il valore. Tipologie e categorie hanno ancora la
+        -- loro tabella per non spostare dati che stanno bene dove sono.
+        CREATE TABLE IF NOT EXISTS venue_list_values (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            list_key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            workspace_id INTEGER,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS photos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
@@ -344,6 +459,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_photos_location ON photos(location_id);
         CREATE INDEX IF NOT EXISTS idx_locations_next_contact ON locations(next_contact_date);
         CREATE INDEX IF NOT EXISTS idx_notes_location ON notes(location_id);
+        CREATE INDEX IF NOT EXISTS idx_venue_list_values ON venue_list_values(workspace_id, list_key);
         """
     )
     migrate_schema(conn)
@@ -367,6 +483,20 @@ def migrate_schema(conn):
         conn.execute("ALTER TABLE locations ADD COLUMN category TEXT")
     if "owner_email" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN owner_email TEXT")
+    if "landline" not in cols:
+        # Il fisso arriva accanto al cellulare, che sulla colonna "phone"
+        # c'era gia' (vedi LOCATION_FIELDS).
+        conn.execute("ALTER TABLE locations ADD COLUMN landline TEXT")
+
+    # Contesto, stagionalita' e periodo sono arrivati insieme: la colonna
+    # context e' il segnale che questa installazione non li ha ancora visti,
+    # e quindi che i valori di partenza vanno ancora travasati. Il segnale si
+    # legge prima di aggiungere le colonne, cosi' il travaso gira una volta
+    # sola: chi svuota una lista non se la ritrova piena al riavvio dopo.
+    venue_lists_are_new = "context" not in cols
+    for key, cfg in VENUE_LISTS.items():
+        if cfg["field"] not in cols:
+            conn.execute(f"ALTER TABLE locations ADD COLUMN {cfg['field']} TEXT")
 
     my_band_cols = {row["name"] for row in conn.execute("PRAGMA table_info(my_bands)").fetchall()}
     if "genre" not in my_band_cols:
@@ -422,6 +552,8 @@ def migrate_schema(conn):
     migrate_to_workspaces(conn)
     migrate_to_gigs(conn)
     migrate_to_mail_templates(conn)
+    if venue_lists_are_new:
+        migrate_to_venue_lists(conn)
 
     # Un palcoscenico rimasto senza serate non e' un errore — vuol dire che
     # nessuna stagione e' ancora aperta — ma il suo stato deve dirlo. Le
@@ -483,6 +615,47 @@ def migrate_to_mail_templates(conn):
                 for t in DEFAULT_MAIL_TEMPLATES
             ],
         )
+
+
+def migrate_to_venue_lists(conn):
+    """Porta contesto, stagionalita' e periodo dentro un'installazione che
+    non li aveva.
+
+    Gira una volta sola — chi cancella tutti i valori di una lista non se li
+    ritrova al riavvio dopo — ed e' additiva: non tocca niente di quello che
+    c'e' gia'. Stessa forma di migrate_to_mail_templates.
+    """
+    ts = now_iso()
+
+    # Se app_templates e' vuota ci pensa seed_app_templates subito dopo, con
+    # tutti i tipi insieme: qui si riempie solo il buco di chi ce li ha gia'.
+    if conn.execute("SELECT 1 FROM app_templates LIMIT 1").fetchone():
+        for cfg in VENUE_LISTS.values():
+            kind = cfg["template_kind"]
+            if conn.execute(
+                "SELECT 1 FROM app_templates WHERE kind = ? LIMIT 1", (kind,)
+            ).fetchone():
+                continue
+            conn.executemany(
+                "INSERT INTO app_templates (kind, name, subject, message, position, created_at, updated_at) "
+                "VALUES (?, ?, NULL, NULL, ?, ?, ?)",
+                [(kind, name, i, ts, ts) for i, name in enumerate(cfg["defaults"])],
+            )
+
+    # Le band che esistono gia' non ripassano da seed_workspace_defaults:
+    # senza questo si troverebbero tre liste vuote da riempire a mano.
+    for ws in conn.execute("SELECT id FROM workspaces").fetchall():
+        for key, cfg in VENUE_LISTS.items():
+            if conn.execute(
+                "SELECT 1 FROM venue_list_values WHERE workspace_id = ? AND list_key = ? LIMIT 1",
+                (ws["id"], key),
+            ).fetchone():
+                continue
+            conn.executemany(
+                "INSERT INTO venue_list_values (list_key, name, workspace_id, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                [(key, name, ws["id"], ts) for name in cfg["defaults"]],
+            )
 
 
 def migrate_to_gigs(conn):
@@ -1205,6 +1378,11 @@ TEMPLATE_KINDS = {
     "wa_template": {"message": True, "subject": False},
     "mail_template": {"message": True, "subject": True},
 }
+# Contesto, stagionalita' e periodo: anche loro sono solo un nome, come la
+# categoria. Aggiunti da VENUE_LISTS invece che a mano, cosi' una lista nuova
+# non puo' nascere senza il suo template.
+for _cfg in VENUE_LISTS.values():
+    TEMPLATE_KINDS[_cfg["template_kind"]] = {"message": False, "subject": False}
 
 
 def seed_app_templates(conn):
@@ -1222,6 +1400,9 @@ def seed_app_templates(conn):
         rows.append(("venue_type", name, None, None, i, ts, ts))
     for i, name in enumerate(DEFAULT_VENUE_CATEGORIES):
         rows.append(("venue_category", name, None, None, i, ts, ts))
+    for cfg in VENUE_LISTS.values():
+        for i, name in enumerate(cfg["defaults"]):
+            rows.append((cfg["template_kind"], name, None, None, i, ts, ts))
     for i, t in enumerate(DEFAULT_WA_TEMPLATES):
         rows.append(("wa_template", t["name"], None, t["message"], i, ts, ts))
     for i, t in enumerate(DEFAULT_MAIL_TEMPLATES):
@@ -1335,6 +1516,18 @@ def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
             "INSERT INTO venue_categories (name, workspace_id, created_at) VALUES (?, ?, ?)",
             [(name, ws, ts) for name in categories],
         )
+
+    for key, cfg in VENUE_LISTS.items():
+        values = [t["name"] for t in fetch_templates(conn, cfg["template_kind"])]
+        if values and not conn.execute(
+            "SELECT 1 FROM venue_list_values WHERE workspace_id = ? AND list_key = ? LIMIT 1",
+            (ws, key),
+        ).fetchone():
+            conn.executemany(
+                "INSERT INTO venue_list_values (list_key, name, workspace_id, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                [(key, name, ws, ts) for name in values],
+            )
 
     messages = fetch_templates(conn, "wa_template")
     if messages and not conn.execute(
@@ -2471,6 +2664,116 @@ def delete_venue_category(conn, ws, category_id):
     conn.commit()
 
 
+# --- liste di valori configurabili: un CRUD solo per tutte -------------
+# Stesse regole della categoria: nomi unici senza distinzione di maiuscole,
+# rinominare propaga sui palcoscenici che usano quel valore, e un valore in
+# uso non si puo' eliminare.
+
+
+def venue_list_cfg(key):
+    """La configurazione della lista, o 404. E' anche il filtro che impedisce
+    a una chiave arrivata dalla rete di finire dentro una query."""
+    cfg = VENUE_LISTS.get(key)
+    if not cfg:
+        raise ApiError(404, "Lista non trovata")
+    return cfg
+
+
+def fetch_venue_list(conn, ws, key):
+    venue_list_cfg(key)
+    rows = conn.execute(
+        "SELECT * FROM venue_list_values WHERE workspace_id = ? AND list_key = ? ORDER BY id ASC",
+        (ws, key),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_venue_list_value(conn, ws, key, body):
+    cfg = venue_list_cfg(key)
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, f"Il nome {cfg['name_of']} è obbligatorio")
+    existing = conn.execute(
+        "SELECT id FROM venue_list_values WHERE LOWER(name) = LOWER(?) "
+        "AND workspace_id = ? AND list_key = ?",
+        (name, ws, key),
+    ).fetchone()
+    if existing:
+        raise ApiError(400, cfg["duplicate"])
+    cur = conn.execute(
+        "INSERT INTO venue_list_values (list_key, name, workspace_id, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (key, name, ws, now_iso()),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM venue_list_values WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def update_venue_list_value(conn, ws, key, value_id, body):
+    cfg = venue_list_cfg(key)
+    row = conn.execute(
+        "SELECT name FROM venue_list_values WHERE id = ? AND workspace_id = ? AND list_key = ?",
+        (value_id, ws, key),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, cfg["not_found"])
+    new_name = (body.get("name") or "").strip()
+    if not new_name:
+        raise ApiError(400, f"Il nome {cfg['name_of']} è obbligatorio")
+    old_name = row["name"]
+
+    if new_name.lower() != old_name.lower():
+        dup = conn.execute(
+            "SELECT id FROM venue_list_values WHERE LOWER(name) = LOWER(?) AND id != ? "
+            "AND workspace_id = ? AND list_key = ?",
+            (new_name, value_id, ws, key),
+        ).fetchone()
+        if dup:
+            raise ApiError(400, cfg["duplicate"])
+
+    conn.execute("UPDATE venue_list_values SET name = ? WHERE id = ?", (new_name, value_id))
+
+    affected = 0
+    if new_name != old_name:
+        field = cfg["field"]  # da VENUE_LISTS, mai dalla rete
+        cur = conn.execute(
+            f"UPDATE locations SET {field} = ?, updated_at = ? "
+            f"WHERE {field} = ? AND workspace_id = ?",
+            (new_name, now_iso(), old_name, ws),
+        )
+        affected = cur.rowcount
+
+    conn.commit()
+    updated = dict(conn.execute("SELECT * FROM venue_list_values WHERE id = ?", (value_id,)).fetchone())
+    updated["affected_locations"] = affected
+    return updated
+
+
+def delete_venue_list_value(conn, ws, key, value_id):
+    cfg = venue_list_cfg(key)
+    row = conn.execute(
+        "SELECT name FROM venue_list_values WHERE id = ? AND workspace_id = ? AND list_key = ?",
+        (value_id, ws, key),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, cfg["not_found"])
+    field = cfg["field"]  # da VENUE_LISTS, mai dalla rete
+    count = conn.execute(
+        f"SELECT COUNT(*) AS n FROM locations WHERE {field} = ? AND workspace_id = ?",
+        (row["name"], ws),
+    ).fetchone()["n"]
+    if count > 0:
+        noun = "palcoscenico" if count == 1 else "palcoscenici"
+        verb = "usa" if count == 1 else "usano"
+        raise ApiError(400, f"Impossibile eliminare: {count} {noun} {verb} ancora {cfg['in_use']}")
+    conn.execute(
+        "DELETE FROM venue_list_values WHERE id = ? AND workspace_id = ? AND list_key = ?",
+        (value_id, ws, key),
+    )
+    conn.commit()
+
+
 def list_owners(conn, ws):
     """Chi puo' avere inserito un palcoscenico: i membri della band attiva,
     non piu' chiunque abbia un profilo sul server."""
@@ -2755,6 +3058,25 @@ def _h_update_venue_category(conn, match, query, body, ctx):
     return 200, update_venue_category(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_list_venue_list(conn, match, query, body, ctx):
+    return 200, fetch_venue_list(conn, require_ws(ctx), match.group(1))
+
+
+def _h_create_venue_list_value(conn, match, query, body, ctx):
+    return 201, create_venue_list_value(conn, require_ws(ctx), match.group(1), body)
+
+
+def _h_update_venue_list_value(conn, match, query, body, ctx):
+    return 200, update_venue_list_value(
+        conn, require_ws(ctx), match.group(1), int(match.group(2)), body
+    )
+
+
+def _h_delete_venue_list_value(conn, match, query, body, ctx):
+    delete_venue_list_value(conn, require_ws(ctx), match.group(1), int(match.group(2)))
+    return 204, {}
+
+
 def _h_delete_venue_category(conn, match, query, body, ctx):
     delete_venue_category(conn, require_ws(ctx), int(match.group(1)))
     return 204, {}
@@ -2819,6 +3141,12 @@ ROUTES = [
     ("POST", re.compile(r"^/api/venue_categories$"), _h_create_venue_category),
     ("PUT", re.compile(r"^/api/venue_categories/(\d+)$"), _h_update_venue_category),
     ("DELETE", re.compile(r"^/api/venue_categories/(\d+)$"), _h_delete_venue_category),
+    # La chiave della lista viene comunque validata contro VENUE_LISTS: qui
+    # il pattern serve solo a non far passare caratteri strani.
+    ("GET", re.compile(r"^/api/venue_lists/([a-z_]+)$"), _h_list_venue_list),
+    ("POST", re.compile(r"^/api/venue_lists/([a-z_]+)$"), _h_create_venue_list_value),
+    ("PUT", re.compile(r"^/api/venue_lists/([a-z_]+)/(\d+)$"), _h_update_venue_list_value),
+    ("DELETE", re.compile(r"^/api/venue_lists/([a-z_]+)/(\d+)$"), _h_delete_venue_list_value),
 ]
 
 
@@ -2998,7 +3326,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_file(self, path, content_type):
+    def _send_file(self, path, content_type, cache_control=None):
         try:
             with open(path, "rb") as f:
                 body = f.read()
@@ -3007,6 +3335,32 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", content_type)
+        if cache_control:
+            self.send_header("Cache-Control", cache_control)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_sw(self):
+        """Il service worker, con dentro la versione della build.
+
+        Il browser sostituisce un service worker solo se i byte del file sono
+        cambiati. Incollando qui l'impronta dei file statici, ogni deploy
+        produce da se' un sw.js diverso e il giro di aggiornamento parte da
+        solo: nessun numero di versione da alzare a mano.
+        """
+        try:
+            with open(os.path.join(STATIC_DIR, "sw.js"), encoding="utf-8") as f:
+                source = f.read()
+        except OSError:
+            self._send_json(404, {"error": "Non trovato"})
+            return
+        body = source.replace("__BUILD__", build_version()).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        # Senza questo il browser puo' riproporsi la copia vecchia di sw.js
+        # dalla cache HTTP, e l'aggiornamento non parte mai.
+        self.send_header("Cache-Control", "no-cache")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -3252,8 +3606,17 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_redirect("/login")
                 return
 
+        if method == "GET" and path == "/api/version":
+            self._send_json(200, {"version": build_version()})
+            return
+
         if method == "GET" and path in ("/", "/index.html"):
-            self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
+            # no-cache: l'HTML e' tutta l'app, deve poter cambiare al volo.
+            self._send_file(
+                os.path.join(STATIC_DIR, "index.html"),
+                "text/html; charset=utf-8",
+                cache_control="no-cache",
+            )
             return
 
         if method == "GET" and path == "/manifest.json":
@@ -3261,7 +3624,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if method == "GET" and path == "/sw.js":
-            self._send_file(os.path.join(STATIC_DIR, "sw.js"), "application/javascript; charset=utf-8")
+            self._send_sw()
             return
 
         if method == "GET" and path == "/comuni.json":
