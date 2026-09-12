@@ -6,6 +6,7 @@ Avvio:  python3 app.py [porta]
 """
 
 import base64
+import csv
 import hashlib
 import html
 import http.cookies
@@ -17,7 +18,9 @@ import sqlite3
 import socket
 import urllib.error
 import urllib.request
+import io
 import uuid
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, urlencode, unquote, quote
@@ -2905,6 +2908,145 @@ def update_report(conn, ctx, report_id, body):
     return _report_rows(conn, "WHERE r.id = ?", (report_id,))[0]
 
 
+# --- esportazione per Excel -------------------------------------------
+# Due dettagli decidono se Excel apre il file o mostra una colonna sola di
+# caratteri strani, e non sono opzionali:
+#   - il separatore e' il punto e virgola. Excel in italiano si aspetta
+#     quello, perche' la virgola qui e' il separatore dei decimali.
+#   - il file parte con il BOM UTF-8. Senza, Excel legge il file come
+#     ANSI e "Forlì" diventa "ForlÃ¬" su ogni riga con un accento.
+CSV_BOM = "\ufeff"
+
+
+def _csv_bytes(intestazioni, righe):
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\r\n")
+    w.writerow(intestazioni)
+    for r in righe:
+        w.writerow(["" if v is None else v for v in r])
+    return (CSV_BOM + buf.getvalue()).encode("utf-8")
+
+
+def _query(conn, sql, args=()):
+    return conn.execute(sql, args).fetchall()
+
+
+def export_zip(conn):
+    """Tutti i dati in un archivio di CSV, uno per foglio.
+
+    Un CSV solo non puo' tenere palcoscenici, serate e note insieme senza
+    ripetere ogni palcoscenico una volta per nota. Meglio i fogli separati,
+    che in Excel si aprono uno per uno e si incrociano con l'id.
+
+    Non escono sessioni e inviti: contengono i token con cui si entra
+    nell'app, e in un file che gira per posta non ci devono stare.
+    """
+    fogli = []
+
+    fogli.append(("palcoscenici.csv", _csv_bytes(
+        ["id", "band", "nome", "tipo", "categoria", "contesto", "stagionalita", "periodo",
+         "citta", "indirizzo", "lat", "lng", "capienza", "genere", "titolare", "telefono",
+         "cellulare", "email", "sito", "art_director", "stato", "prossimo_contatto",
+         "promemoria", "preferito", "inserito_da", "archiviato_il", "creato_il", "aggiornato_il"],
+        [(r["id"], r["band"], r["name"], r["type"], r["category"], r["context"], r["seasonality"],
+          r["live_period"], r["city"], r["address"], r["lat"], r["lng"], r["capacity"], r["genre"],
+          r["contact_name"], r["landline"], r["phone"], r["email"], r["website"], r["ad"],
+          r["status"], r["next_contact_date"], r["planning_note"],
+          "sì" if r["favorite"] else "", r["owner_email"], r["deleted_at"],
+          r["created_at"], r["updated_at"])
+         for r in _query(conn,
+            "SELECT l.*, w.name AS band, a.name AS ad FROM locations l "
+            "LEFT JOIN workspaces w ON w.id = l.workspace_id "
+            "LEFT JOIN art_directors a ON a.id = l.art_director_id "
+            "ORDER BY w.name, l.name")])))
+
+    fogli.append(("serate.csv", _csv_bytes(
+        ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "stagione", "stato",
+         "data", "compenso", "come_e_andata", "chiusa_il", "creata_il"],
+        [(g["id"], g["band"], g["location_id"], g["palco"], g["city"], g["season"], g["status"],
+          g["gig_date"], g["fee"], g["outcome_note"], g["closed_at"], g["created_at"])
+         for g in _query(conn,
+            "SELECT g.*, l.name AS palco, l.city, w.name AS band FROM gigs g "
+            "LEFT JOIN locations l ON l.id = g.location_id "
+            "LEFT JOIN workspaces w ON w.id = l.workspace_id "
+            "ORDER BY g.gig_date DESC, g.id DESC")])))
+
+    fogli.append(("note.csv", _csv_bytes(
+        ["id", "band", "palcoscenico_id", "palcoscenico", "tipo", "testo", "serata_id", "creata_il"],
+        [(n["id"], n["band"], n["location_id"], n["palco"], n["kind"], n["text"],
+          n["gig_id"], n["created_at"])
+         for n in _query(conn,
+            "SELECT n.*, l.name AS palco, w.name AS band FROM notes n "
+            "LEFT JOIN locations l ON l.id = n.location_id "
+            "LEFT JOIN workspaces w ON w.id = l.workspace_id "
+            "ORDER BY n.created_at DESC")])))
+
+    fogli.append(("art_director.csv", _csv_bytes(
+        ["id", "band", "nome", "telefono", "email", "note", "creato_il"],
+        [(a["id"], a["band"], a["name"], a["phone"], a["email"], a["notes"], a["created_at"])
+         for a in _query(conn,
+            "SELECT a.*, w.name AS band FROM art_directors a "
+            "LEFT JOIN workspaces w ON w.id = a.workspace_id ORDER BY w.name, a.name")])))
+
+    fogli.append(("altre_band.csv", _csv_bytes(
+        ["id", "band", "nome", "facebook", "follower", "base", "contatto", "date", "note"],
+        [(b["id"], b["band"], b["name"], b["facebook"], b["followers"], b["base"],
+          b["contact"], b["gigs_count"], b["notes"])
+         for b in _query(conn,
+            "SELECT b.*, w.name AS band FROM bands b "
+            "LEFT JOIN workspaces w ON w.id = b.workspace_id ORDER BY w.name, b.name")])))
+
+    fogli.append(("liste_valori.csv", _csv_bytes(
+        ["band", "lista", "valore"],
+        [(r["band"], r["lista"], r["name"]) for r in _query(conn,
+            "SELECT w.name AS band, 'tipologia' AS lista, t.name FROM venue_types t "
+            "LEFT JOIN workspaces w ON w.id = t.workspace_id "
+            "UNION ALL SELECT w.name, 'categoria', c.name FROM venue_categories c "
+            "LEFT JOIN workspaces w ON w.id = c.workspace_id "
+            "UNION ALL SELECT w.name, v.list_key, v.name FROM venue_list_values v "
+            "LEFT JOIN workspaces w ON w.id = v.workspace_id "
+            "ORDER BY 1, 2, 3")])))
+
+    fogli.append(("segnalazioni.csv", _csv_bytes(
+        ["id", "stato", "testo", "autore", "email", "band", "build", "creata_il", "chiusa_il", "chiusa_da"],
+        [(r["id"], r["status"], r["text"], r["author_name"], r["email"], r["band_name"],
+          r["build"], r["created_at"], r["resolved_at"], r["resolved_by"])
+         for r in _report_rows(conn, "", ())])))
+
+    fogli.append(("band_e_membri.csv", _csv_bytes(
+        ["band_id", "band", "genere", "citta", "membro", "email", "ruolo", "entrato_il"],
+        [(m["ws_id"], m["band"], m["genre"], m["city"], m["nome"], m["email"],
+          m["role"], m["joined_at"])
+         for m in _query(conn,
+            "SELECT w.id AS ws_id, w.name AS band, w.genre, w.city, "
+            "m.email, m.role, m.joined_at, p.name AS nome "
+            "FROM workspaces w LEFT JOIN workspace_members m ON m.workspace_id = w.id "
+            "LEFT JOIN user_profiles p ON p.email = m.email ORDER BY w.name, m.email")])))
+
+    fogli.append(("modelli.csv", _csv_bytes(
+        ["band", "tipo", "nome", "oggetto", "messaggio"],
+        [(r["band"], r["tipo"], r["name"], r["subject"], r["message"]) for r in _query(conn,
+            "SELECT w.name AS band, 'whatsapp' AS tipo, t.name, NULL AS subject, t.message "
+            "FROM wa_templates t LEFT JOIN workspaces w ON w.id = t.workspace_id "
+            "UNION ALL SELECT w.name, 'email', t.name, t.subject, t.message "
+            "FROM mail_templates t LEFT JOIN workspaces w ON w.id = t.workspace_id "
+            "ORDER BY 1, 2, 3")])))
+
+    memoria = io.BytesIO()
+    with zipfile.ZipFile(memoria, "w", zipfile.ZIP_DEFLATED) as z:
+        for nome, dati in fogli:
+            z.writestr(nome, dati)
+        z.writestr("LEGGIMI.txt", (
+            "Esportazione GigFlow del " + now_iso()[:19].replace("T", " ") + " (UTC)\r\n"
+            "build " + build_label() + " · " + build_version() + "\r\n\r\n"
+            "I file sono CSV con separatore punto e virgola e codifica UTF-8 con BOM:\r\n"
+            "aprili con un doppio clic, Excel in italiano li riconosce da solo.\r\n\r\n"
+            "Le colonne *_id servono a incrociare i fogli fra loro.\r\n"
+            "Non sono inclusi sessioni e inviti: contengono i token di accesso.\r\n"
+        ).encode("utf-8"))
+    return memoria.getvalue()
+
+
 def list_owners(conn, ws):
     """Chi puo' avere inserito un palcoscenico: i membri della band attiva,
     non piu' chiunque abbia un profilo sul server."""
@@ -3489,6 +3631,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_download(self, body, content_type, filename):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        # Senza questo il browser proverebbe a mostrare l'archivio invece di
+        # salvarlo, e nell'app installata non succederebbe niente.
+        self.send_header("Content-Disposition", 'attachment; filename="%s"' % filename)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _send_sw(self):
         """Il service worker, con dentro la versione della build.
 
@@ -3753,6 +3906,25 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send_redirect("/login")
                 return
+
+        # Fuori da ROUTES: quelle rispondono tutte JSON, questa un archivio.
+        if method == "GET" and path == "/api/admin/export.zip":
+            conn = get_conn()
+            try:
+                email = self._current_email(conn)
+                ctx = RequestContext(email, resolve_active_workspace(conn, email), self._request_origin())
+                require_admin(ctx)
+                dati = export_zip(conn)
+            except ApiError as e:
+                self._send_json(e.status, {"error": e.message})
+                return
+            finally:
+                conn.close()
+            self._send_download(
+                dati, "application/zip",
+                "gigflow-%s.zip" % now_iso()[:10].replace("-", ""),
+            )
+            return
 
         if method == "GET" and path == "/api/version":
             self._send_json(200, {"version": build_version(), "build": build_label()})

@@ -725,6 +725,18 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
+      <div class="section-header">ESPORTAZIONE</div>
+      <div class="grouped-list">
+        <div class="row" id="rowAdminExport">
+          <div class="row-main"><div class="row-title">Scarica tutti i dati</div>
+          <div class="row-sub" id="adminExportSub">Un archivio di fogli CSV, pronti per Excel</div></div>
+          <div class="row-trail">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tint);"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 19h16"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="section-footer">Un file <code>.zip</code> con un foglio per tipo di dato — palcoscenici, serate, note, art director, band, segnalazioni — di <strong>tutte</strong> le band, non solo la tua. I CSV hanno il punto e virgola come separatore e la codifica che Excel in italiano si aspetta: basta un doppio clic. Restano fuori sessioni e inviti, che contengono i codici di accesso.</div>
+
       <div class="section-footer">Nei modelli WhatsApp <code>{band}</code>, <code>{genere}</code> e <code>{nome}</code> vengono sostituiti con i dati della band al momento della creazione, una volta sola. I segnaposto dei modelli email (<code>{mio_nome}</code>, <code>{titolare}</code>…) restano scritti così e si riempiono a ogni invio. Quello che scrivi fra parentesi quadre resta com'è, da compilare a mano.</div>
 
     </div>
@@ -6249,6 +6261,21 @@
   });
   document.getElementById("rowAdminWa").addEventListener("click", function(){ openAdminList("wa_template"); });
   document.getElementById("rowAdminMail").addEventListener("click", function(){ openAdminList("mail_template"); });
+
+  /* Scaricare l'archivio è una navigazione normale verso /api/: il service
+     worker non tocca quel percorso, e l'header Content-Disposition fa
+     partire il salvataggio invece di aprire il file. Passa dai cookie di
+     sessione come qualunque altra chiamata, quindi non serve altro. */
+  document.getElementById("rowAdminExport").addEventListener("click", function(){
+    var sub = document.getElementById("adminExportSub");
+    var testo = sub.textContent;
+    sub.textContent = "Preparo l'archivio…";
+    toast("Preparo l'archivio…");
+    window.location.href = "/api/admin/export.zip";
+    // Il download non genera un evento che si possa aspettare: dopo qualche
+    // secondo la riga torna com'era, invece di restare in eterno "preparo".
+    setTimeout(function(){ sub.textContent = testo; }, 6000);
+  });
   document.getElementById("btnAdminListBack").addEventListener("click", closeAdminList);
 
   document.getElementById("btnAdminAdd").addEventListener("click", function(){
