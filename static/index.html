@@ -488,6 +488,17 @@
   .sheet-backdrop.show{opacity:1;pointer-events:auto;}
   .sheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:61;transform:translateY(120%);visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear .28s;}
   .sheet.show{transform:translateY(0);visibility:visible;pointer-events:auto;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear 0s;}
+  /* Un foglio con la ricerca fa comparire la tastiera, e una tastiera che
+     si apre sotto un foglio appoggiato in basso lo copre per intero: è
+     proprio l'elenco che stavi per leggere a sparire. Con la ricerca il
+     foglio si appoggia in alto, dove la tastiera non arriva, e scende da
+     sopra invece di salire da sotto. Gli altri restano in basso, che sul
+     telefono è dove arriva il pollice. */
+  .sheet.con-ricerca{top:calc(8px + env(safe-area-inset-top));bottom:auto;transform:translateY(-120%);}
+  .sheet.con-ricerca.show{transform:translateY(0);}
+  /* Ripiego per i browser senza visualViewport: i vh non sanno niente
+     della tastiera, quindi si tiene più basso e si spera bene. */
+  .sheet.con-ricerca .sheet-group{max-height:44vh;}
   @media (prefers-reduced-motion:reduce){.sheet{transition:none;} .sheet-backdrop{transition:none;}}
   .sheet-title{text-align:center;font-size:13px;color:var(--text-secondary);padding:14px 16px 10px;background:var(--bg-elevated);border-radius:14px 14px 0 0;}
   .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;}
@@ -2364,6 +2375,8 @@
       elSheetSearch.hidden = true;
     }
 
+    // Il foglio con la ricerca va in alto, gli altri restano in basso.
+    elSheet.classList.toggle("con-ricerca", hasSearch);
     elSheetDone.hidden = !sheetMultiSelect;
     elSheetGroup.style.borderRadius = (hasTitle || hasSearch) ? "0 0 14px 14px" : "14px";
     renderSheetOptions("");
@@ -2372,12 +2385,43 @@
     elSheetBackdrop.classList.add("show");
     requestAnimationFrame(function(){
       elSheet.classList.add("show");
-      if(hasSearch) setTimeout(function(){ elSheetSearchInput.focus(); }, 260);
+      if(hasSearch){
+        setTimeout(function(){ elSheetSearchInput.focus(); }, 260);
+        seguiTastiera();
+      }
     });
+  }
+
+  /* Quanto spazio resta davvero sopra la tastiera. I vh non lo sanno:
+     restano l'altezza dello schermo anche con mezza tastiera sopra, ed è
+     per questo che l'elenco finiva sotto. visualViewport invece si
+     restringe quando la tastiera si apre, e qui l'elenco ci si adatta. */
+  function adattaAllaTastiera(){
+    if(!sheetHasSearch || !window.visualViewport) return;
+    var alto = elSheetGroup.getBoundingClientRect().top;
+    var disponibile = window.visualViewport.height - alto - 16;
+    // Mai meno di un paio di righe: un elenco alto zero non aiuta nessuno,
+    // meglio che sfori e si possa scorrere.
+    elSheetGroup.style.maxHeight = Math.max(120, disponibile) + "px";
+  }
+  function seguiTastiera(){
+    if(!window.visualViewport) return;
+    window.visualViewport.addEventListener("resize", adattaAllaTastiera);
+    window.visualViewport.addEventListener("scroll", adattaAllaTastiera);
+    // La prima misura va presa a foglio fermo: mentre scorre in posizione
+    // è ancora fuori schermo, e misurarlo lì darebbe un'altezza sbagliata.
+    setTimeout(adattaAllaTastiera, 300);
+  }
+  function smettiDiSeguireTastiera(){
+    if(!window.visualViewport) return;
+    window.visualViewport.removeEventListener("resize", adattaAllaTastiera);
+    window.visualViewport.removeEventListener("scroll", adattaAllaTastiera);
+    elSheetGroup.style.maxHeight = "";
   }
   function closeSheet(){
     elSheet.classList.remove("show");
     elSheetBackdrop.classList.remove("show");
+    smettiDiSeguireTastiera();
   }
   elSheetSearchInput.addEventListener("input", function(){
     renderSheetOptions(elSheetSearchInput.value);
