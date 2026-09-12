@@ -37,12 +37,14 @@
     --shadow:rgba(0,0,0,.14);
 
     --slate:#8e8e93;   --slate-soft:#e9e9eb;
+    --teal:#0d8ca3;    --teal-soft:#d3eef4;
     --blue:#007aff;    --blue-soft:#d9ecff;
     --orange:#ff9500;  --orange-soft:#ffedd1;
     --green:#34c759;   --green-soft:#dcf5e2;
     --pick:#dba63f;    --pick-bg:#10181f;
     --purple:#af52de;  --purple-soft:#f1e0f9;
     --red:#ff3b30;     --red-soft:#ffe5e3;
+    --brown:#8c6f4b;   --brown-soft:#ece4d9;
   }
   /* --- tema: "Automatico" segue il sistema; l'utente può forzare
      Chiaro/Scuro/Grigio scuro dalle Impostazioni (attributo data-theme). --- */
@@ -66,11 +68,13 @@
       --shadow:rgba(0,0,0,.5);
 
       --slate:#98989f;   --slate-soft:#28282a;
+      --teal:#40c8e0;    --teal-soft:#0e3239;
       --blue:#0a84ff;    --blue-soft:#122a42;
       --orange:#ff9f0a;  --orange-soft:#3a2a10;
       --green:#30d158;   --green-soft:#123a1e;
       --purple:#bf5af2;  --purple-soft:#301b3d;
       --red:#ff453a;     --red-soft:#3a221f;
+      --brown:#c0a27c;   --brown-soft:#33291f;
     }
   }
   :root[data-theme="dark"]{
@@ -92,11 +96,13 @@
     --shadow:rgba(0,0,0,.5);
 
     --slate:#98989f;   --slate-soft:#28282a;
+    --teal:#40c8e0;    --teal-soft:#0e3239;
     --blue:#0a84ff;    --blue-soft:#122a42;
     --orange:#ff9f0a;  --orange-soft:#3a2a10;
     --green:#30d158;   --green-soft:#123a1e;
     --purple:#bf5af2;  --purple-soft:#301b3d;
     --red:#ff453a;     --red-soft:#3a221f;
+    --brown:#c0a27c;   --brown-soft:#33291f;
   }
   :root[data-theme="dim"]{
     --bg:#1c1c1e;
@@ -117,11 +123,13 @@
     --shadow:rgba(0,0,0,.5);
 
     --slate:#98989f;   --slate-soft:#3a3a3c;
+    --teal:#40c8e0;    --teal-soft:#123c45;
     --blue:#0a84ff;    --blue-soft:#122a42;
     --orange:#ff9f0a;  --orange-soft:#3a2a10;
     --green:#30d158;   --green-soft:#123a1e;
     --purple:#bf5af2;  --purple-soft:#301b3d;
     --red:#ff453a;     --red-soft:#3a221f;
+    --brown:#c0a27c;   --brown-soft:#3a2f22;
   }
 
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -669,8 +677,13 @@
           <div class="row-trail"><span class="row-badge" id="adminWaCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="row" id="rowAdminMail">
+          <div class="row-main"><div class="row-title">Modelli email</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminMailCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
-      <div class="section-footer">Nei modelli WhatsApp puoi usare <code>{band}</code>, <code>{genere}</code> e <code>{nome}</code>: vengono sostituiti con i dati della band al momento della creazione. Quello che scrivi fra parentesi quadre resta com'è, da compilare a mano.</div>
+      <div class="section-footer">Nei modelli WhatsApp <code>{band}</code>, <code>{genere}</code> e <code>{nome}</code> vengono sostituiti con i dati della band al momento della creazione, una volta sola. I segnaposto dei modelli email (<code>{mio_nome}</code>, <code>{titolare}</code>…) restano scritti così e si riempiono a ogni invio. Quello che scrivi fra parentesi quadre resta com'è, da compilare a mano.</div>
 
     </div>
   </section>
@@ -714,12 +727,18 @@
     </header>
     <div class="screen-scroll">
       <div class="d-title-name"><input id="adminEditName" placeholder="Nome" /></div>
+      <div id="adminEditSubjectWrap" hidden>
+        <div class="section-header">OGGETTO</div>
+        <div class="grouped-list">
+          <div class="field-row stacked"><input id="adminEditSubject" placeholder="Oggetto della mail…" style="text-align:left;" /></div>
+        </div>
+      </div>
       <div id="adminEditMessageWrap" hidden>
         <div class="section-header">MESSAGGIO</div>
         <div class="grouped-list">
           <div class="field-row stacked"><textarea id="adminEditMessage" rows="12" placeholder="Testo del messaggio…" style="text-align:left;"></textarea></div>
         </div>
-        <div class="section-footer">Segnaposto disponibili: <code>{band}</code>, <code>{genere}</code>, <code>{nome}</code>.</div>
+        <div class="section-footer" id="adminEditVarsFooter"></div>
       </div>
     </div>
   </section>
@@ -787,7 +806,13 @@
           <div class="row-trail"><span class="row-badge" id="settingsWaTemplatesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="row" id="rowSettingsMailTemplates">
+          <div class="row-main"><div class="row-title">Modelli email</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsMailTemplatesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
+      <div class="section-footer" id="settingsTemplatesFooter"></div>
       <div class="section-header" id="sectionAdminHeader" hidden>AMMINISTRAZIONE DELL'APP</div>
       <div class="grouped-list" id="rowSettingsAdminWrap" hidden>
         <div class="row" id="rowSettingsAdmin">
@@ -1028,6 +1053,60 @@
       <div class="grouped-list">
         <div class="field-row stacked"><textarea id="waTemplateEditMessage" rows="12" placeholder="Testo del messaggio da inviare su WhatsApp…" style="text-align:left;"></textarea></div>
       </div>
+      <div class="section-footer" id="waTemplateEditVars"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODELLI EMAIL ============
+       Gli stessi modelli dei messaggi, ma con l'oggetto: una mail senza
+       oggetto e' una mail che non viene aperta. -->
+  <section class="screen pushed" id="mailTemplatesScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnMailTemplatesBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Modelli email</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">MODELLI</div>
+      <div class="grouped-list" id="mailTemplatesList"></div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <input type="text" id="newMailTemplateInput" placeholder="Nome del modello…" autocomplete="off">
+          <button id="btnAddMailTemplate">Aggiungi</button>
+        </div>
+      </div>
+      <div class="section-footer">Tocca un modello per scrivere oggetto e testo, scorri a sinistra per eliminarlo. Quando invii una mail dal dettaglio di un palcoscenico o di un art director potrai scegliere quale modello usare.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: MODIFICA MODELLO EMAIL ============ -->
+  <section class="screen pushed" id="mailTemplateEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnMailTemplateEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Modelli email
+        </button>
+        <span class="inline-title">Modello</span>
+        <button class="nav-btn primary" id="btnMailTemplateEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="mailTemplateEditName" placeholder="Nome del modello (es. Primo contatto)" /></div>
+      <div class="section-header">OGGETTO</div>
+      <div class="grouped-list">
+        <div class="field-row stacked"><input id="mailTemplateEditSubject" placeholder="Oggetto della mail…" style="text-align:left;" /></div>
+      </div>
+      <div class="section-header">MESSAGGIO</div>
+      <div class="grouped-list">
+        <div class="field-row stacked"><textarea id="mailTemplateEditMessage" rows="12" placeholder="Testo della mail…" style="text-align:left;"></textarea></div>
+      </div>
+      <div class="section-footer" id="mailTemplateEditVars"></div>
     </div>
   </section>
 
@@ -1405,7 +1484,7 @@
           <button type="button" class="act-chip" data-act="email">✉️ Email</button>
         </div>
       </div>
-      <div class="section-footer">Un tocco la registra con la data di oggi. Se la trattativa era "Da contattare" passa a "Contattato".</div>
+      <div class="section-footer">Un tocco la registra con la data di oggi. Se la trattativa era "Da contattare" o "Potenziale" passa a "Contattato".</div>
 
       <div class="section-header">STORICO CONTATTI</div>
       <div class="grouped-list" id="notesList"></div>
@@ -1518,15 +1597,31 @@
 (function(){
   "use strict";
 
+  /* "Potenziale" sta fra i due stati di partenza per un motivo preciso: "da
+     contattare" e' tutto quello che e' finito in rubrica, "potenziale" e'
+     quello che ci hai guardato dentro e su cui vuoi davvero provarci.
+     Nessuno dei due dice che qualcuno ti abbia risposto, quindi registrare
+     un'attivita' li fa avanzare tutti e due a "contattato" (lo fa il
+     server, vedi PRE_CONTACT_STATUSES in app.py). */
   var STATUSES = [
     {key:"da_contattare", label:"Da contattare", color:"var(--slate)", soft:"var(--slate-soft)"},
+    {key:"potenziale",    label:"Potenziale",    color:"var(--teal)",  soft:"var(--teal-soft)"},
     {key:"contattato",    label:"Contattato",    color:"var(--blue)",  soft:"var(--blue-soft)"},
     {key:"trattativa",    label:"In trattativa", color:"var(--orange)",soft:"var(--orange-soft)"},
     {key:"confermato",    label:"Confermato",    color:"var(--green)", soft:"var(--green-soft)"},
+    {key:"rifiutato",     label:"Rifiutato",     color:"var(--red)",   soft:"var(--red-soft)"},
     {key:"suonato",       label:"Suonato",       color:"var(--purple)",soft:"var(--purple-soft)"},
-    {key:"rifiutato",     label:"Rifiutato",     color:"var(--red)",   soft:"var(--red-soft)"}
+    {key:"annullato",     label:"Annullato",     color:"var(--brown)", soft:"var(--brown-soft)"}
   ];
   function statusInfo(k){ return STATUSES.find(function(s){return s.key===k;}) || STATUSES[0]; }
+
+  /* I tre modi in cui una serata finisce, e dirli diversi conta: "rifiutato"
+     e' un no del titolare, "annullato" e' una serata che era fissata e poi
+     e' saltata — piove, il locale chiude, succede. Riproporsi l'anno dopo
+     dopo una pioggia e' tutt'altra conversazione che dopo un no.
+     Stessa lista di CLOSING_STATUSES in app.py. */
+  var CLOSING_STATUSES = ["suonato", "rifiutato", "annullato"];
+  function isClosingStatus(s){ return CLOSING_STATUSES.indexOf(s) > -1; }
 
   var CHEVRON = '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>';
 
@@ -1573,10 +1668,10 @@
     var max = nums.length ? Math.max.apply(null, nums) : cur - 1;
     return String(Math.max(cur, max + 1));
   }
-  /* Una stagione chiusa che non e' ne' suonata ne' rifiutata e' semplicemente
-     finita nel nulla: dirlo e' piu' onesto che mostrare "In trattativa" su
-     una trattativa di tre anni fa. */
-  function gigStalled(g){ return !g.open && g.status !== "suonato" && g.status !== "rifiutato"; }
+  /* Una stagione chiusa che non e' finita in nessuno dei tre modi buoni e'
+     semplicemente finita nel nulla: dirlo e' piu' onesto che mostrare "In
+     trattativa" su una trattativa di tre anni fa. */
+  function gigStalled(g){ return !g.open && !isClosingStatus(g.status); }
   function gigStateLabel(g){ return gigStalled(g) ? "Non conclusa" : statusInfo(g.status).label; }
   function gigStateColors(g){
     if(gigStalled(g)) return {color:"var(--text-tertiary)", soft:"var(--fill)"};
@@ -2613,15 +2708,27 @@
     if(isNaN(d)) return dateStr || "";
     return d.toLocaleDateString("it-IT", {month:"long", year:"numeric"});
   }
+  /* Le stesse due azioni dell'elenco palcoscenici, con gli stessi colori:
+     archiviare e' reversibile e sta in grigio, eliminare no e sta in rosso.
+     Qui servono perche' l'agenda e' il posto dove ci si accorge che un
+     promemoria non ha piu' senso — e fin qui l'unico modo di toglierlo era
+     aprire la scheda. Un palcoscenico archiviato esce da solo dall'elenco:
+     venuesToRecontact() salta chi ha deleted_at. */
   function recontactRowHtml(v){
     var d = daysUntil(v.next_contact_date);
     var tag = d < 0 ? ("scaduto · "+Math.abs(d)+"g") : (d === 0 ? "oggi" : ("tra "+d+"g"));
     var color = d < 0 ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
-    return '<div class="row" data-open-id="'+v.id+'">'+
-      '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
-      '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+esc(v.planning_note) : "")+'</div></div>'+
-      '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
-      CHEVRON+'</div>'+
+    return '<div class="swipe-row" data-id="'+v.id+'">'+
+      '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(v.name||"Senza nome")+'</div>'+
+        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+esc(v.planning_note) : "")+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
+        CHEVRON+'</div>'+
+      '</div></div>'+
+      '<div class="row-actions two">'+
+        '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
+        '<button data-purge-id="'+v.id+'">Elimina</button>'+
+      '</div>'+
     '</div>';
   }
   /* Raggruppati a rottura di mese. L'elenco arriva gia' ordinato per data,
@@ -2650,6 +2757,10 @@
     elRecontactList.innerHTML = html + '</div>';
   }
   elRecontactList.addEventListener("click", function(e){
+    var purge = e.target.closest("[data-purge-id]");
+    if(purge){ purgeVenueRow(purge.getAttribute("data-purge-id")); return; }
+    var del = e.target.closest("[data-del-id]");
+    if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
@@ -2869,7 +2980,10 @@
       var gigId = yes ? yes.getAttribute("data-played") : no.getAttribute("data-cancelled");
       var noteEl = document.getElementById("conf-note-" + gigId);
       var dateEl = document.getElementById("conf-date-" + gigId);
-      var payload = {status: yes ? "suonato" : "rifiutato"};
+      // "Annullata" qui vuol dire che la serata e' saltata, non che il
+      // locale ha detto di no: prima dell'esistenza di "annullato" finiva
+      // in "rifiutato", che raccontava una cosa diversa da quella successa.
+      var payload = {status: yes ? "suonato" : "annullato"};
       if(noteEl) payload.outcome_note = noteEl.value;
       // Anche se e' vuota: svuotare il campo vuol dire "non ricontattarli".
       if(dateEl) payload.next_contact_date = dateEl.value;
@@ -3089,15 +3203,102 @@
     var actions = [];
     if(v.phone) actions.push({icon:"📞", label:"Chiama", href:"tel:"+v.phone.replace(/\s+/g,"")});
     if(v.phone) actions.push({icon:"💬", label:"WhatsApp", waAction:true});
-    if(v.email) actions.push({icon:"✉️", label:"Email", href:"mailto:"+v.email});
+    if(v.email) actions.push({icon:"✉️", label:"Email", mailAction:true});
     if(v.website) actions.push({icon:"🔗", label:"Sito", href:/^https?:\/\//i.test(v.website)?v.website:("https://"+v.website)});
     if(v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "") actions.push({icon:"📍", label:"Mappa", href:"https://www.google.com/maps?q="+v.lat+","+v.lng});
     quickActions.innerHTML = actions.map(function(a){
-      if(a.waAction){
-        return '<button type="button" class="qa" data-qa-whatsapp="1"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></button>';
+      // WhatsApp ed Email non sono link diretti: prima chiedono quale modello
+      // usare, e il link lo costruisce la scelta.
+      if(a.waAction || a.mailAction){
+        var attr = a.waAction ? "data-qa-whatsapp" : "data-qa-mail";
+        return '<button type="button" class="qa" '+attr+'="1"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></button>';
       }
       return '<a class="qa" target="_blank" rel="noopener" href="'+esc(a.href)+'"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></a>';
     }).join("");
+  }
+
+  /* ---------------- segnaposto dei modelli ----------------
+     Un modello si scrive una volta e si manda a decine di posti diversi,
+     quindi i segnaposto si risolvono quando si invia, non quando si salva:
+     lo stesso testo saluta ogni volta il referente giusto.
+
+     Nome e cognome escono da un campo solo — il profilo ha "nome" e basta —
+     quindi il primo pezzo e' il nome e tutto il resto il cognome. Chi si
+     chiama "Anna Maria Rossi" si ritrova cognome "Maria Rossi": l'alternativa
+     era chiedere due campi a chi ne aveva gia' compilato uno, e sbagliare
+     comunque su chi ha il cognome doppio.
+
+     Un segnaposto senza dato dietro diventa stringa vuota: una frase con un
+     buco si vede prima di spedire, la parola "{titolare}" arrivata a un
+     cliente no. Quelli che non conosciamo restano scritti come sono. */
+  var TEMPLATE_VARS = [
+    {key:"{mio_nome}",    hint:"il tuo nome"},
+    {key:"{mio_cognome}", hint:"il tuo cognome"},
+    {key:"{mia_band}",    hint:"il nome della band"},
+    {key:"{titolare}",    hint:"il referente del palcoscenico"},
+    {key:"{art_nome}",    hint:"il nome dell\u2019art director"},
+    {key:"{art_cognome}", hint:"il cognome dell\u2019art director"}
+  ];
+  function templateVarsHelpHtml(){
+    return "Segnaposto sostituiti al momento dell\u2019invio: " +
+      TEMPLATE_VARS.map(function(v){ return "<code>"+v.key+"</code> " + v.hint; }).join(", ") +
+      ". Quello che scrivi fra parentesi quadre resta com\u2019\u00e8, da compilare a mano.";
+  }
+  function splitFullName(full){
+    var parts = String(full || "").trim().split(/\s+/).filter(Boolean);
+    return {first: parts[0] || "", last: parts.slice(1).join(" ")};
+  }
+  function templateValues(opts){
+    opts = opts || {};
+    var io = splitFullName(me && me.name);
+    var ad = opts.ad;
+    if(!ad && opts.venue && opts.venue.art_director_id != null){
+      ad = artDirectors.find(function(a){ return a.id === opts.venue.art_director_id; });
+    }
+    var art = splitFullName(ad && ad.name);
+    // activeBandName() ripiega su "Home" per il titolo della schermata: in
+    // fondo a una mail sarebbe una firma sbagliata.
+    var band = activeBandName();
+    if(band === "Home") band = "";
+    return {
+      "{mio_nome}":    io.first,
+      "{mio_cognome}": io.last,
+      "{mia_band}":    band,
+      "{titolare}":    (opts.venue && opts.venue.contact_name) || "",
+      "{art_nome}":    art.first,
+      "{art_cognome}": art.last
+    };
+  }
+  function fillTemplate(text, opts){
+    var vals = templateValues(opts);
+    return String(text || "").replace(/\{[a-z_]+\}/g, function(m){
+      return Object.prototype.hasOwnProperty.call(vals, m) ? vals[m] : m;
+    });
+  }
+
+  /* La posta si apre con oggetto e testo gia' dentro: mailto: e' l'unico
+     modo che funziona con qualsiasi client, su telefono e su desktop. */
+  function buildMailtoUrl(email, subject, body){
+    var q = [];
+    if(subject) q.push("subject=" + encodeURIComponent(subject));
+    if(body) q.push("body=" + encodeURIComponent(body));
+    return "mailto:" + email + (q.length ? "?" + q.join("&") : "");
+  }
+  /* target: {email, venue} dalla scheda del palcoscenico, {email, ad} da
+     quella dell'art director. L'attivita' si registra solo nel primo caso:
+     e' il palcoscenico ad avere un diario. */
+  function openMailPicker(target){
+    function send(subject, body){
+      window.location.href = buildMailtoUrl(target.email, subject, body);
+      if(target.venue) logActivity("email");
+    }
+    var opts = [{label:"Apri la posta senza modello", onSelect:function(){ send("", ""); }}];
+    mailTemplates.forEach(function(t){
+      opts.push({label:t.name, onSelect:function(){
+        send(fillTemplate(t.subject, target), fillTemplate(t.message, target));
+      }});
+    });
+    openSheet({title:"Invia email", options:opts});
   }
 
   function waPhoneDigits(phone){
@@ -3113,33 +3314,42 @@
     if(text) url += "?text=" + encodeURIComponent(text);
     return url;
   }
-  function openWhatsAppPicker(v){
+  /* Stessa forma del selettore della posta: {phone, venue} dalla scheda del
+     palcoscenico, {phone, ad} da quella dell'art director. L'attivita' si
+     registra solo nel primo caso — il diario ce l'ha il palcoscenico. */
+  function openWhatsAppPicker(target){
     function send(text){
-      var url = buildWhatsAppUrl(v.phone, text);
+      var url = buildWhatsAppUrl(target.phone, text);
       if(!url) return;
       window.open(url, "_blank");
-      logActivity("messaggio");
+      if(target.venue) logActivity("messaggio");
     }
     var opts = [{label:"Apri WhatsApp senza modello", onSelect:function(){ send(""); }}];
     waTemplates.forEach(function(t){
-      opts.push({label:t.name, onSelect:function(){ send(t.message); }});
+      opts.push({label:t.name, onSelect:function(){ send(fillTemplate(t.message, target)); }});
     });
     openSheet({title:"Invia messaggio", options:opts});
   }
   quickActions.addEventListener("click", function(e){
-    var btn = e.target.closest("[data-qa-whatsapp]");
-    if(btn){
-      var v = currentVenue(); if(!v) return;
-      openWhatsAppPicker(v);
+    var wa = e.target.closest("[data-qa-whatsapp]");
+    if(wa){
+      var vw = currentVenue();
+      if(!vw || !vw.phone) return;
+      openWhatsAppPicker({phone: vw.phone, venue: vw});
       return;
     }
-    // Telefonata ed email partono da un link normale: l'attivita' si registra
-    // da sola, senza intralciare l'apertura dell'app del telefono.
+    var mail = e.target.closest("[data-qa-mail]");
+    if(mail){
+      var vm = currentVenue();
+      if(!vm || !vm.email) return;
+      openMailPicker({email: vm.email, venue: vm});
+      return;
+    }
+    // La telefonata parte da un link normale: l'attivita' si registra da
+    // sola, senza intralciare l'apertura dell'app del telefono.
     var link = e.target.closest("a.qa");
     if(!link) return;
-    var href = link.getAttribute("href") || "";
-    if(href.indexOf("tel:") === 0) logActivity("chiamata");
-    else if(href.indexOf("mailto:") === 0) logActivity("email");
+    if((link.getAttribute("href") || "").indexOf("tel:") === 0) logActivity("chiamata");
   });
 
   function renderTypeRow(v){
@@ -3357,7 +3567,7 @@
     readGigDraft();
     var v = currentVenue(); if(!v || !gigDraft) return;
     var g = venueGigs(v).filter(function(x){ return String(x.id) === String(gigId); })[0];
-    var chiude = !!g && g.open && (gigDraft.status === "suonato" || gigDraft.status === "rifiutato");
+    var chiude = !!g && g.open && isClosingStatus(gigDraft.status);
     var body = {
       season: gigDraft.season,
       status: gigDraft.status,
@@ -3756,14 +3966,36 @@
   adEmail.addEventListener("input", function(){ scheduleSaveAd("email", adEmail.value); renderAdQuickActions(currentAd()||{phone:adPhone.value,email:adEmail.value}); });
   adNotes.addEventListener("input", function(){ scheduleSaveAd("notes", adNotes.value); });
 
+  /* Le stesse tre azioni della scheda del palcoscenico e nello stesso
+     ordine: un art director si contatta come si contatta un locale, e
+     WhatsApp e' spesso l'unico canale a cui risponde davvero. */
   function renderAdQuickActions(ad){
     var actions = [];
     if(ad.phone) actions.push({icon:"📞", label:"Chiama", href:"tel:"+ad.phone.replace(/\s+/g,"")});
-    if(ad.email) actions.push({icon:"✉️", label:"Email", href:"mailto:"+ad.email});
+    if(ad.phone) actions.push({icon:"💬", label:"WhatsApp", waAction:true});
+    if(ad.email) actions.push({icon:"✉️", label:"Email", mailAction:true});
     document.getElementById("adQuickActions").innerHTML = actions.map(function(a){
+      if(a.waAction || a.mailAction){
+        var attr = a.waAction ? "data-qa-whatsapp" : "data-qa-mail";
+        return '<button type="button" class="qa" '+attr+'="1"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></button>';
+      }
       return '<a class="qa" target="_blank" rel="noopener" href="'+esc(a.href)+'"><span class="qa-circle">'+a.icon+'</span><span class="qa-label">'+a.label+'</span></a>';
     }).join("");
   }
+  /* Anche qui si passa dai modelli, ed e' il caso in cui {art_nome} e
+     {art_cognome} valgono davvero: l'art director e' la persona a cui stai
+     scrivendo, non un contatto del palcoscenico. Nessuna attivita' da
+     registrare: il diario ce l'ha il palcoscenico, non lui. */
+  document.getElementById("adQuickActions").addEventListener("click", function(e){
+    var ad = currentAd() || {name: adName.value, phone: adPhone.value, email: adEmail.value};
+    if(e.target.closest("[data-qa-whatsapp]")){
+      if(ad.phone) openWhatsAppPicker({phone: ad.phone, ad: ad});
+      return;
+    }
+    if(e.target.closest("[data-qa-mail]")){
+      if(ad.email) openMailPicker({email: ad.email, ad: ad});
+    }
+  });
 
   function renderAdVenues(ad){
     var elAdVenues = document.getElementById("adVenuesList");
@@ -4776,6 +5008,125 @@
   document.getElementById("rowSettingsWaTemplates").addEventListener("click", openWaTemplatesScreen);
   document.getElementById("btnWaTemplatesBack").addEventListener("click", closeWaTemplatesScreen);
 
+  /* ---------------- Impostazioni: Modelli email ----------------
+     Stessa forma dei modelli WhatsApp, con l'oggetto in piu'. E' quello che
+     cambia una mail da "ne mando una e vediamo" a "ne mando venti stasera":
+     il testo lungo lo si scrive una volta sola e i segnaposto fanno il
+     resto. */
+  var mailTemplates = [];
+  function loadMailTemplates(){
+    return api("GET", "/api/mail_templates").then(function(data){
+      mailTemplates = data;
+      updateSettingsMailTemplatesCount();
+    });
+  }
+  function updateSettingsMailTemplatesCount(){
+    document.getElementById("settingsMailTemplatesCount").textContent = mailTemplates.length;
+  }
+  function renderMailTemplatesList(){
+    var el = document.getElementById("mailTemplatesList");
+    if(!mailTemplates.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun modello configurato.</div>';
+      return;
+    }
+    // Sotto il nome va l'oggetto, non il testo: e' quello che si riconosce
+    // al volo quando si sceglie quale modello mandare.
+    el.innerHTML = mailTemplates.map(function(t){
+      var sub = t.subject || t.message || "";
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-mailtemplate="'+t.id+'">'+
+        '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+
+        '<div class="row-sub">'+esc(sub)+'</div></div>'+
+        '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-del-mailtemplate="'+t.id+'">Elimina</button></div></div>';
+    }).join("");
+  }
+  document.getElementById("mailTemplatesList").addEventListener("click", function(e){
+    var del = e.target.closest("[data-del-mailtemplate]");
+    if(del){
+      var id = del.getAttribute("data-del-mailtemplate");
+      api("DELETE", "/api/mail_templates/" + id).then(function(){
+        mailTemplates = mailTemplates.filter(function(t){ return String(t.id) !== String(id); });
+        renderMailTemplatesList();
+        updateSettingsMailTemplatesCount();
+        toast("Modello eliminato");
+      }).catch(function(err){ toast(err.message); });
+      return;
+    }
+    var row = e.target.closest("[data-open-mailtemplate]");
+    if(row) openMailTemplateEditScreen(Number(row.getAttribute("data-open-mailtemplate")));
+  });
+
+  var currentMailTemplateEditId = null;
+  var elMailTemplateEditScreen = document.getElementById("mailTemplateEditScreen");
+  function openMailTemplateEditScreen(id){
+    var t = mailTemplates.find(function(x){ return x.id === id; });
+    if(!t) return;
+    currentMailTemplateEditId = id;
+    document.getElementById("mailTemplateEditName").value = t.name || "";
+    document.getElementById("mailTemplateEditSubject").value = t.subject || "";
+    document.getElementById("mailTemplateEditMessage").value = t.message || "";
+    elMailTemplateEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elMailTemplateEditScreen.classList.add("in"); });
+    setTimeout(function(){ document.getElementById("mailTemplateEditName").focus(); }, 260);
+  }
+  function closeMailTemplateEditScreen(){
+    elMailTemplateEditScreen.classList.remove("in");
+    setTimeout(function(){ elMailTemplateEditScreen.hidden = true; }, 320);
+    currentMailTemplateEditId = null;
+  }
+  document.getElementById("btnMailTemplateEditBack").addEventListener("click", closeMailTemplateEditScreen);
+  document.getElementById("btnMailTemplateEditSave").addEventListener("click", function(){
+    if(currentMailTemplateEditId == null) return;
+    var name = document.getElementById("mailTemplateEditName").value.trim();
+    var subject = document.getElementById("mailTemplateEditSubject").value.trim();
+    var message = document.getElementById("mailTemplateEditMessage").value.trim();
+    if(!name){ toast("Il nome è obbligatorio"); return; }
+    if(!message){ toast("Il messaggio è obbligatorio"); return; }
+    withButtonBusy(this, function(){
+      return api("PUT", "/api/mail_templates/" + currentMailTemplateEditId,
+        {name:name, subject:subject, message:message});
+    }).then(function(updated){
+      var i = mailTemplates.findIndex(function(t){ return t.id === updated.id; });
+      if(i > -1) mailTemplates[i] = updated;
+      renderMailTemplatesList();
+      toast("Modello salvato");
+      closeMailTemplateEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  document.getElementById("btnAddMailTemplate").addEventListener("click", function(){
+    var input = document.getElementById("newMailTemplateInput");
+    var name = input.value.trim();
+    if(!name) return;
+    api("POST", "/api/mail_templates", {name:name, subject:"", message:""}).then(function(created){
+      mailTemplates.push(created);
+      input.value = "";
+      renderMailTemplatesList();
+      updateSettingsMailTemplatesCount();
+      openMailTemplateEditScreen(created.id);
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  var elMailTemplatesScreen = document.getElementById("mailTemplatesScreen");
+  function openMailTemplatesScreen(){
+    renderMailTemplatesList();
+    updateSettingsMailTemplatesCount();
+    elMailTemplatesScreen.hidden = false;
+    requestAnimationFrame(function(){ elMailTemplatesScreen.classList.add("in"); });
+  }
+  function closeMailTemplatesScreen(){
+    elMailTemplatesScreen.classList.remove("in");
+    setTimeout(function(){ elMailTemplatesScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsMailTemplates").addEventListener("click", openMailTemplatesScreen);
+  document.getElementById("btnMailTemplatesBack").addEventListener("click", closeMailTemplatesScreen);
+
+  // L'elenco dei segnaposto e' lo stesso in tre punti: scriverlo una volta
+  // sola vuol dire che aggiungerne uno non lascia indietro due schermate.
+  document.getElementById("waTemplateEditVars").innerHTML = templateVarsHelpHtml();
+  document.getElementById("mailTemplateEditVars").innerHTML = templateVarsHelpHtml();
+  document.getElementById("settingsTemplatesFooter").innerHTML = templateVarsHelpHtml();
+
   var elAboutScreen = document.getElementById("aboutScreen");
   function openAboutScreen(){
     document.getElementById("aboutCountVenues").textContent = venues.length;
@@ -4873,7 +5224,7 @@
 
   var elAdminListScreen = document.getElementById("adminListScreen");
   var elAdminEditScreen = document.getElementById("adminEditScreen");
-  var templates = {venue_type: [], venue_category: [], wa_template: []};
+  var templates = {venue_type: [], venue_category: [], wa_template: [], mail_template: []};
   var adminKind = null;
   var adminEditId = null;
 
@@ -4891,14 +5242,21 @@
     wa_template: {
       title: "Modelli WhatsApp", header: "MODELLI DI PARTENZA", placeholder: "Nome del modello…",
       footer: "I messaggi tipo che una band nuova si trova già pronti. Usa {band}, {genere} e {nome} per i dati della band; quello che scrivi fra parentesi quadre resta com'è.",
-      hasMessage: true, countEl: "adminWaCount"
+      hasMessage: true, hasSubject: false, countEl: "adminWaCount",
+      vars: "Segnaposto sostituiti alla creazione della band: <code>{band}</code>, <code>{genere}</code>, <code>{nome}</code>."
+    },
+    mail_template: {
+      title: "Modelli email", header: "MODELLI DI PARTENZA", placeholder: "Nome del modello…",
+      footer: "Le mail tipo che una band nuova si trova già pronte, oggetto compreso. Qui i segnaposto non vengono risolti: restano scritti nella copia della band e si riempiono a ogni invio.",
+      hasMessage: true, hasSubject: true, countEl: "adminMailCount",
+      vars: null  // riempito con templateVarsHelpHtml(): sono gli stessi
     }
   };
 
   function loadTemplates(){
     if(!me || !me.is_admin) return Promise.resolve();
     return api("GET", "/api/admin/templates").then(function(rows){
-      templates = {venue_type: [], venue_category: [], wa_template: []};
+      templates = {venue_type: [], venue_category: [], wa_template: [], mail_template: []};
       rows.forEach(function(r){ if(templates[r.kind]) templates[r.kind].push(r); });
       Object.keys(ADMIN_KINDS).forEach(function(k){
         document.getElementById(ADMIN_KINDS[k].countEl).textContent = templates[k].length;
@@ -4918,8 +5276,9 @@
       return;
     }
     el.innerHTML = rows.map(function(t){
-      var sub = cfg.hasMessage && t.message
-        ? '<div class="row-sub">'+esc(t.message.split("\n")[0].slice(0, 60))+'…</div>' : "";
+      var anteprima = cfg.hasSubject ? (t.subject || t.message || "") : (t.message || "");
+      var sub = cfg.hasMessage && anteprima
+        ? '<div class="row-sub">'+esc(anteprima.split("\n")[0].slice(0, 60))+'…</div>' : "";
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-admin-open="'+t.id+'">'+
         '<div class="row-main"><div class="row-title">'+esc(t.name)+'</div>'+sub+'</div>'+
         '<div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
@@ -4946,6 +5305,7 @@
   document.getElementById("rowAdminTypes").addEventListener("click", function(){ openAdminList("venue_type"); });
   document.getElementById("rowAdminCategories").addEventListener("click", function(){ openAdminList("venue_category"); });
   document.getElementById("rowAdminWa").addEventListener("click", function(){ openAdminList("wa_template"); });
+  document.getElementById("rowAdminMail").addEventListener("click", function(){ openAdminList("mail_template"); });
   document.getElementById("btnAdminListBack").addEventListener("click", closeAdminList);
 
   document.getElementById("btnAdminAdd").addEventListener("click", function(){
@@ -4978,10 +5338,14 @@
   function openAdminEdit(id){
     var t = (templates[adminKind] || []).find(function(x){ return x.id === id; });
     if(!t) return;
+    var cfg = ADMIN_KINDS[adminKind];
     adminEditId = id;
     document.getElementById("adminEditName").value = t.name || "";
+    document.getElementById("adminEditSubject").value = t.subject || "";
     document.getElementById("adminEditMessage").value = t.message || "";
-    document.getElementById("adminEditMessageWrap").hidden = !ADMIN_KINDS[adminKind].hasMessage;
+    document.getElementById("adminEditSubjectWrap").hidden = !cfg.hasSubject;
+    document.getElementById("adminEditMessageWrap").hidden = !cfg.hasMessage;
+    document.getElementById("adminEditVarsFooter").innerHTML = cfg.vars || templateVarsHelpHtml();
     elAdminEditScreen.hidden = false;
     requestAnimationFrame(function(){ elAdminEditScreen.classList.add("in"); });
   }
@@ -4995,6 +5359,7 @@
     if(adminEditId == null) return;
     var body = {name: document.getElementById("adminEditName").value.trim()};
     if(ADMIN_KINDS[adminKind].hasMessage) body.message = document.getElementById("adminEditMessage").value;
+    if(ADMIN_KINDS[adminKind].hasSubject) body.subject = document.getElementById("adminEditSubject").value;
     api("PUT", "/api/admin/templates/" + adminEditId, body)
       .then(loadTemplates)
       .then(function(){ closeAdminEdit(); toast("Template salvato"); })
@@ -5281,7 +5646,7 @@
   function loadAllData(){
     return Promise.all([
       loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
-      loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates(),
+      loadVenueCategories(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates()
     ]).catch(function(){
       // Senza band attiva le API rispondono 409: e' normale per un utente
@@ -5335,6 +5700,8 @@
   addEdgeSwipeBack(elAdminEditScreen, closeAdminEdit);
   addEdgeSwipeBack(elWaTemplatesScreen, closeWaTemplatesScreen);
   addEdgeSwipeBack(elWaTemplateEditScreen, closeWaTemplateEditScreen);
+  addEdgeSwipeBack(elMailTemplatesScreen, closeMailTemplatesScreen);
+  addEdgeSwipeBack(elMailTemplateEditScreen, closeMailTemplateEditScreen);
 
   /* ---------------- boot ---------------- */
   // loadMe per primo: decide se c'e' una band attiva, e senza quella le

@@ -68,7 +68,7 @@ STATE_INVITE_SEP = "."
 # confini del workspace. notes e photos non sono qui: seguono la location.
 WORKSPACE_SCOPED_TABLES = [
     "locations", "art_directors", "bands",
-    "wa_templates", "venue_types", "venue_categories",
+    "wa_templates", "mail_templates", "venue_types", "venue_categories",
 ]
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -106,18 +106,32 @@ ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
 
 STATUS_VALUES = {
-    "da_contattare", "contattato", "trattativa",
-    "confermato", "suonato", "rifiutato",
+    "da_contattare", "potenziale", "contattato", "trattativa",
+    "confermato", "rifiutato", "suonato", "annullato",
 }
 
-# Gli stessi sei stati, ma applicati alla singola serata invece che al
+# Prima di aver alzato la cornetta gli stati sono due e non uno: "da
+# contattare" e' la lista di partenza, "potenziale" e' il posto che hai
+# guardato da vicino e su cui vuoi davvero provarci. Nessuno dei due dice
+# che qualcuno ti abbia risposto, quindi registrare un'attivita' li fa
+# avanzare tutti e due a "contattato".
+PRE_CONTACT_STATUSES = {"da_contattare", "potenziale"}
+
+# Gli stessi otto stati, ma applicati alla singola serata invece che al
 # palcoscenico: e' quello che permette di ripartire da zero ogni stagione
 # senza cancellare com'e' andata l'anno prima.
 GIG_FIELDS = ["season", "status", "gig_date", "fee", "outcome_note"]
 
-# Dopo "suonato" o "rifiutato" su quella stagione non c'e' piu' niente da
-# fare: la serata si chiude e la prossima nasce come riga nuova.
-CLOSING_STATUSES = {"suonato", "rifiutato"}
+# I tre modi in cui una serata finisce, e sono diversi fra loro: "suonato"
+# ci sei andato, "rifiutato" il titolare ha detto di no, "annullato" era
+# fissata e poi e' saltata — piove, il locale chiude, succede. Dopo uno di
+# questi su quella stagione non c'e' piu' niente da fare: la serata si
+# chiude e la prossima nasce come riga nuova.
+#
+# Distinguere annullato da rifiutato conta: una serata saltata per la
+# pioggia non dice niente su cosa pensa di te quel locale, e riproporsi
+# l'anno dopo e' tutt'altra conversazione che dopo un no.
+CLOSING_STATUSES = {"suonato", "rifiutato", "annullato"}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SEASON_YEAR_RE = re.compile(r"(\d{4})")
@@ -243,6 +257,15 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS mail_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            subject TEXT,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS user_profiles (
             email TEXT PRIMARY KEY,
             name TEXT,
@@ -292,6 +315,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT NOT NULL,
             name TEXT NOT NULL,
+            subject TEXT,
             message TEXT,
             position INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
@@ -397,6 +421,7 @@ def migrate_schema(conn):
 
     migrate_to_workspaces(conn)
     migrate_to_gigs(conn)
+    migrate_to_mail_templates(conn)
 
     # Un palcoscenico rimasto senza serate non e' un errore — vuol dire che
     # nessuna stagione e' ancora aperta — ma il suo stato deve dirlo. Le
@@ -413,6 +438,51 @@ def migrate_schema(conn):
     # di dire "nessuna data" che le query devono distinguere. Qui restano in
     # uno solo, ed e' idempotente.
     conn.execute("UPDATE locations SET next_contact_date = NULL WHERE next_contact_date = ''")
+
+
+def migrate_to_mail_templates(conn):
+    """Porta i modelli email dentro un'installazione che non li aveva.
+
+    Il segnale e' la colonna subject su app_templates: esiste solo dalla
+    versione che ha introdotto la posta, quindi se manca siamo al primo
+    avvio dopo l'aggiornamento. Gira una volta sola — chi cancella tutti i
+    modelli non se li ritrova al riavvio dopo — e non tocca niente di
+    quello che c'e' gia'.
+    """
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(app_templates)").fetchall()}
+    if "subject" in cols:
+        return
+    conn.execute("ALTER TABLE app_templates ADD COLUMN subject TEXT")
+    ts = now_iso()
+
+    # Se app_templates e' vuota ci pensa seed_app_templates subito dopo, con
+    # tutti i tipi insieme: qui si riempie solo il buco di chi ce li ha gia'.
+    if conn.execute("SELECT 1 FROM app_templates LIMIT 1").fetchone():
+        conn.executemany(
+            "INSERT INTO app_templates (kind, name, subject, message, position, created_at, updated_at) "
+            "VALUES ('mail_template', ?, ?, ?, ?, ?, ?)",
+            [
+                (t["name"], t["subject"], t["message"], i, ts, ts)
+                for i, t in enumerate(DEFAULT_MAIL_TEMPLATES)
+            ],
+        )
+
+    # Le band che esistono gia' non ripassano da seed_workspace_defaults:
+    # senza questo si troverebbero la posta senza nessun modello da cui
+    # partire, che e' il modo peggiore di scoprire una funzione nuova.
+    for ws in conn.execute("SELECT id FROM workspaces").fetchall():
+        if conn.execute(
+            "SELECT 1 FROM mail_templates WHERE workspace_id = ? LIMIT 1", (ws["id"],)
+        ).fetchone():
+            continue
+        conn.executemany(
+            "INSERT INTO mail_templates (name, subject, message, workspace_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                (t["name"], t["subject"], t["message"], ws["id"], ts, ts)
+                for t in DEFAULT_MAIL_TEMPLATES
+            ],
+        )
 
 
 def migrate_to_gigs(conn):
@@ -1075,6 +1145,49 @@ DEFAULT_WA_TEMPLATES = [
 ]
 
 
+# I modelli email arrivano dopo i segnaposto che si risolvono all'invio, e
+# usano solo quelli: {mio_nome}, {mio_cognome} e {mia_band} sono chi scrive,
+# {titolare} il referente del palcoscenico, {art_nome} e {art_cognome}
+# l'art director. Non passano da render_default_text — restano scritti cosi'
+# anche nella copia della band, e si riempiono ogni volta che si invia.
+DEFAULT_MAIL_TEMPLATES = [
+    {
+        "name": "Primo contatto",
+        "subject": "Musica dal vivo — {mia_band}",
+        "message": (
+            "Buongiorno {titolare},\n"
+            "mi chiamo {mio_nome} {mio_cognome} e suono nei {mia_band}.\n\n"
+            "Se avete in programma serate con musica dal vivo per la "
+            "prossima stagione ci farebbe piacere proporvi il nostro "
+            "spettacolo: [quanti siete e quanto dura].\n\n"
+            "Qui sotto un link dove vedere un collage di video dei nostri "
+            "concerti:\n\n"
+            "[incolla qui il link ai vostri video]\n\n"
+            "Per qualsiasi cosa sono raggiungibile al [il tuo numero] "
+            "oppure a [la tua email].\n\n"
+            "Grazie e buona giornata,\n"
+            "{mio_nome} {mio_cognome} — {mia_band}"
+        ),
+    },
+    {
+        "name": "Materiale all'art director",
+        "subject": "Materiale {mia_band} per la stagione [anno]",
+        "message": (
+            "Buongiorno {art_nome} {art_cognome},\n"
+            "sono {mio_nome} {mio_cognome} dei {mia_band}.\n\n"
+            "Le mando il nostro materiale per la programmazione della "
+            "prossima stagione: repertorio, formazione e qualche video "
+            "dal vivo.\n\n"
+            "[incolla qui il link al materiale]\n\n"
+            "Se le serve altro mi trova al [il tuo numero] o a "
+            "[la tua email].\n\n"
+            "Grazie per l'attenzione,\n"
+            "{mio_nome} {mio_cognome}"
+        ),
+    },
+]
+
+
 def render_default_text(text, band_name, genre=None, person=None):
     genre_part = f", {genre.strip().lower()}" if (genre or "").strip() else ""
     return (
@@ -1084,10 +1197,13 @@ def render_default_text(text, band_name, genre=None, person=None):
     )
 
 
+# Cosa ha ogni tipo di template: il testo lungo ce l'hanno i messaggi, e
+# l'oggetto solo la mail — una tipologia di palcoscenico e' solo un nome.
 TEMPLATE_KINDS = {
-    "venue_type": ("venue_types", False),
-    "venue_category": ("venue_categories", False),
-    "wa_template": ("wa_templates", True),
+    "venue_type": {"message": False, "subject": False},
+    "venue_category": {"message": False, "subject": False},
+    "wa_template": {"message": True, "subject": False},
+    "mail_template": {"message": True, "subject": True},
 }
 
 
@@ -1103,14 +1219,16 @@ def seed_app_templates(conn):
     ts = now_iso()
     rows = []
     for i, name in enumerate(DEFAULT_VENUE_TYPES):
-        rows.append(("venue_type", name, None, i, ts, ts))
+        rows.append(("venue_type", name, None, None, i, ts, ts))
     for i, name in enumerate(DEFAULT_VENUE_CATEGORIES):
-        rows.append(("venue_category", name, None, i, ts, ts))
+        rows.append(("venue_category", name, None, None, i, ts, ts))
     for i, t in enumerate(DEFAULT_WA_TEMPLATES):
-        rows.append(("wa_template", t["name"], t["message"], i, ts, ts))
+        rows.append(("wa_template", t["name"], None, t["message"], i, ts, ts))
+    for i, t in enumerate(DEFAULT_MAIL_TEMPLATES):
+        rows.append(("mail_template", t["name"], t["subject"], t["message"], i, ts, ts))
     conn.executemany(
-        "INSERT INTO app_templates (kind, name, message, position, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO app_templates (kind, name, subject, message, position, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
         rows,
     )
     conn.commit()
@@ -1136,8 +1254,9 @@ def create_template(conn, kind, body):
     name = (body.get("name") or "").strip()
     if not name:
         raise ApiError(400, "Il nome è obbligatorio")
-    has_message = TEMPLATE_KINDS[kind][1]
-    message = (body.get("message") or "").strip() if has_message else None
+    cfg = TEMPLATE_KINDS[kind]
+    message = (body.get("message") or "").strip() if cfg["message"] else None
+    subject = (body.get("subject") or "").strip() if cfg["subject"] else None
     dup = conn.execute(
         "SELECT id FROM app_templates WHERE kind = ? AND LOWER(name) = LOWER(?)", (kind, name)
     ).fetchone()
@@ -1148,9 +1267,9 @@ def create_template(conn, kind, body):
         "SELECT COALESCE(MAX(position), -1) + 1 AS p FROM app_templates WHERE kind = ?", (kind,)
     ).fetchone()["p"]
     cur = conn.execute(
-        "INSERT INTO app_templates (kind, name, message, position, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (kind, name, message, position, ts, ts),
+        "INSERT INTO app_templates (kind, name, subject, message, position, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (kind, name, subject, message, position, ts, ts),
     )
     conn.commit()
     return dict(conn.execute("SELECT * FROM app_templates WHERE id = ?", (cur.lastrowid,)).fetchone())
@@ -1169,12 +1288,16 @@ def update_template(conn, template_id, body):
     ).fetchone()
     if dup:
         raise ApiError(400, "Esiste già un template con questo nome")
+    cfg = TEMPLATE_KINDS[row["kind"]]
     message = row["message"]
-    if TEMPLATE_KINDS[row["kind"]][1] and "message" in body:
+    if cfg["message"] and "message" in body:
         message = (body.get("message") or "").strip()
+    subject = row["subject"]
+    if cfg["subject"] and "subject" in body:
+        subject = (body.get("subject") or "").strip()
     conn.execute(
-        "UPDATE app_templates SET name = ?, message = ?, updated_at = ? WHERE id = ?",
-        (name, message, now_iso(), template_id),
+        "UPDATE app_templates SET name = ?, subject = ?, message = ?, updated_at = ? WHERE id = ?",
+        (name, subject, message, now_iso(), template_id),
     )
     conn.commit()
     return dict(conn.execute("SELECT * FROM app_templates WHERE id = ?", (template_id,)).fetchone())
@@ -1228,6 +1351,18 @@ def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
                 )
                 for t in messages
             ],
+        )
+
+    # I modelli email non passano da render_default_text: i loro segnaposto
+    # si risolvono al momento dell'invio, quindi vanno copiati come sono.
+    mails = fetch_templates(conn, "mail_template")
+    if mails and not conn.execute(
+        "SELECT 1 FROM mail_templates WHERE workspace_id = ? LIMIT 1", (ws,)
+    ).fetchone():
+        conn.executemany(
+            "INSERT INTO mail_templates (name, subject, message, workspace_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [(t["name"], t["subject"] or "", t["message"] or "", ws, ts, ts) for t in mails],
         )
 
 
@@ -1746,15 +1881,16 @@ def add_note(conn, ws, loc_id, body):
         (loc_id, gig["id"] if gig else None, kind, text, ts),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
-    # Aver contattato il posto e' esattamente cosa distingue "da contattare"
-    # da "contattato": avanzarlo qui evita di dover cambiare lo stato a mano
-    # ogni volta. Da "contattato" in poi non si tocca piu' niente: dove sia
-    # arrivata la trattativa lo sa solo chi la sta portando avanti.
+    # Aver contattato il posto e' esattamente cosa distingue i due stati di
+    # partenza ("da contattare", "potenziale") da "contattato": avanzarlo qui
+    # evita di dover cambiare lo stato a mano ogni volta. Da "contattato" in
+    # poi non si tocca piu' niente: dove sia arrivata la trattativa lo sa solo
+    # chi la sta portando avanti.
     #
     # Senza nessuna serata l'attivita' ne apre una per la stagione corrente
     # (ci pensa set_location_status): lavorare un posto vuol dire aver
     # cominciato, e la nota appena scritta e' la prova.
-    if kind != "nota" and (gig is None or gig["status"] == "da_contattare"):
+    if kind != "nota" and (gig is None or gig["status"] in PRE_CONTACT_STATUSES):
         set_location_status(conn, loc_id, "contattato")
         if gig is None:
             nuova = current_gig_row(conn, loc_id)
@@ -2114,6 +2250,59 @@ def update_wa_template(conn, ws, template_id, body):
 def delete_wa_template(conn, ws, template_id):
     cur = conn.execute(
         "DELETE FROM wa_templates WHERE id = ? AND workspace_id = ?", (template_id, ws)
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        raise ApiError(404, "Modello non trovato")
+
+
+# I modelli email sono i modelli WhatsApp piu' l'oggetto: un messaggio senza
+# oggetto in casella di posta e' un messaggio che non viene aperto.
+def fetch_mail_templates(conn, ws):
+    rows = conn.execute(
+        "SELECT * FROM mail_templates WHERE workspace_id = ? ORDER BY id ASC", (ws,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_mail_template(conn, ws, body):
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    subject = (body.get("subject") or "").strip()
+    message = (body.get("message") or "").strip()
+    ts = now_iso()
+    cur = conn.execute(
+        "INSERT INTO mail_templates (name, subject, message, workspace_id, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (name, subject, message, ws, ts, ts),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM mail_templates WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+def update_mail_template(conn, ws, template_id, body):
+    existing = conn.execute(
+        "SELECT * FROM mail_templates WHERE id = ? AND workspace_id = ?", (template_id, ws)
+    ).fetchone()
+    if not existing:
+        raise ApiError(404, "Modello non trovato")
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome è obbligatorio")
+    subject = (body.get("subject") or "").strip() if "subject" in body else existing["subject"]
+    message = (body.get("message") or "").strip() if "message" in body else existing["message"]
+    conn.execute(
+        "UPDATE mail_templates SET name = ?, subject = ?, message = ?, updated_at = ? WHERE id = ?",
+        (name, subject, message, now_iso(), template_id),
+    )
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM mail_templates WHERE id = ?", (template_id,)).fetchone())
+
+
+def delete_mail_template(conn, ws, template_id):
+    cur = conn.execute(
+        "DELETE FROM mail_templates WHERE id = ? AND workspace_id = ?", (template_id, ws)
     )
     conn.commit()
     if cur.rowcount == 0:
@@ -2520,6 +2709,23 @@ def _h_delete_wa_template(conn, match, query, body, ctx):
     return 204, {}
 
 
+def _h_list_mail_templates(conn, match, query, body, ctx):
+    return 200, fetch_mail_templates(conn, require_ws(ctx))
+
+
+def _h_create_mail_template(conn, match, query, body, ctx):
+    return 201, create_mail_template(conn, require_ws(ctx), body)
+
+
+def _h_update_mail_template(conn, match, query, body, ctx):
+    return 200, update_mail_template(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_delete_mail_template(conn, match, query, body, ctx):
+    delete_mail_template(conn, require_ws(ctx), int(match.group(1)))
+    return 204, {}
+
+
 def _h_list_venue_types(conn, match, query, body, ctx):
     return 200, fetch_venue_types(conn, require_ws(ctx))
 
@@ -2597,6 +2803,10 @@ ROUTES = [
     ("POST", re.compile(r"^/api/wa_templates$"), _h_create_wa_template),
     ("PUT", re.compile(r"^/api/wa_templates/(\d+)$"), _h_update_wa_template),
     ("DELETE", re.compile(r"^/api/wa_templates/(\d+)$"), _h_delete_wa_template),
+    ("GET", re.compile(r"^/api/mail_templates$"), _h_list_mail_templates),
+    ("POST", re.compile(r"^/api/mail_templates$"), _h_create_mail_template),
+    ("PUT", re.compile(r"^/api/mail_templates/(\d+)$"), _h_update_mail_template),
+    ("DELETE", re.compile(r"^/api/mail_templates/(\d+)$"), _h_delete_mail_template),
     ("GET", re.compile(r"^/api/admin/templates$"), _h_list_templates),
     ("POST", re.compile(r"^/api/admin/templates$"), _h_create_template),
     ("PUT", re.compile(r"^/api/admin/templates/(\d+)$"), _h_update_template),
