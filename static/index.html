@@ -498,7 +498,7 @@
   .sheet.con-ricerca.show{transform:translateY(0);}
   /* Ripiego per i browser senza visualViewport: i vh non sanno niente
      della tastiera, quindi si tiene più basso e si spera bene. */
-  .sheet.con-ricerca .sheet-group{max-height:44vh;}
+  .sheet.con-ricerca .sheet-group{max-height:38vh;}
   @media (prefers-reduced-motion:reduce){.sheet{transition:none;} .sheet-backdrop{transition:none;}}
   .sheet-title{text-align:center;font-size:13px;color:var(--text-secondary);padding:14px 16px 10px;background:var(--bg-elevated);border-radius:14px 14px 0 0;}
   .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;}
@@ -2399,7 +2399,14 @@
   function adattaAllaTastiera(){
     if(!sheetHasSearch || !window.visualViewport) return;
     var alto = elSheetGroup.getBoundingClientRect().top;
-    var disponibile = window.visualViewport.height - alto - 16;
+    // Sotto l'elenco ci sono "Fatto" e "Annulla". Se non si toglie anche
+    // il loro spazio, l'elenco arriva fino alla tastiera e i pulsanti
+    // finiscono sotto: si vede l'elenco ma non si può più uscirne.
+    var sotto = 0;
+    [elSheetDone, elSheetCancel].forEach(function(b){
+      if(b && !b.hidden) sotto += b.getBoundingClientRect().height + 8;
+    });
+    var disponibile = window.visualViewport.height - alto - sotto - 16;
     // Mai meno di un paio di righe: un elenco alto zero non aiuta nessuno,
     // meglio che sfori e si possa scorrere.
     elSheetGroup.style.maxHeight = Math.max(120, disponibile) + "px";
