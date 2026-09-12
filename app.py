@@ -2855,11 +2855,20 @@ def _report_rows(conn, where, args):
     return [dict(r) for r in rows]
 
 
-def fetch_reports(conn, ctx):
-    """Chi vede cosa: l'amministratore dell'app le vede tutte, gli altri le
-    proprie piu' quelle della band attiva — una segnalazione fatta da un
-    compagno di band riguarda anche te, e vederla evita di riscriverla."""
-    if not auth_enabled() or is_admin(ctx.email):
+def fetch_reports(conn, ctx, tutte=False):
+    """Le segnalazioni che uno puo' vedere.
+
+    Senza "tutte" sono le proprie piu' quelle della band attiva, e vale
+    anche per l'amministratore: dalle informazioni dell'app guarda le sue,
+    come chiunque altro. Con "tutte" — che solo l'amministratore puo'
+    chiedere — arrivano quelle di ogni band, ed e' la schermata da cui le
+    lavora.
+    """
+    if tutte:
+        require_admin(ctx)
+        return _report_rows(conn, "", ())
+    if not auth_enabled() and not ctx.email:
+        # Installazione senza login: non c'e' un "proprie" da distinguere.
         return _report_rows(conn, "", ())
     return _report_rows(
         conn,
@@ -3332,7 +3341,8 @@ def _h_update_venue_category(conn, match, query, body, ctx):
 
 
 def _h_list_reports(conn, match, query, body, ctx):
-    return 200, fetch_reports(conn, ctx)
+    tutte = (query.get("scope") or [""])[0] == "all"
+    return 200, fetch_reports(conn, ctx, tutte)
 
 
 def _h_create_report(conn, match, query, body, ctx):

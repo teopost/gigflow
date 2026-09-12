@@ -725,6 +725,17 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
+      <div class="section-header">SEGNALAZIONI DEGLI UTENTI</div>
+      <div class="grouped-list">
+        <div class="row" id="rowAdminReports">
+          <div class="row-main"><div class="row-title">Tutte le segnalazioni</div>
+          <div class="row-sub" id="adminReportsSub">Di tutte le band</div></div>
+          <div class="row-trail"><span class="row-badge" id="adminReportsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">Scorri una segnalazione a sinistra per segnarla come fatta o rifiutata. Chi l'ha scritta vede cambiare la pastiglia dalle informazioni dell'app.</div>
+
       <div class="section-header">ESPORTAZIONE</div>
       <div class="grouped-list">
         <div class="row" id="rowAdminExport">
@@ -1017,6 +1028,25 @@
       <div class="section-header" id="reportsListHeader">LE TUE SEGNALAZIONI</div>
       <div class="grouped-list" id="reportsList"></div>
       <div class="section-footer" id="reportsFooter"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: SEGNALAZIONI · LAVORAZIONE (admin) ============ -->
+  <section class="screen pushed" id="adminReportsScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnAdminReportsBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Admin
+        </button>
+        <span class="inline-title">Segnalazioni</span>
+        <span class="nav-btn" style="visibility:hidden;">Admin</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header" id="adminReportsHeader">DA GUARDARE</div>
+      <div class="grouped-list" id="adminReportsList"></div>
+      <div class="section-footer">Scorri a sinistra per chiudere una segnalazione: <strong>Fatto</strong> se l'hai risolta, <strong>Rifiutato</strong> se non si farà — una risposta netta vale più di un silenzio. <strong>Riapri</strong> se hai chiuso per sbaglio. Le aperte stanno in cima.</div>
     </div>
   </section>
 
@@ -5936,57 +5966,69 @@
     var d = new Date(r.created_at);
     return isNaN(d) ? "" : d.toLocaleDateString("it-IT", {day:"2-digit", month:"short", year:"numeric"});
   }
-  function renderReportsList(){
-    var el = document.getElementById("reportsList");
-    var admin = !!(me && me.is_admin);
-    document.getElementById("reportsListHeader").textContent = admin ? "TUTTE LE SEGNALAZIONI" : "LE TUE E QUELLE DELLA BAND";
-    document.getElementById("reportsFooter").textContent = admin
-      ? "Scorri una segnalazione a sinistra per segnarla come fatta o rifiutata. Le aperte stanno in cima."
-      : "Vedi le tue e quelle della tua band. Quando vengono lavorate cambia la pastiglia accanto.";
-    if(!reports.length){
-      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna segnalazione. Se qualcosa non va, scrivila qui sopra.</div>';
-      return;
-    }
-    el.innerHTML = reports.map(function(r){
-      var st = reportStato(r.status);
-      var chi = r.author_name || r.email || "qualcuno";
-      // Il codice serve a parlarne: "la 14" è più corta di mezza frase di
-      // citazione, e resta valida anche quando il testo viene rivisto.
-      var meta = ["#" + r.id].concat([chi, r.band_name, reportQuando(r)].filter(Boolean)).join(" · ");
-      var riga = '<div class="row" style="cursor:default;align-items:flex-start;">'+
-        '<div class="row-main">'+
-          '<div class="report-text">'+dato(r.text)+'</div>'+
-          '<div class="report-meta">'+dato(meta)+(r.build ? ' · <span translate="no">'+esc(r.build)+'</span>' : '')+'</div>'+
-        '</div>'+
-        '<div class="row-trail"><span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span></div>'+
-      '</div>';
-      // Solo l'amministratore ha le azioni: agli altri la riga non si apre
-      // nemmeno, cosi' non promette qualcosa che non possono fare.
-      if(!admin) return '<div class="swipe-row">'+riga+'</div>';
-      var azioni = r.status === "aperta"
-        ? '<button class="role" data-report-done="'+r.id+'">Fatto</button>'+
-          '<button data-report-reject="'+r.id+'">Rifiutato</button>'
-        : '<button class="role" data-report-open="'+r.id+'">Riapri</button>';
-      return '<div class="swipe-row"><div class="row-content">'+riga+'</div>'+
-        '<div class="row-actions'+(r.status === "aperta" ? ' two' : '')+'">'+azioni+'</div></div>';
-    }).join("");
+  function reportRowHtml(r, conAzioni){
+    var st = reportStato(r.status);
+    var chi = r.author_name || r.email || "qualcuno";
+    // Il codice serve a parlarne: "la 14" è più corta di mezza frase di
+    // citazione, e resta valida anche quando il testo viene rivisto.
+    var meta = ["#" + r.id].concat([chi, r.band_name, reportQuando(r)].filter(Boolean)).join(" · ");
+    var riga = '<div class="row" style="cursor:default;align-items:flex-start;">'+
+      '<div class="row-main">'+
+        '<div class="report-text">'+dato(r.text)+'</div>'+
+        '<div class="report-meta">'+dato(meta)+(r.build ? ' · <span translate="no">'+esc(r.build)+'</span>' : '')+'</div>'+
+      '</div>'+
+      '<div class="row-trail"><span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span></div>'+
+    '</div>';
+    // Senza azioni la riga non si apre nemmeno scorrendola: non promette
+    // qualcosa che li' non si puo' fare.
+    if(!conAzioni) return '<div class="swipe-row">'+riga+'</div>';
+    var azioni = r.status === "aperta"
+      ? '<button class="role" data-report-done="'+r.id+'">Fatto</button>'+
+        '<button data-report-reject="'+r.id+'">Rifiutato</button>'
+      : '<button class="role" data-report-open="'+r.id+'">Riapri</button>';
+    return '<div class="swipe-row"><div class="row-content">'+riga+'</div>'+
+      '<div class="row-actions'+(r.status === "aperta" ? ' two' : '')+'">'+azioni+'</div></div>';
   }
 
+  /* L'elenco dentro "Informazioni sull'app" è quello personale, e lo è
+     anche per l'amministratore: da lì guarda le sue e quelle della sua
+     band, come chiunque. Le segnalazioni di tutti si lavorano da Admin. */
+  function renderReportsList(){
+    var el = document.getElementById("reportsList");
+    document.getElementById("reportsListHeader").textContent = "LE TUE E QUELLE DELLA BAND";
+    document.getElementById("reportsFooter").textContent =
+      "Vedi le tue e quelle della tua band. Quando vengono lavorate cambia la pastiglia accanto.";
+    if(!reports.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna segnalazione. Se qualcosa non va, o ti viene un\'idea, scrivila qui sopra.</div>';
+      return;
+    }
+    el.innerHTML = reports.map(function(r){ return reportRowHtml(r, false); }).join("");
+  }
+
+  // Le aperte stanno in cima: cambiando stato la riga cambia posto.
+  function ordinaSegnalazioni(elenco){
+    elenco.sort(function(a,b){
+      var aa = a.status === "aperta" ? 0 : 1, bb = b.status === "aperta" ? 0 : 1;
+      return aa - bb || (a.created_at < b.created_at ? 1 : -1);
+    });
+  }
   function setReportStatus(id, status){
     api("PUT", "/api/reports/" + id, {status:status}).then(function(updated){
-      var i = reports.findIndex(function(r){ return r.id === updated.id; });
-      if(i > -1) reports[i] = updated;
-      // Le aperte stanno in cima: cambiando stato la riga cambia posto.
-      reports.sort(function(a,b){
-        var aa = a.status === "aperta" ? 0 : 1, bb = b.status === "aperta" ? 0 : 1;
-        return aa - bb || (a.created_at < b.created_at ? 1 : -1);
+      // La stessa segnalazione può stare in tutti e due gli elenchi: se
+      // l'admin lavora una sua, deve cambiare anche dove la vede da utente.
+      [adminReports, reports].forEach(function(elenco){
+        var i = elenco.findIndex(function(r){ return r.id === updated.id; });
+        if(i > -1) elenco[i] = updated;
+        ordinaSegnalazioni(elenco);
       });
+      renderAdminReportsList();
+      updateAdminReportsCount();
       renderReportsList();
       updateReportsCount();
       toast("Segnalazione: " + reportStato(status).label.toLowerCase());
     }).catch(function(err){ toast(err.message); });
   }
-  document.getElementById("reportsList").addEventListener("click", function(e){
+  document.getElementById("adminReportsList").addEventListener("click", function(e){
     var done = e.target.closest("[data-report-done]");
     if(done) return setReportStatus(Number(done.getAttribute("data-report-done")), "fatto");
     var rej = e.target.closest("[data-report-reject]");
@@ -5994,6 +6036,52 @@
     var reo = e.target.closest("[data-report-open]");
     if(reo) return setReportStatus(Number(reo.getAttribute("data-report-open")), "aperta");
   });
+
+  /* ---- la schermata di lavorazione, sotto Admin ---- */
+  var adminReports = [];
+  function loadAdminReports(){
+    if(!me || !me.is_admin) return Promise.resolve();
+    return api("GET", "/api/reports?scope=all").then(function(data){
+      adminReports = data;
+      updateAdminReportsCount();
+      renderAdminReportsList();
+    }).catch(function(){});
+  }
+  function updateAdminReportsCount(){
+    var el = document.getElementById("adminReportsCount");
+    if(!el) return;
+    var aperte = adminReports.filter(function(r){ return r.status === "aperta"; }).length;
+    el.textContent = aperte ? aperte : "";
+    document.getElementById("adminReportsSub").textContent = adminReports.length
+      ? (adminReports.length + (adminReports.length === 1 ? " segnalazione" : " segnalazioni") +
+         (aperte ? " · " + aperte + " da guardare" : " · tutte chiuse"))
+      : "Di tutte le band";
+  }
+  function renderAdminReportsList(){
+    var el = document.getElementById("adminReportsList");
+    if(!el) return;
+    var aperte = adminReports.filter(function(r){ return r.status === "aperta"; }).length;
+    document.getElementById("adminReportsHeader").textContent =
+      aperte ? (aperte === 1 ? "1 DA GUARDARE" : aperte + " DA GUARDARE") : "NESSUNA APERTA";
+    if(!adminReports.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna segnalazione da nessuna band.</div>';
+      return;
+    }
+    el.innerHTML = adminReports.map(function(r){ return reportRowHtml(r, true); }).join("");
+  }
+  var elAdminReportsScreen = document.getElementById("adminReportsScreen");
+  function openAdminReportsScreen(){
+    renderAdminReportsList();
+    elAdminReportsScreen.hidden = false;
+    requestAnimationFrame(function(){ elAdminReportsScreen.classList.add("in"); });
+    loadAdminReports();
+  }
+  function closeAdminReportsScreen(){
+    elAdminReportsScreen.classList.remove("in");
+    setTimeout(function(){ elAdminReportsScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowAdminReports").addEventListener("click", openAdminReportsScreen);
+  document.getElementById("btnAdminReportsBack").addEventListener("click", closeAdminReportsScreen);
 
   document.getElementById("btnSendReport").addEventListener("click", function(){
     var ta = document.getElementById("newReportText");
@@ -6009,6 +6097,7 @@
       });
     }).then(function(creata){
       reports.unshift(creata);
+      if(me && me.is_admin){ adminReports.unshift(creata); updateAdminReportsCount(); renderAdminReportsList(); }
       ta.value = "";
       renderReportsList();
       updateReportsCount();
@@ -6635,7 +6724,7 @@
   function loadAllData(){
     return Promise.all([
       loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
-      loadVenueCategories(), loadVenueLists(), loadProvince(), loadReports(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
+      loadVenueCategories(), loadVenueLists(), loadProvince(), loadReports(), loadAdminReports(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates()
     ]).catch(function(){
       // Senza band attiva le API rispondono 409: e' normale per un utente
@@ -6683,6 +6772,7 @@
   addEdgeSwipeBack(elCategoryEditScreen, closeCategoryEditScreen);
   addEdgeSwipeBack(elVenueListScreen, closeVenueListScreen);
   addEdgeSwipeBack(elReportsScreen, closeReportsScreen);
+  addEdgeSwipeBack(elAdminReportsScreen, closeAdminReportsScreen);
   addEdgeSwipeBack(elVenueListEditScreen, closeVenueListEditScreen);
   addEdgeSwipeBack(elProfileScreen, closeProfileScreen);
   addEdgeSwipeBack(elMyBandsScreen, closeMyBandsScreen);
