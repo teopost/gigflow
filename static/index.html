@@ -1207,6 +1207,12 @@
         <div class="pick-badge"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div>
         <div style="font-size:20px;font-weight:700;">GigFlow</div>
         <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Versione 1.0</div>
+        <!-- Serve a rispondere a "sto guardando la versione giusta?": la
+             data e' ordinabile a occhio, l'impronta identifica la build in
+             modo esatto. Tocca per copiarle. -->
+        <div id="aboutBuild" translate="no" class="notranslate"
+             style="display:inline-block;margin-top:10px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+                    color:var(--text-secondary);background:var(--fill);padding:6px 12px;border-radius:9px;cursor:pointer;">build …</div>
       </div>
       <div class="section-footer" style="text-align:center;padding:8px 32px 24px;">
         Gestionale live per tenere traccia dei posti dove far suonare la band: locali, feste di paese, bagni al mare e altro — con anagrafica art director e promemoria di ricontatto.
@@ -1395,6 +1401,16 @@
         <div class="field-row picker" id="rowFilterCategory">
           <label>Categoria</label>
           <div class="picker-value"><span id="filterCategoryValue">Tutte</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowFilterRegione">
+          <label>Regione</label>
+          <div class="picker-value"><span id="filterRegioneValue">Tutte</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowFilterProvincia">
+          <label>Provincia</label>
+          <div class="picker-value"><span id="filterProvinciaValue">Tutte</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="field-row picker" id="rowFilterContext">
@@ -2325,7 +2341,7 @@
   /* ---------------- schermata Filtri ---------------- */
   var elFiltersScreen = document.getElementById("filtersScreen");
   function updateFilterActiveDot(){
-    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !nearMeEnabled && !showDeletedEnabled);
+    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !nearMeEnabled && !showDeletedEnabled);
   }
   function ownerLabel(email){
     var o = owners.filter(function(x){ return x.email === email; })[0];
@@ -2457,9 +2473,13 @@
   });
 
   function openFiltersScreen(){
+    // In sottofondo: serve solo alle poche citta' scritte senza la sigla
+    // della provincia, e non deve rallentare l'apertura.
+    loadComuni().then(renderGeoFilterRows).catch(function(){});
     renderFilterStatusRow();
     renderFilterTypeRow();
     renderFilterCategoryRow();
+    renderGeoFilterRows();
     renderVenueListFilterRows();
     renderFilterOwnerRow();
     renderNearMeRow();
@@ -2476,8 +2496,9 @@
   document.getElementById("btnFiltersReset").addEventListener("click", function(){
     filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all";
     resetVenueListFilters();
+    resetGeoFilters();
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
-    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
+    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderGeoFilterRows(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
     if(showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); loadVenues(); }
     toast("Filtri azzerati");
   });
@@ -2496,6 +2517,7 @@
     if(filterType !== "all" && v.type !== filterType) return false;
     if(filterCategory !== "all" && v.category !== filterCategory) return false;
     if(!venueMatchesVenueLists(v)) return false;
+    if(!venueMatchesGeo(v)) return false;
     if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
     if(nearMeEnabled && nearMeCoords){
       if(v.lat == null || v.lng == null) return false;
@@ -2564,7 +2586,7 @@
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
     var sorted = filtered.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
     if(sorted.length === 0){
-      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !searchText;
+      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
           ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
@@ -4681,6 +4703,150 @@
   document.getElementById("rowSettingsCategories").addEventListener("click", openCategoriesScreen);
   document.getElementById("btnCategoriesBack").addEventListener("click", closeCategoriesScreen);
 
+
+  /* ---------------- provincia e regione, senza inserirle ----------------
+     Nessun campo nuovo e nessun modulo da compilare: la citta' di un
+     palcoscenico e' gia' scritta come "Comune (PR)", e province.json dice a
+     quale provincia e regione appartiene ogni sigla. Dove la sigla manca si
+     cerca il comune per nome. Il legame resta sotteso: si vede solo nei
+     filtri. */
+  var PROVINCE = {};        // sigla -> {p: provincia, r: regione}
+  var SANMARINO = {};       // castello di San Marino -> true
+  var SIGLE_STORICHE = {};  // sigla abolita -> sigla di oggi
+  var filterRegione = "all";
+  var filterProvincia = "all";
+  var luogoCache = {};
+
+  function loadProvince(){
+    return fetch("/province.json", {credentials:"same-origin"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d) return;
+        PROVINCE = d.province || {};
+        SIGLE_STORICHE = d.storiche || {};
+        (d.sanmarino || []).forEach(function(n){ SANMARINO[normLuogo(n)] = true; });
+        luogoCache = {};
+      })
+      .catch(function(){ /* senza il file i due filtri restano vuoti, il resto funziona */ });
+  }
+
+  function normLuogo(s){
+    return (s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  }
+
+  /* Da "Cesenatico (FC)" a {sigla, provincia, regione}. Il risultato viene
+     tenuto da parte: la stessa citta' torna centinaia di volte mentre si
+     ridisegna l'elenco. */
+  function luogoDi(city){
+    if(!city) return null;
+    if(luogoCache[city] !== undefined) return luogoCache[city];
+    var out = null;
+    var m = /\(([A-Za-z]{2})\)\s*$/.exec(city);
+    if(m){
+      var sigla = m[1].toUpperCase();
+      if(SIGLE_STORICHE[sigla]) sigla = SIGLE_STORICHE[sigla];
+      if(PROVINCE[sigla]) out = {sigla:sigla, provincia:PROVINCE[sigla].p, regione:PROVINCE[sigla].r};
+    }
+    if(!out){
+      var nome = city.replace(/\s*\([^)]*\)\s*$/, "").trim();
+      var k = normLuogo(nome);
+      if(SANMARINO[k] && PROVINCE.SM){
+        out = {sigla:"SM", provincia:PROVINCE.SM.p, regione:PROVINCE.SM.r};
+      } else {
+        var c = comuneDaNome(nome);
+        if(c && PROVINCE[c.sigla]) out = {sigla:c.sigla, provincia:PROVINCE[c.sigla].p, regione:PROVINCE[c.sigla].r};
+      }
+    }
+    luogoCache[city] = out;
+    return out;
+  }
+
+  /* Il comune per nome: prima esatto, poi — solo se il candidato e' uno
+     solo — per inizio del nome, che recupera le forme accorciate tipo
+     "Bellaria" per "Bellaria-Igea Marina". Con piu' candidati non si
+     indovina: "Misano" sarebbe sia Misano Adriatico sia Misano di Gera
+     d'Adda, e sbagliare regione e' peggio che non saperla. */
+  function comuneDaNome(nome){
+    if(!comuniList || !comuniList.length) return null;
+    var k = normLuogo(nome);
+    if(!k) return null;
+    var esatto = null, prefisso = null, quanti = 0;
+    for(var i = 0; i < comuniList.length; i++){
+      var n = normLuogo(comuniList[i].nome);
+      if(n === k){ esatto = comuniList[i]; break; }
+      if(n.indexOf(k + " ") === 0 || n.indexOf(k + "-") === 0){ prefisso = comuniList[i]; quanti++; }
+    }
+    return esatto || (quanti === 1 ? prefisso : null);
+  }
+
+  function venueRegione(v){ var l = luogoDi(v.city); return l ? l.regione : ""; }
+  function venueProvincia(v){ var l = luogoDi(v.city); return l ? l.provincia : ""; }
+
+  function venueMatchesGeo(v){
+    if(filterRegione !== "all" && venueRegione(v) !== filterRegione) return false;
+    if(filterProvincia !== "all" && venueProvincia(v) !== filterProvincia) return false;
+    return true;
+  }
+  function anyGeoFilterOn(){ return filterRegione !== "all" || filterProvincia !== "all"; }
+  function resetGeoFilters(){ filterRegione = "all"; filterProvincia = "all"; }
+  function renderGeoFilterRows(){
+    setDato("filterRegioneValue", filterRegione === "all" ? "" : filterRegione, "Tutte");
+    setDato("filterProvinciaValue", filterProvincia === "all" ? "" : filterProvincia, "Tutte");
+  }
+
+  /* Nei menu compaiono solo le regioni e le province che hai davvero, con
+     accanto quanti palcoscenici: scorrere 107 province per trovarne otto
+     usate non serve a niente. */
+  function contaPer(estrai){
+    var m = {};
+    venues.forEach(function(v){
+      if(v.deleted_at && !showDeletedEnabled) return;
+      var k = estrai(v);
+      if(k) m[k] = (m[k] || 0) + 1;
+    });
+    return m;
+  }
+
+  document.getElementById("rowFilterRegione").addEventListener("click", function(){
+    var conte = contaPer(venueRegione);
+    var opts = [{label:"Tutte", checkmark: filterRegione === "all", onSelect:function(){
+      filterRegione = "all"; renderGeoFilterRows(); renderAll();
+    }}];
+    Object.keys(conte).sort().forEach(function(r){
+      opts.push({label:r + " (" + conte[r] + ")", checkmark: filterRegione === r, onSelect:function(){
+        filterRegione = r;
+        // Una provincia di un'altra regione darebbe un elenco vuoto senza
+        // dire perche': se non c'entra piu', si toglie.
+        if(filterProvincia !== "all"){
+          var ok = venues.some(function(v){ return venueRegione(v) === r && venueProvincia(v) === filterProvincia; });
+          if(!ok) filterProvincia = "all";
+        }
+        renderGeoFilterRows(); renderAll();
+      }});
+    });
+    openSheet({title:"Filtra per regione", searchable: opts.length > 7, searchPlaceholder:"Cerca regione…", options:opts});
+  });
+
+  document.getElementById("rowFilterProvincia").addEventListener("click", function(){
+    // Se una regione e' selezionata, l'elenco si restringe a quella.
+    var conte = contaPer(function(v){
+      if(filterRegione !== "all" && venueRegione(v) !== filterRegione) return "";
+      return venueProvincia(v);
+    });
+    var opts = [{label:"Tutte", checkmark: filterProvincia === "all", onSelect:function(){
+      filterProvincia = "all"; renderGeoFilterRows(); renderAll();
+    }}];
+    Object.keys(conte).sort().forEach(function(p){
+      opts.push({label:p + " (" + conte[p] + ")", checkmark: filterProvincia === p, onSelect:function(){
+        filterProvincia = p; renderGeoFilterRows(); renderAll();
+      }});
+    });
+    openSheet({
+      title: filterRegione === "all" ? "Filtra per provincia" : "Province · " + filterRegione,
+      searchable: opts.length > 7, searchPlaceholder:"Cerca provincia…", options:opts
+    });
+  });
+
   /* ---------------- liste di valori configurabili ----------------
      Contesto, stagionalita' e periodo si comportano come la categoria, ma
      sono tre: invece di tre copie dello stesso codice c'e' una descrizione
@@ -5568,7 +5734,25 @@
   document.getElementById("settingsTemplatesFooter").innerHTML = templateVarsHelpHtml();
 
   var elAboutScreen = document.getElementById("aboutScreen");
+  var elAboutBuild = document.getElementById("aboutBuild");
+  // La build viene chiesta al server, non ricordata dall'app: se quello che
+  // stai guardando e' una copia vecchia rimasta in cache, e' proprio questo
+  // il numero che deve smascherarla.
+  function renderBuild(){
+    fetch("/api/version", {cache:"no-store", credentials:"same-origin"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d) return;
+        elAboutBuild.textContent = "build " + (d.build || "?") + " · " + (d.version || "");
+      })
+      .catch(function(){ elAboutBuild.textContent = "build non raggiungibile (sei offline?)"; });
+  }
+  elAboutBuild.addEventListener("click", function(){
+    var t = elAboutBuild.textContent;
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ toast("Build copiata"); }, function(){});
+  });
   function openAboutScreen(){
+    renderBuild();
     document.getElementById("aboutCountVenues").textContent = venues.length;
     document.getElementById("aboutCountAd").textContent = artDirectors.length;
     elAboutScreen.hidden = false;
@@ -5589,6 +5773,9 @@
     if(comuniList) return Promise.resolve(comuniList);
     return fetch("/comuni.json").then(function(res){ return res.json(); }).then(function(data){
       comuniList = data;
+      // Le citta' senza sigla erano state date per irrisolvibili con la
+      // lista ancora vuota: adesso si puo' riprovare.
+      luogoCache = {};
       return comuniList;
     });
   }
@@ -6103,7 +6290,7 @@
   function loadAllData(){
     return Promise.all([
       loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
-      loadVenueCategories(), loadVenueLists(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
+      loadVenueCategories(), loadVenueLists(), loadProvince(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates()
     ]).catch(function(){
       // Senza band attiva le API rispondono 409: e' normale per un utente

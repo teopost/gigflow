@@ -41,7 +41,9 @@ PHOTO_EXT_CONTENT_TYPE = {
 # a mano un numero di versione perche' gli utenti vedano le novita'.
 # /api/version espone la stessa impronta all'app gia' aperta, che puo'
 # accorgersi da sola di essere rimasta indietro.
-STATIC_FINGERPRINT_FILES = ("index.html", "sw.js", "manifest.json")
+# Anche i dati serviti: se cambia la tabella delle province, l'app deve
+# accorgersene come si accorge di una modifica al codice.
+STATIC_FINGERPRINT_FILES = ("index.html", "sw.js", "manifest.json", "province.json")
 _BUILD_VERSION_CACHE = {}
 
 
@@ -78,6 +80,36 @@ def build_version():
     _BUILD_VERSION_CACHE.clear()  # tenere solo l'ultima: i file cambiano di rado
     _BUILD_VERSION_CACHE[key] = version
     return version
+
+
+def build_label():
+    """Un nome di build che una persona possa leggere e confrontare.
+
+    L'impronta dice se due build sono uguali, ma non quale delle due e' piu'
+    recente: "0658745ffee3" e "a91c4e02bb17" non si mettono in fila. Qui
+    esce la data dell'ultima modifica al codice servito, nel formato
+    AAMMGG.hhmm — ordinabile a occhio, e sempre esatta perche' non la scrive
+    nessuno a mano. Docker conserva le date dei file quando li copia
+    nell'immagine, quindi resta quella del codice, non della ricostruzione.
+    """
+    ultima = 0
+    for name in STATIC_FINGERPRINT_FILES + ("comuni.json",):
+        try:
+            ultima = max(ultima, os.stat(os.path.join(STATIC_DIR, name)).st_mtime)
+        except OSError:
+            pass
+    try:
+        ultima = max(ultima, os.stat(os.path.join(BASE_DIR, "app.py")).st_mtime)
+    except OSError:
+        pass
+    if not ultima:
+        return "?"
+    # Sempre in UTC, mai nel fuso locale: il server gira in un container
+    # impostato su UTC e lo sviluppo avviene su una macchina in ora
+    # italiana. Con .astimezone() la stessa identica build si presenterebbe
+    # con due numeri diversi a seconda di dove la si legge, che e'
+    # esattamente il contrario di quello che serve a questa etichetta.
+    return datetime.fromtimestamp(ultima, timezone.utc).strftime("%y%m%d.%H%M")
 
 
 # --- login con Google (opzionale) -------------------------------------
@@ -3607,7 +3639,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
         if method == "GET" and path == "/api/version":
-            self._send_json(200, {"version": build_version()})
+            self._send_json(200, {"version": build_version(), "build": build_label()})
             return
 
         if method == "GET" and path in ("/", "/index.html"):
@@ -3629,6 +3661,13 @@ class Handler(BaseHTTPRequestHandler):
 
         if method == "GET" and path == "/comuni.json":
             self._send_file(os.path.join(STATIC_DIR, "comuni.json"), "application/json; charset=utf-8")
+            return
+
+        # Provincia e regione di ogni sigla: l'app le ricava dalla citta' che
+        # e' gia' scritta sul palcoscenico, cosi' i filtri per provincia e
+        # regione esistono senza che nessuno debba inserire quei dati.
+        if method == "GET" and path == "/province.json":
+            self._send_file(os.path.join(STATIC_DIR, "province.json"), "application/json; charset=utf-8")
             return
 
         if self._handle_me_route(method, path):
