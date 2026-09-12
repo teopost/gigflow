@@ -241,6 +241,12 @@ VENUE_LISTS = {
 ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
 
+# Una segnalazione nasce aperta; l'amministratore dell'app la chiude in uno
+# dei due modi. "Rifiutato" non e' una scortesia: e' la risposta onesta a
+# qualcosa che non verra' fatto, e vale piu' di un silenzio.
+REPORT_STATUSES = {"aperta", "fatto", "rifiutato"}
+MAX_REPORT_CHARS = 4000
+
 STATUS_VALUES = {
     "da_contattare", "potenziale", "contattato", "trattativa",
     "confermato", "rifiutato", "suonato", "annullato",
@@ -373,6 +379,25 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
+        -- Le segnalazioni degli utenti. Non stanno fra le tabelle legate al
+        -- workspace apposta: sono indirizzate a chi mantiene l'app, e
+        -- devono sopravvivere alla band che le ha scritte. Se una band
+        -- viene eliminata, la segnalazione resta (col suo workspace_id che
+        -- non punta piu' a niente, ed e' corretto cosi': dice comunque da
+        -- dove arrivava).
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'aperta',
+            email TEXT,
+            workspace_id INTEGER,
+            build TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            resolved_at TEXT,
+            resolved_by TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS photos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
@@ -492,6 +517,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_locations_next_contact ON locations(next_contact_date);
         CREATE INDEX IF NOT EXISTS idx_notes_location ON notes(location_id);
         CREATE INDEX IF NOT EXISTS idx_venue_list_values ON venue_list_values(workspace_id, list_key);
+        CREATE INDEX IF NOT EXISTS idx_reports_email ON reports(email);
+        CREATE INDEX IF NOT EXISTS idx_reports_workspace ON reports(workspace_id);
         """
     )
     migrate_schema(conn)
@@ -2806,6 +2833,78 @@ def delete_venue_list_value(conn, ws, key, value_id):
     conn.commit()
 
 
+# --- segnalazioni ------------------------------------------------------
+
+
+def _report_rows(conn, where, args):
+    """Le segnalazioni con accanto chi le ha scritte e da quale band: chi le
+    legge ha bisogno di sapere a chi rispondere, non di un indirizzo."""
+    rows = conn.execute(
+        "SELECT r.*, p.name AS author_name, w.name AS band_name "
+        "FROM reports r "
+        "LEFT JOIN user_profiles p ON p.email = r.email "
+        "LEFT JOIN workspaces w ON w.id = r.workspace_id "
+        + where +
+        # Le aperte in cima: sono le uniche su cui c'e' qualcosa da fare.
+        " ORDER BY (r.status != 'aperta'), r.created_at DESC",
+        args,
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def fetch_reports(conn, ctx):
+    """Chi vede cosa: l'amministratore dell'app le vede tutte, gli altri le
+    proprie piu' quelle della band attiva — una segnalazione fatta da un
+    compagno di band riguarda anche te, e vederla evita di riscriverla."""
+    if not auth_enabled() or is_admin(ctx.email):
+        return _report_rows(conn, "", ())
+    return _report_rows(
+        conn,
+        "WHERE r.email = ? OR (r.workspace_id IS NOT NULL AND r.workspace_id = ?)",
+        (ctx.email, ctx.ws),
+    )
+
+
+def create_report(conn, ctx, body):
+    text = (body.get("text") or "").strip()
+    if not text:
+        raise ApiError(400, "Scrivi che cosa è successo")
+    if len(text) > MAX_REPORT_CHARS:
+        raise ApiError(400, "Segnalazione troppo lunga")
+    # La build arriva dall'app: una segnalazione senza sapere su quale
+    # versione e' successa e' meta' segnalazione. Se manca, si ripiega su
+    # quella servita adesso, che e' comunque meglio di niente.
+    build = (body.get("build") or "").strip()[:64] or build_version()
+    ts = now_iso()
+    cur = conn.execute(
+        "INSERT INTO reports (text, status, email, workspace_id, build, created_at, updated_at) "
+        "VALUES (?, 'aperta', ?, ?, ?, ?, ?)",
+        (text, ctx.email, ctx.ws, build, ts, ts),
+    )
+    conn.commit()
+    return _report_rows(conn, "WHERE r.id = ?", (cur.lastrowid,))[0]
+
+
+def update_report(conn, ctx, report_id, body):
+    """Solo l'amministratore dell'app cambia lo stato: e' lui che decide se
+    una cosa si fa. Chi l'ha scritta la vede cambiare, non la cambia."""
+    require_admin(ctx)
+    row = conn.execute("SELECT id FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if not row:
+        raise ApiError(404, "Segnalazione non trovata")
+    status = (body.get("status") or "").strip()
+    if status not in REPORT_STATUSES:
+        raise ApiError(400, "Stato non valido")
+    ts = now_iso()
+    chiusa = status != "aperta"
+    conn.execute(
+        "UPDATE reports SET status = ?, updated_at = ?, resolved_at = ?, resolved_by = ? WHERE id = ?",
+        (status, ts, ts if chiusa else None, ctx.email if chiusa else None, report_id),
+    )
+    conn.commit()
+    return _report_rows(conn, "WHERE r.id = ?", (report_id,))[0]
+
+
 def list_owners(conn, ws):
     """Chi puo' avere inserito un palcoscenico: i membri della band attiva,
     non piu' chiunque abbia un profilo sul server."""
@@ -3090,6 +3189,18 @@ def _h_update_venue_category(conn, match, query, body, ctx):
     return 200, update_venue_category(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_list_reports(conn, match, query, body, ctx):
+    return 200, fetch_reports(conn, ctx)
+
+
+def _h_create_report(conn, match, query, body, ctx):
+    return 201, create_report(conn, ctx, body)
+
+
+def _h_update_report(conn, match, query, body, ctx):
+    return 200, update_report(conn, ctx, int(match.group(1)), body)
+
+
 def _h_list_venue_list(conn, match, query, body, ctx):
     return 200, fetch_venue_list(conn, require_ws(ctx), match.group(1))
 
@@ -3117,7 +3228,9 @@ def _h_delete_venue_category(conn, match, query, body, ctx):
 # Scritture che uno Slaker puo' comunque fare: cambiare la band attiva e'
 # una preferenza sua, e creare una band nuova non tocca quella in cui e'
 # Slaker — nella band nuova sara' Leader.
-SLAKER_ALLOWED = {_h_switch_workspace, _h_create_my_band}
+# Segnalare non e' modificare i dati della band: anche chi puo' solo
+# guardare deve poter dire che qualcosa non va.
+SLAKER_ALLOWED = {_h_switch_workspace, _h_create_my_band, _h_create_report}
 
 ROUTES = [
     ("GET", re.compile(r"^/api/locations$"), _h_list_locations),
@@ -3175,6 +3288,9 @@ ROUTES = [
     ("DELETE", re.compile(r"^/api/venue_categories/(\d+)$"), _h_delete_venue_category),
     # La chiave della lista viene comunque validata contro VENUE_LISTS: qui
     # il pattern serve solo a non far passare caratteri strani.
+    ("GET", re.compile(r"^/api/reports$"), _h_list_reports),
+    ("POST", re.compile(r"^/api/reports$"), _h_create_report),
+    ("PUT", re.compile(r"^/api/reports/(\d+)$"), _h_update_report),
     ("GET", re.compile(r"^/api/venue_lists/([a-z_]+)$"), _h_list_venue_list),
     ("POST", re.compile(r"^/api/venue_lists/([a-z_]+)$"), _h_create_venue_list_value),
     ("PUT", re.compile(r"^/api/venue_lists/([a-z_]+)/(\d+)$"), _h_update_venue_list_value),

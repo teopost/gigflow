@@ -170,7 +170,7 @@
   .btn-spinner{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:btn-spin .6s linear infinite;vertical-align:-2px;}
   @keyframes btn-spin{to{transform:rotate(360deg);}}
   @media (prefers-reduced-motion:reduce){.btn-spinner{animation-duration:1.4s;}}
-  .navbar-trailing{display:flex;align-items:center;gap:2px;}
+  .navbar-trailing{display:flex;align-items:center;gap:17px;}
   .navbar-row .nav-btn svg{display:block;}
   .navbar-row .inline-title{position:absolute;left:50%;transform:translateX(-50%);font-size:17px;font-weight:600;opacity:0;transition:opacity .2s;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
   .navbar.scrolled .inline-title{opacity:1;}
@@ -448,7 +448,13 @@
   .tab-badge-wrap{position:relative;}
   .tab-dot{position:absolute;top:-2px;right:-6px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg-tabbar);}
   .filter-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--tint);margin-left:4px;vertical-align:middle;}
+  /* Senza questa riga il pallino non si nasconde mai: "display:inline-block"
+     qui sopra vince sull'attributo hidden, che il browser applica con una
+     regola di pari specificita' ma di priorita' piu' bassa. */
+  .filter-dot[hidden]{display:none;}
   /* L'esito del controllo versione, sotto il riquadro della build. */
+  .report-text{font-size:15px;color:var(--text);white-space:normal;line-height:1.4;}
+  .report-meta{font-size:12.5px;color:var(--text-secondary);margin-top:3px;}
   .about-update{margin-top:12px;font-size:13px;color:var(--text-secondary);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
   .about-update.nuova{color:var(--tint);font-weight:600;}
   .about-update button{border:0;background:var(--tint);color:#fff;font:inherit;font-weight:600;font-size:13px;padding:7px 14px;border-radius:10px;cursor:pointer;}
@@ -456,7 +462,7 @@
      allargherebbe il bottone e sposterebbe il titolo. */
   .navbar-trailing .nav-btn{position:relative;}
   .navbar-trailing .nav-btn .filter-dot{position:absolute;top:3px;right:2px;margin:0;box-shadow:0 0 0 2px var(--bg-navbar);}
-  .nav-btn-spacer{width:96px;}
+  .nav-btn-spacer{width:126px;}
 
   /* ---------- sheets ---------- */
   .sheet-backdrop{position:fixed;inset:0;background:var(--overlay-dim);z-index:60;opacity:0;pointer-events:none;transition:opacity .22s;}
@@ -971,6 +977,37 @@
     </div>
   </section>
 
+  <!-- ============ PUSHED: SEGNALAZIONI ============ -->
+  <section class="screen pushed" id="reportsScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnReportsBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Informazioni
+        </button>
+        <span class="inline-title">Segnalazioni</span>
+        <span class="nav-btn" style="visibility:hidden;">Informazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">SCRIVINE UNA</div>
+      <div class="grouped-list">
+        <div class="field-row stacked">
+          <textarea id="newReportText" rows="3" placeholder="Che cosa è successo, o che cosa ti servirebbe…" style="text-align:left;"></textarea>
+        </div>
+      </div>
+      <div class="grouped-list" style="margin-top:10px;">
+        <div class="add-note-row">
+          <span style="flex:1;font-size:13px;color:var(--text-secondary);">Parte con la versione che stai usando.</span>
+          <button id="btnSendReport">Invia</button>
+        </div>
+      </div>
+      <div class="section-header" id="reportsListHeader">LE TUE SEGNALAZIONI</div>
+      <div class="grouped-list" id="reportsList"></div>
+      <div class="section-footer" id="reportsFooter"></div>
+    </div>
+  </section>
+
   <!-- ============ PUSHED: LISTA VALORI (contesto, stagionalità, periodo) ============
        Una schermata sola per tutte e tre: cambiano solo i testi, che arrivano
        da VENUE_LISTS. Tipologie e categorie hanno ancora le loro, nate prima. -->
@@ -1234,6 +1271,16 @@
       <div class="section-footer" style="text-align:center;padding:8px 32px 24px;">
         Gestionale live per tenere traccia dei posti dove far suonare la band: locali, feste di paese, bagni al mare e altro — con anagrafica art director e promemoria di ricontatto.
       </div>
+      <div class="section-header">SEGNALAZIONI</div>
+      <div class="grouped-list">
+        <div class="row" id="rowAboutReports">
+          <div class="row-main"><div class="row-title">Segnalazioni</div>
+          <div class="row-sub" id="aboutReportsSub">Qualcosa non va, o manca?</div></div>
+          <div class="row-trail"><span class="row-badge" id="aboutReportsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+
       <div class="section-header">DATI</div>
       <div class="grouped-list">
         <div class="row" style="cursor:default;">
@@ -5824,6 +5871,134 @@
   document.getElementById("mailTemplateEditVars").innerHTML = templateVarsHelpHtml();
   document.getElementById("settingsTemplatesFooter").innerHTML = templateVarsHelpHtml();
 
+
+  /* ---------------- segnalazioni ----------------
+     Chi usa l'app scrive qui quello che non va. Le vede insieme a quelle
+     della sua band — una cosa gia' segnalata da un compagno non va
+     riscritta — mentre chi amministra l'app le vede tutte e le chiude
+     scorrendo la riga a sinistra. */
+  var reports = [];
+  var REPORT_STATI = {
+    aperta:    {label:"Aperta",    color:"var(--text-secondary)", soft:"var(--fill)"},
+    fatto:     {label:"Fatto",     color:"var(--green)",          soft:"var(--green-soft)"},
+    rifiutato: {label:"Rifiutato", color:"var(--red)",            soft:"var(--red-soft)"}
+  };
+  function reportStato(k){ return REPORT_STATI[k] || REPORT_STATI.aperta; }
+
+  function loadReports(){
+    return api("GET", "/api/reports").then(function(data){
+      reports = data;
+      updateReportsCount();
+      renderReportsList();
+    }).catch(function(){ /* senza segnalazioni il resto dell'app funziona lo stesso */ });
+  }
+  function updateReportsCount(){
+    var aperte = reports.filter(function(r){ return r.status === "aperta"; }).length;
+    var el = document.getElementById("aboutReportsCount");
+    // Il numero conta le aperte: quelle chiuse non chiedono piu' niente.
+    el.textContent = aperte ? aperte : "";
+    document.getElementById("aboutReportsSub").textContent = reports.length
+      ? (reports.length + (reports.length === 1 ? " segnalazione" : " segnalazioni") +
+         (aperte ? " · " + aperte + " da guardare" : ""))
+      : "Qualcosa non va, o manca?";
+  }
+
+  function reportQuando(r){
+    var d = new Date(r.created_at);
+    return isNaN(d) ? "" : d.toLocaleDateString("it-IT", {day:"2-digit", month:"short", year:"numeric"});
+  }
+  function renderReportsList(){
+    var el = document.getElementById("reportsList");
+    var admin = !!(me && me.is_admin);
+    document.getElementById("reportsListHeader").textContent = admin ? "TUTTE LE SEGNALAZIONI" : "LE TUE E QUELLE DELLA BAND";
+    document.getElementById("reportsFooter").textContent = admin
+      ? "Scorri una segnalazione a sinistra per segnarla come fatta o rifiutata. Le aperte stanno in cima."
+      : "Vedi le tue e quelle della tua band. Quando vengono lavorate cambia la pastiglia accanto.";
+    if(!reports.length){
+      el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna segnalazione. Se qualcosa non va, scrivila qui sopra.</div>';
+      return;
+    }
+    el.innerHTML = reports.map(function(r){
+      var st = reportStato(r.status);
+      var chi = r.author_name || r.email || "qualcuno";
+      var meta = [chi, r.band_name, reportQuando(r)].filter(Boolean).join(" · ");
+      var riga = '<div class="row" style="cursor:default;align-items:flex-start;">'+
+        '<div class="row-main">'+
+          '<div class="report-text">'+dato(r.text)+'</div>'+
+          '<div class="report-meta">'+dato(meta)+(r.build ? ' · <span translate="no">'+esc(r.build)+'</span>' : '')+'</div>'+
+        '</div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span></div>'+
+      '</div>';
+      // Solo l'amministratore ha le azioni: agli altri la riga non si apre
+      // nemmeno, cosi' non promette qualcosa che non possono fare.
+      if(!admin) return '<div class="swipe-row">'+riga+'</div>';
+      var azioni = r.status === "aperta"
+        ? '<button class="role" data-report-done="'+r.id+'">Fatto</button>'+
+          '<button data-report-reject="'+r.id+'">Rifiutato</button>'
+        : '<button class="role" data-report-open="'+r.id+'">Riapri</button>';
+      return '<div class="swipe-row"><div class="row-content">'+riga+'</div>'+
+        '<div class="row-actions'+(r.status === "aperta" ? ' two' : '')+'">'+azioni+'</div></div>';
+    }).join("");
+  }
+
+  function setReportStatus(id, status){
+    api("PUT", "/api/reports/" + id, {status:status}).then(function(updated){
+      var i = reports.findIndex(function(r){ return r.id === updated.id; });
+      if(i > -1) reports[i] = updated;
+      // Le aperte stanno in cima: cambiando stato la riga cambia posto.
+      reports.sort(function(a,b){
+        var aa = a.status === "aperta" ? 0 : 1, bb = b.status === "aperta" ? 0 : 1;
+        return aa - bb || (a.created_at < b.created_at ? 1 : -1);
+      });
+      renderReportsList();
+      updateReportsCount();
+      toast("Segnalazione: " + reportStato(status).label.toLowerCase());
+    }).catch(function(err){ toast(err.message); });
+  }
+  document.getElementById("reportsList").addEventListener("click", function(e){
+    var done = e.target.closest("[data-report-done]");
+    if(done) return setReportStatus(Number(done.getAttribute("data-report-done")), "fatto");
+    var rej = e.target.closest("[data-report-reject]");
+    if(rej) return setReportStatus(Number(rej.getAttribute("data-report-reject")), "rifiutato");
+    var reo = e.target.closest("[data-report-open]");
+    if(reo) return setReportStatus(Number(reo.getAttribute("data-report-open")), "aperta");
+  });
+
+  document.getElementById("btnSendReport").addEventListener("click", function(){
+    var ta = document.getElementById("newReportText");
+    var text = ta.value.trim();
+    if(!text){ toast("Scrivi che cosa è successo"); return; }
+    var btn = this;
+    // La versione in uso viaggia con la segnalazione: senza, "non funziona"
+    // e' una frase senza appigli.
+    var motore = window.gigflowUpdate;
+    (motore ? motore.versioneInUso() : Promise.resolve(null)).then(function(build){
+      return withButtonBusy(btn, function(){
+        return api("POST", "/api/reports", {text:text, build:build || ""});
+      });
+    }).then(function(creata){
+      reports.unshift(creata);
+      ta.value = "";
+      renderReportsList();
+      updateReportsCount();
+      toast("Segnalazione inviata");
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  var elReportsScreen = document.getElementById("reportsScreen");
+  function openReportsScreen(){
+    renderReportsList();
+    elReportsScreen.hidden = false;
+    requestAnimationFrame(function(){ elReportsScreen.classList.add("in"); });
+    loadReports();   // in sottofondo: se qualcuno ne ha scritte altre, compaiono
+  }
+  function closeReportsScreen(){
+    elReportsScreen.classList.remove("in");
+    setTimeout(function(){ elReportsScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowAboutReports").addEventListener("click", openReportsScreen);
+  document.getElementById("btnReportsBack").addEventListener("click", closeReportsScreen);
+
   var elAboutScreen = document.getElementById("aboutScreen");
   var elAboutBuild = document.getElementById("aboutBuild");
   var elAboutUpdate = document.getElementById("aboutUpdate");
@@ -6414,7 +6589,7 @@
   function loadAllData(){
     return Promise.all([
       loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
-      loadVenueCategories(), loadVenueLists(), loadProvince(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
+      loadVenueCategories(), loadVenueLists(), loadProvince(), loadReports(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates()
     ]).catch(function(){
       // Senza band attiva le API rispondono 409: e' normale per un utente
@@ -6461,6 +6636,7 @@
   addEdgeSwipeBack(elCategoriesScreen, closeCategoriesScreen);
   addEdgeSwipeBack(elCategoryEditScreen, closeCategoryEditScreen);
   addEdgeSwipeBack(elVenueListScreen, closeVenueListScreen);
+  addEdgeSwipeBack(elReportsScreen, closeReportsScreen);
   addEdgeSwipeBack(elVenueListEditScreen, closeVenueListEditScreen);
   addEdgeSwipeBack(elProfileScreen, closeProfileScreen);
   addEdgeSwipeBack(elMyBandsScreen, closeMyBandsScreen);
