@@ -1010,7 +1010,7 @@
       </div>
       <div class="grouped-list" style="margin-top:10px;">
         <div class="add-note-row">
-          <span style="flex:1;font-size:13px;color:var(--text-secondary);">Parte con la versione che stai usando.</span>
+          <span style="flex:1;"></span>
           <button id="btnSendReport">Invia</button>
         </div>
       </div>
@@ -5884,6 +5884,23 @@
   document.getElementById("settingsTemplatesFooter").innerHTML = templateVarsHelpHtml();
 
 
+  /* Tutte le schermate sovrapposte hanno lo stesso z-index, e a parità
+     vince quella scritta più in basso nel documento. Così una schermata
+     aperta da un'altra che nel markup viene dopo di lei finisce dietro,
+     invisibile: è successo con le segnalazioni aperte dalle informazioni,
+     e sarebbe successo di nuovo alla prossima schermata aggiunta nel posto
+     sbagliato. Qui ogni apertura prende un livello sopra a quelle già
+     aperte, così conta l'ordine in cui le apri e non quello in cui sono
+     scritte. */
+  new MutationObserver(function(mutazioni){
+    mutazioni.forEach(function(m){
+      var el = m.target;
+      if(!el.classList || !el.classList.contains("pushed")) return;
+      if(el.hidden) el.style.zIndex = "";
+      else el.style.zIndex = 40 + document.querySelectorAll(".screen.pushed:not([hidden])").length;
+    });
+  }).observe(document.body, {subtree:true, attributes:true, attributeFilter:["hidden"]});
+
   /* ---------------- segnalazioni ----------------
      Chi usa l'app scrive qui quello che non va. Le vede insieme a quelle
      della sua band — una cosa gia' segnalata da un compagno non va
@@ -5933,7 +5950,9 @@
     el.innerHTML = reports.map(function(r){
       var st = reportStato(r.status);
       var chi = r.author_name || r.email || "qualcuno";
-      var meta = [chi, r.band_name, reportQuando(r)].filter(Boolean).join(" · ");
+      // Il codice serve a parlarne: "la 14" è più corta di mezza frase di
+      // citazione, e resta valida anche quando il testo viene rivisto.
+      var meta = ["#" + r.id].concat([chi, r.band_name, reportQuando(r)].filter(Boolean)).join(" · ");
       var riga = '<div class="row" style="cursor:default;align-items:flex-start;">'+
         '<div class="row-main">'+
           '<div class="report-text">'+dato(r.text)+'</div>'+
