@@ -2553,7 +2553,6 @@
     var st = statusInfo(v.status);
     var subParts = [];
     if(v.type) subParts.push('<span class="type-tag">'+dato(v.type)+'</span>');
-    if(v.city) subParts.push(dato(v.city));
     if(v.contact_name) subParts.push('👤 '+dato(v.contact_name));
     if(v.art_director_name) subParts.push('🎨 '+dato(v.art_director_name));
     var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
@@ -2576,7 +2575,8 @@
       '<div class="row-content"><div class="row'+(v.deleted_at ? ' row-deleted' : '')+'" data-open-id="'+v.id+'">'+
         leadingHtml+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+'</div>'+
+        (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+
+        (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+
           badgeHtml+
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
