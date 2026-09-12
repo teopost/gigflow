@@ -263,7 +263,7 @@
   .row + .row, .swipe-row + .swipe-row .row, .grouped-list > .swipe-row:not(:first-child) .row{box-shadow:none;}
   .grouped-list > .swipe-row:not(:first-child) .row-content .row,
   .grouped-list > .row:not(:first-child){border-top:.5px solid var(--separator);margin-left:0;}
-  .row-dot-wrap{flex:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
+  .row-dot-wrap{flex:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;}
   .row-dot{width:10px;height:10px;border-radius:50%;}
   .row-main{flex:1;min-width:0;}
   .row-title{font-size:16px;font-weight:590;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -345,8 +345,13 @@
   .lightbox-close{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:2;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:15px;cursor:pointer;}
   .lightbox-close:active{background:rgba(255,255,255,.28);}
   .lightbox-counter{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:rgba(255,255,255,.85);font-size:13px;font-variant-numeric:tabular-nums;pointer-events:none;}
-  .row-cover{flex:none;width:36px;height:36px;border-radius:10px;object-fit:cover;background:var(--fill);}
-  .fav-star-lead{flex:none;width:36px;height:36px;border-radius:10px;background:var(--fill);}
+  /* La cella è alta tre righe: a 36px la foto lasciava una fascia vuota
+     sopra e sotto. Le altre due cose che possono stare al suo posto — la
+     stella e il pallino di stato — tengono la stessa larghezza anche se
+     non crescono, altrimenti i titoli delle righe con e senza foto non
+     sarebbero più incolonnati. */
+  .row-cover{flex:none;width:48px;height:48px;border-radius:12px;object-fit:cover;background:var(--fill);}
+  .fav-star-lead{flex:none;width:48px;height:48px;border-radius:12px;background:var(--fill);}
   .avatar{flex:none;width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--fill);margin-right:2px;}
   .avatar-lg{width:84px;height:84px;border-radius:50%;object-fit:cover;background:var(--fill);margin:0 auto 14px;display:block;}
   .qa{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;color:var(--tint);cursor:pointer;text-decoration:none;}
@@ -5913,6 +5918,61 @@
   document.getElementById("mailTemplateEditVars").innerHTML = templateVarsHelpHtml();
   document.getElementById("settingsTemplatesFooter").innerHTML = templateVarsHelpHtml();
 
+
+  /* Le azioni di una riga si scoprono facendola scorrere di lato. Sul
+     telefono è il dito, ed è uno scorrimento orizzontale vero (overflow-x
+     più scroll-snap, nessun codice). Con il mouse quel gesto non esiste: la
+     barra di scorrimento è nascosta apposta e la rotella scorre in
+     verticale, quindi da computer le azioni erano irraggiungibili. Qui il
+     trascinamento col mouse fa la stessa cosa del dito, per ogni riga
+     scorrevole dell'app.
+
+     Solo per il mouse: sul touch lo scorrimento è già quello nativo, e
+     intercettarlo lo renderebbe peggiore di com'è. */
+  (function(){
+    var riga = null, partenzaX = 0, partenzaScroll = 0, trascinato = false;
+
+    document.addEventListener("pointerdown", function(e){
+      if(e.pointerType !== "mouse" || e.button !== 0) return;
+      var r = e.target.closest && e.target.closest(".swipe-row");
+      // Niente da scoprire: la riga non ha azioni sotto.
+      if(!r || r.scrollWidth <= r.clientWidth + 1) return;
+      riga = r; partenzaX = e.clientX; partenzaScroll = r.scrollLeft; trascinato = false;
+    });
+
+    document.addEventListener("pointermove", function(e){
+      if(!riga) return;
+      var d = e.clientX - partenzaX;
+      // Una soglia piccola: senza, il minimo tremolio del mouse durante un
+      // clic verrebbe preso per un trascinamento e il clic sparirebbe.
+      if(!trascinato && Math.abs(d) < 4) return;
+      if(!trascinato){
+        trascinato = true;
+        document.body.style.userSelect = "none";
+      }
+      riga.scrollLeft = partenzaScroll - d;
+      e.preventDefault();
+    });
+
+    function fine(){
+      if(!riga) return;
+      var r = riga; riga = null;
+      document.body.style.userSelect = "";
+      if(!trascinato) return;
+      // Lo scatto in posizione: aperta o chiusa, mai a metà.
+      var aperta = r.scrollWidth - r.clientWidth;
+      try { r.scrollTo({left: r.scrollLeft > aperta / 2 ? aperta : 0, behavior:"smooth"}); }
+      catch(err){ r.scrollLeft = r.scrollLeft > aperta / 2 ? aperta : 0; }
+      // Il rilascio dopo un trascinamento non è un clic: senza questo,
+      // trascinare per scoprire "Elimina" finirebbe per premerlo.
+      document.addEventListener("click", function stop(ev){
+        ev.stopPropagation(); ev.preventDefault();
+        document.removeEventListener("click", stop, true);
+      }, true);
+    }
+    document.addEventListener("pointerup", fine);
+    document.addEventListener("pointercancel", fine);
+  })();
 
   /* Tutte le schermate sovrapposte hanno lo stesso z-index, e a parità
      vince quella scritta più in basso nel documento. Così una schermata
