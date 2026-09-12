@@ -466,7 +466,10 @@
   .tag-opt{flex:1;border:1px solid var(--separator-opaque);background:var(--bg-elevated);color:var(--text-secondary);
     font:inherit;font-size:14px;font-weight:600;padding:9px 12px;border-radius:11px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
   .tag-opt.on{background:var(--tint);border-color:var(--tint);color:#fff;}
-  .add-note-row button[disabled]{opacity:.4;cursor:default;}
+  /* Spento vuol dire grigio, non sbiadito: con l'opacità sopra il grigio
+     della regola qui sopra il pulsante quasi spariva, e un comando che non
+     si vede è peggio di uno che non si può premere. */
+  .add-note-row button[disabled]{color:var(--text-tertiary);cursor:default;}
   .report-kind{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
     padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:1px;}
   .report-text{font-size:15px;color:var(--text);white-space:normal;line-height:1.4;}
@@ -902,6 +905,14 @@
         </div>
       </div>
       <div class="section-footer" id="settingsTemplatesFooter"></div>
+      <div class="section-header">INFORMAZIONI</div>
+      <div class="grouped-list">
+        <div class="row" id="rowSettingsAbout">
+          <div class="row-main"><div class="row-title">Informazioni sull'app</div></div>
+          <div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+
       <div class="section-header" id="sectionAdminHeader" hidden>AMMINISTRAZIONE DELL'APP</div>
       <div class="grouped-list" id="rowSettingsAdminWrap" hidden>
         <div class="row admin-row" id="rowSettingsAdmin">
@@ -913,13 +924,6 @@
       </div>
       <div class="section-footer" id="sectionAdminFooter" hidden></div>
 
-      <div class="section-header">INFORMAZIONI</div>
-      <div class="grouped-list">
-        <div class="row" id="rowSettingsAbout">
-          <div class="row-main"><div class="row-title">Informazioni sull'app</div></div>
-          <div class="row-trail"><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -1025,13 +1029,16 @@
       <div class="section-header">SCRIVINE UNA</div>
       <div class="grouped-list">
         <div class="field-row stacked">
+          <textarea id="newReportText" rows="3" placeholder="Che cosa è successo, o che cosa ti servirebbe…" style="text-align:left;"></textarea>
+        </div>
+      </div>
+      <div class="section-header">TIPO DI SEGNALAZIONE</div>
+      <div class="grouped-list">
+        <div class="field-row stacked">
           <div class="tag-choice" id="newReportKind">
             <button type="button" class="tag-opt" data-kind="anomalia">Anomalia</button>
             <button type="button" class="tag-opt" data-kind="suggerimento">Suggerimento</button>
           </div>
-        </div>
-        <div class="field-row stacked">
-          <textarea id="newReportText" rows="3" placeholder="Che cosa è successo, o che cosa ti servirebbe…" style="text-align:left;"></textarea>
         </div>
       </div>
       <div class="grouped-list" style="margin-top:10px;">
