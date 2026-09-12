@@ -486,8 +486,13 @@
   /* ---------- sheets ---------- */
   .sheet-backdrop{position:fixed;inset:0;background:var(--overlay-dim);z-index:60;opacity:0;pointer-events:none;transition:opacity .22s;}
   .sheet-backdrop.show{opacity:1;pointer-events:auto;}
-  .sheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:61;transform:translateY(120%);visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear .28s;}
-  .sheet.show{transform:translateY(0);visibility:visible;pointer-events:auto;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear 0s;}
+  /* --tastiera e' quanto il foglio deve stare sollevato da terra per
+     restare sopra la tastiera. Sta dentro la stessa transform con cui il
+     foglio entra, cosi' salita ed entrata sono un movimento solo invece di
+     due scatti in fila; e transform la muove la scheda grafica, mentre
+     spostare "bottom" fa ricalcolare il layout a ogni fotogramma. */
+  .sheet{--tastiera:0px;position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:61;transform:translateY(120%);visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear .28s;}
+  .sheet.show{transform:translateY(calc(0px - var(--tastiera)));visibility:visible;pointer-events:auto;transition:transform .28s cubic-bezier(.32,.72,0,1), visibility 0s linear 0s;}
   /* Ripiego per i browser che non hanno visualViewport e quindi non sanno
      dire quanto è alta la tastiera: lì il foglio si appoggia in alto, dove
      la tastiera non arriva, invece di finirci sotto. Con visualViewport —
@@ -498,7 +503,8 @@
   .sheet.con-ricerca .sheet-group{max-height:38vh;}
   @media (prefers-reduced-motion:reduce){.sheet{transition:none;} .sheet-backdrop{transition:none;}}
   .sheet-title{text-align:center;font-size:13px;color:var(--text-secondary);padding:14px 16px 10px;background:var(--bg-elevated);border-radius:14px 14px 0 0;}
-  .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;}
+  .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;transition:max-height .28s cubic-bezier(.32,.72,0,1);}
+  @media (prefers-reduced-motion:reduce){.sheet-group{transition:none;}}
   .sheet-search{background:var(--bg-elevated);padding:8px 10px;border-bottom:.5px solid var(--separator);}
   .sheet-search-field{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:9px;padding:9px 12px;}
   .sheet-search-field input{flex:1;min-width:0;width:auto;border:none;background:transparent;padding:0;font-size:16px;color:var(--text);font-family:inherit;}
@@ -2383,7 +2389,12 @@
     requestAnimationFrame(function(){
       elSheet.classList.add("show");
       if(hasSearch){
-        setTimeout(function(){ elSheetSearchInput.focus(); }, 260);
+        // Il fuoco quasi subito: aspettare la fine dell'animazione voleva
+        // dire far partire la tastiera a foglio gia' fermo, e il foglio
+        // doveva risalire in un secondo tempo. Cosi' le due cose si
+        // muovono insieme. Su iOS, per giunta, il fuoco ha piu' probabilita'
+        // di essere accettato se resta vicino al tocco che lo ha chiesto.
+        setTimeout(function(){ elSheetSearchInput.focus(); }, 50);
         seguiTastiera();
       }
     });
@@ -2401,9 +2412,9 @@
     if(!sheetHasSearch || !window.visualViewport) return;
     var vv = window.visualViewport;
     var tastiera = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-    // Senza tastiera si torna alla posizione decisa dal foglio di stile,
-    // che tiene conto della zona sicura in fondo allo schermo.
-    elSheet.style.bottom = tastiera ? (8 + tastiera) + "px" : "";
+    // Senza tastiera torna a zero e il foglio si riappoggia dove lo mette
+    // il foglio di stile, zona sicura compresa.
+    elSheet.style.setProperty("--tastiera", tastiera + "px");
 
     // Quanto può essere alto l'elenco: lo spazio visibile meno tutto
     // quello che nel foglio non è l'elenco — titolo, ricerca, "Fatto",
@@ -2430,7 +2441,7 @@
     window.visualViewport.removeEventListener("resize", adattaAllaTastiera);
     window.visualViewport.removeEventListener("scroll", adattaAllaTastiera);
     elSheetGroup.style.maxHeight = "";
-    elSheet.style.bottom = "";
+    elSheet.style.removeProperty("--tastiera");
   }
   function closeSheet(){
     elSheet.classList.remove("show");
