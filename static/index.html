@@ -448,6 +448,11 @@
   .tab-badge-wrap{position:relative;}
   .tab-dot{position:absolute;top:-2px;right:-6px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg-tabbar);}
   .filter-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--tint);margin-left:4px;vertical-align:middle;}
+  /* Il pallino sta sopra l'angolo dell'icona invece che accanto: di fianco
+     allargherebbe il bottone e sposterebbe il titolo. */
+  .navbar-trailing .nav-btn{position:relative;}
+  .navbar-trailing .nav-btn .filter-dot{position:absolute;top:3px;right:2px;margin:0;box-shadow:0 0 0 2px var(--bg-navbar);}
+  .nav-btn-spacer{width:96px;}
 
   /* ---------- sheets ---------- */
   .sheet-backdrop{position:fixed;inset:0;background:var(--overlay-dim);z-index:60;opacity:0;pointer-events:none;transition:opacity .22s;}
@@ -514,10 +519,17 @@
   <section class="screen tab-screen" id="tabList" data-tab="list" hidden>
     <header class="navbar" id="navList">
       <div class="navbar-row">
-        <span class="nav-btn" style="visibility:hidden;">Filtri</span>
+        <span class="nav-btn nav-btn-spacer"></span>
         <span class="inline-title">Palcoscenici</span>
         <div class="navbar-trailing">
-          <button class="nav-btn" id="btnFilters">Filtri<span class="filter-dot" id="filterActiveDot" hidden></span></button>
+          <button class="nav-btn" id="btnSort" aria-label="Ordina" title="Ordina">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="15" y2="7"/><line x1="4" y1="12" x2="12" y2="12"/><line x1="4" y1="17" x2="9" y2="17"/><polyline points="17 14 20 17 23 14"/><line x1="20" y1="6" x2="20" y2="17"/></svg>
+            <span class="filter-dot" id="sortActiveDot" hidden></span>
+          </button>
+          <button class="nav-btn" id="btnFilters" aria-label="Filtri" title="Filtri">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 4 21 4 14 12.5 14 19.5 10 21.5 10 12.5"/></svg>
+            <span class="filter-dot" id="filterActiveDot" hidden></span>
+          </button>
           <button class="nav-btn" id="fabAdd" aria-label="Aggiungi palcoscenico">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -2581,10 +2593,71 @@
     });
   }
 
+  /* ---------------- ordinamento dell'elenco ----------------
+     Il nome resta il modo normale di leggere l'elenco; gli altri criteri
+     servono a raggruppare. A parita' di chiave si torna sempre al nome,
+     cosi' dentro ogni gruppo l'ordine e' quello di sempre e non un ordine
+     casuale che cambia a ogni ridisegno. */
+  var SORT_OPTIONS = [
+    {key:"name",        label:"Nome"},
+    // Lo stato non va in ordine alfabetico: ha un suo ordine, quello della
+    // trattativa. "Annullato" prima di "Confermato" non direbbe niente.
+    {key:"status",      label:"Stato",        get:function(v){ return v.status || ""; },
+     rank:function(v){ var i = STATUSES.findIndex(function(x){ return x.key === v.status; }); return i < 0 ? 99 : i; }},
+    {key:"type",        label:"Tipo",         get:function(v){ return v.type || ""; }},
+    {key:"category",    label:"Categoria",    get:function(v){ return v.category || ""; }},
+    {key:"regione",     label:"Regione",      get:venueRegione},
+    {key:"provincia",   label:"Provincia",    get:venueProvincia},
+    {key:"context",     label:"Contesto",     get:function(v){ return v.context || ""; }},
+    {key:"seasonality", label:"Stagionalità", get:function(v){ return v.seasonality || ""; }},
+    {key:"live_period", label:"Periodo",      get:function(v){ return v.live_period || ""; }},
+    {key:"owner",       label:"Proprietario", get:function(v){ return v.owner_email ? ownerLabel(v.owner_email) : ""; }}
+  ];
+  var sortBy = "name";
+  function sortOption(){
+    return SORT_OPTIONS.filter(function(o){ return o.key === sortBy; })[0] || SORT_OPTIONS[0];
+  }
+  function perNome(a, b){
+    return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"});
+  }
+  function venueSorter(){
+    var o = sortOption();
+    if(!o.get) return perNome;
+    return function(a, b){
+      if(o.rank){
+        var d = o.rank(a) - o.rank(b);
+        if(d) return d;
+        return perNome(a, b);
+      }
+      var ka = (o.get(a) || "").toString(), kb = (o.get(b) || "").toString();
+      // Chi non ha quel dato finisce in fondo: in cima nasconderebbe
+      // proprio i palcoscenici che stai cercando di raggruppare.
+      if(!ka !== !kb) return ka ? -1 : 1;
+      return ka.localeCompare(kb, "it", {sensitivity:"base"}) || perNome(a, b);
+    };
+  }
+  function renderSortRow(){
+    document.getElementById("sortActiveDot").hidden = (sortBy === "name");
+  }
+  document.getElementById("btnSort").addEventListener("click", function(){
+    openSheet({
+      title:"Ordina per",
+      options: SORT_OPTIONS.map(function(o){
+        return {label:o.label, checkmark: sortBy === o.key, onSelect:function(){
+          sortBy = o.key; renderSortRow(); renderList();
+          toast(o.key === "name" ? "Ordinato per nome" : "Ordinato per " + o.label.toLowerCase());
+        }};
+      })
+    });
+  });
+
   function renderList(){
     var filtered = venues.filter(matchesFilter);
+    // Prima di ogni uscita: l'elenco vuoto esce subito qui sotto, e la
+    // mappa non deve restare con i segnalini di prima.
+    renderMapMarkers();
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
-    var sorted = filtered.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
+    var sorted = filtered.slice().sort(venueSorter());
     if(sorted.length === 0){
       var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
@@ -2739,10 +2812,19 @@
   function fitMapToVenues(){
     if(leafletMap && mapVenueBounds.length) leafletMap.fitBounds(mapVenueBounds, {padding:[30,30], maxZoom:13});
   }
-  function renderMapMarkers(){
+  var mapSignature = null;
+  function renderMapMarkers(force){
     if(!mapMarkersLayer) return;
+    var visibili = venues.filter(function(v){ return matchesFilter(v) && v.lat != null && v.lng != null; });
+    // Se l'insieme visibile e' lo stesso di prima non si tocca niente: il
+    // fit qui sotto rizoomerebbe la mappa mentre l'utente la sta guardando.
+    var firma = visibili.map(function(v){ return v.id + ":" + v.lat + "," + v.lng; }).join("|");
+    if(!force && firma === mapSignature) return;
+    mapSignature = firma;
     mapMarkersLayer.clearLayers();
-    var withCoords = venues.filter(function(v){ return !v.deleted_at && v.lat != null && v.lng != null; });
+    // Gli stessi filtri dell'elenco: una mappa che mostra tutto mentre
+    // l'elenco accanto ne mostra dodici non e' una mappa, e' un inganno.
+    var withCoords = visibili;
     var bounds = [];
     withCoords.forEach(function(v){
       var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon()});
@@ -2776,7 +2858,7 @@
       elScrollList.hidden = true;
       elMapView.hidden = false;
       ensureMap();
-      renderMapMarkers();
+      renderMapMarkers(true);
       setTimeout(function(){
         if(!leafletMap) return;
         leafletMap.invalidateSize();
@@ -2893,9 +2975,9 @@
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+[fmtDateShort(v.next_contact_date)].concat(
-            v.city ? [dato(v.city)] : [], v.planning_note ? [dato(v.planning_note)] : []
-          ).join(" · ")+'</div></div>'+
+        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+
+          (v.planning_note ? ' · '+dato(v.planning_note) : '')+'</div>'+
+        (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
         CHEVRON+'</div>'+
       '</div></div>'+
@@ -2966,11 +3048,11 @@
   function renewRowHtml(v){
     var g = lastPlayedGig(v);
     var quando = g ? (g.gig_date ? fmtDateShort(g.gig_date) : ("stagione " + g.season)) : "";
-    var sub = (v.city ? dato(v.city) + " · " : "") +
-              (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
+    var sub = (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
     return '<div class="row" data-open-id="'+v.id+'">'+
       '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-      '<div class="row-sub">'+sub+'</div></div>'+
+      '<div class="row-sub">'+sub+'</div>'+
+      (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
       '<div class="row-trail"><button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button></div>'+
     '</div>';
   }
@@ -3068,8 +3150,8 @@
           return '<div class="grouped-list gig-card">'+
           '<div class="row" data-open-id="'+x.v.id+'">'+
             '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
-            '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+
-              (x.v.city ? ' · '+dato(x.v.city) : '')+' · stagione '+esc(x.g.season)+'</div></div>'+
+            '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+' · stagione '+esc(x.g.season)+'</div>'+
+            (x.v.city ? '<div class="row-sub">'+dato(x.v.city)+'</div>' : '')+'</div>'+
           '</div>'+
           '<div class="gig-panel">'+
             '<div class="field-row stacked"><label>Com\'è andata</label>'+
