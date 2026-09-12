@@ -503,8 +503,11 @@
   .sheet.con-ricerca .sheet-group{max-height:38vh;}
   @media (prefers-reduced-motion:reduce){.sheet{transition:none;} .sheet-backdrop{transition:none;}}
   .sheet-title{text-align:center;font-size:13px;color:var(--text-secondary);padding:14px 16px 10px;background:var(--bg-elevated);border-radius:14px 14px 0 0;}
-  .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;transition:max-height .28s cubic-bezier(.32,.72,0,1);}
-  @media (prefers-reduced-motion:reduce){.sheet-group{transition:none;}}
+  /* Nessuna transizione sull'altezza: il foglio è appoggiato in basso,
+     quindi animare l'altezza fa strisciare il bordo di sopra per tutta la
+     durata: si legge come un secondo movimento dopo che è già arrivato.
+     L'altezza si decide una volta sola, prima che il foglio entri. */
+  .sheet-group{background:var(--bg-elevated);border-radius:14px;overflow:hidden;max-height:52vh;overflow-y:auto;}
   .sheet-search{background:var(--bg-elevated);padding:8px 10px;border-bottom:.5px solid var(--separator);}
   .sheet-search-field{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:9px;padding:9px 12px;}
   .sheet-search-field input{flex:1;min-width:0;width:auto;border:none;background:transparent;padding:0;font-size:16px;color:var(--text);font-family:inherit;}
@@ -2381,6 +2384,11 @@
     // In alto solo dove non si può sapere quanto è alta la tastiera.
     elSheet.classList.toggle("con-ricerca", hasSearch && !window.visualViewport);
     elSheetDone.hidden = !sheetMultiSelect;
+    // Il foglio si dispone prima di entrare: se le misure arrivassero dopo
+    // lo si vedrebbe aggiustarsi da solo, ed è proprio quello che si legge
+    // come "scattoso".
+    if(hasSearch && window.visualViewport) disponiFoglio(altezzaTastieraAttesa());
+    else { elSheet.style.removeProperty("--tastiera"); elSheetGroup.style.maxHeight = ""; }
     elSheetGroup.style.borderRadius = (hasTitle || hasSearch) ? "0 0 14px 14px" : "14px";
     renderSheetOptions("");
 
@@ -2408,33 +2416,75 @@
      I vh non servono a niente qui: restano l'altezza dello schermo anche
      con mezza tastiera sopra. visualViewport invece si restringe, e la
      differenza con innerHeight è esattamente l'altezza della tastiera. */
-  function adattaAllaTastiera(){
-    if(!sheetHasSearch || !window.visualViewport) return;
-    var vv = window.visualViewport;
-    var tastiera = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-    // Senza tastiera torna a zero e il foglio si riappoggia dove lo mette
-    // il foglio di stile, zona sicura compresa.
-    elSheet.style.setProperty("--tastiera", tastiera + "px");
+  /* Quanto è alta la tastiera di questo telefono. Non c'è modo di saperlo
+     prima che si apra, ma basta averla vista una volta: si impara alla
+     prima apertura e si ricorda, così dalla seconda in poi il foglio nasce
+     già della misura e nella posizione giuste e non deve più aggiustarsi
+     sotto gli occhi. Il primo tocco in assoluto usa una stima. */
+  var tastieraNota = 0;
+  try { tastieraNota = parseInt(localStorage.getItem("gigflow.tastiera") || "0", 10) || 0; } catch(e){}
 
+  function altezzaTastieraAttesa(){
+    // Da computer la tastiera non si apre: prevederla vorrebbe dire
+    // rimpicciolire il foglio per far posto a niente, e poi allargarlo
+    // quando ci si accorge che non arriva — cioè lo scatto, al contrario.
+    var tocco = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+      || navigator.maxTouchPoints > 0;
+    if(!tocco) return 0;
+    if(tastieraNota) return tastieraNota;
+    // Una tastiera sta in genere fra il 40% e il 50% dello schermo.
+    return Math.round((window.innerHeight || 700) * 0.45);
+  }
+
+  /* Dispone il foglio per una certa altezza di tastiera: di quanto sta
+     sollevato e quanto può essere alto l'elenco. Chiamata prima che il
+     foglio entri, e poi a ogni cambio vero del visualViewport. */
+  function disponiFoglio(tastiera){
+    elSheet.style.setProperty("--tastiera", tastiera + "px");
     // Quanto può essere alto l'elenco: lo spazio visibile meno tutto
     // quello che nel foglio non è l'elenco — titolo, ricerca, "Fatto",
     // "Annulla" — e i margini fra un pezzo e l'altro.
     var fuori = 0;
     [elSheetTitle, elSheetSearch, elSheetDone, elSheetCancel].forEach(function(el){
-      if(el && !el.hidden) fuori += el.getBoundingClientRect().height + 8;
+      if(el && !el.hidden) fuori += el.offsetHeight + 8;
     });
-    var disponibile = vv.height - fuori - 24;
+    var schermo = window.innerHeight || 700;
+    var visibile = schermo - tastiera;
     // Mai meno di un paio di righe: un elenco alto zero non aiuta nessuno,
-    // meglio che sfori e si possa scorrere.
-    elSheetGroup.style.maxHeight = Math.max(120, disponibile) + "px";
+    // meglio che sfori e si possa scorrere. E mai un foglio che riempie
+    // tutto lo schermo quando la tastiera non c'è: resta un foglio, non
+    // diventa una schermata.
+    var alto = Math.min(visibile - fuori - 24, Math.round(schermo * 0.62));
+    elSheetGroup.style.maxHeight = Math.max(120, alto) + "px";
+  }
+
+  /* La tastiera non appare: sale, e mentre sale il browser manda una
+     raffica di resize con valori a metà strada. Rispondere a ognuno vuol
+     dire rincorrerla, ed è esattamente quello che si vede come scatti. Si
+     aspetta che si fermi — se la previsione era giusta non c'è niente da
+     correggere e il foglio non si muove affatto. */
+  var attesaTastiera = null;
+  function adattaAllaTastiera(){
+    if(!sheetHasSearch || !window.visualViewport) return;
+    clearTimeout(attesaTastiera);
+    attesaTastiera = setTimeout(function(){
+      var vv = window.visualViewport;
+      var tastiera = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      // Una tastiera aperta si misura: da qui in poi non è più una stima.
+      if(tastiera > 80 && tastiera !== tastieraNota){
+        tastieraNota = tastiera;
+        try { localStorage.setItem("gigflow.tastiera", String(tastiera)); } catch(e){}
+      }
+      disponiFoglio(tastiera);
+    }, 160);
   }
   function seguiTastiera(){
     if(!window.visualViewport) return;
     window.visualViewport.addEventListener("resize", adattaAllaTastiera);
     window.visualViewport.addEventListener("scroll", adattaAllaTastiera);
-    // La prima misura va presa a foglio fermo: mentre scorre in posizione
-    // è ancora fuori schermo, e misurarlo lì darebbe un'altezza sbagliata.
-    setTimeout(adattaAllaTastiera, 300);
+    // Un controllo a tastiera arrivata, per correggere la previsione se
+    // era sbagliata. Prima non serve: il foglio è già disposto.
+    setTimeout(adattaAllaTastiera, 500);
   }
   function smettiDiSeguireTastiera(){
     if(!window.visualViewport) return;
