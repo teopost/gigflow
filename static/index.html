@@ -2893,7 +2893,9 @@
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+(v.planning_note ? " · "+dato(v.planning_note) : "")+'</div></div>'+
+        '<div class="row-sub">'+[fmtDateShort(v.next_contact_date)].concat(
+            v.city ? [dato(v.city)] : [], v.planning_note ? [dato(v.planning_note)] : []
+          ).join(" · ")+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
         CHEVRON+'</div>'+
       '</div></div>'+
@@ -2964,7 +2966,8 @@
   function renewRowHtml(v){
     var g = lastPlayedGig(v);
     var quando = g ? (g.gig_date ? fmtDateShort(g.gig_date) : ("stagione " + g.season)) : "";
-    var sub = (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
+    var sub = (v.city ? dato(v.city) + " · " : "") +
+              (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
     return '<div class="row" data-open-id="'+v.id+'">'+
       '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
       '<div class="row-sub">'+sub+'</div></div>'+
@@ -3065,7 +3068,8 @@
           return '<div class="grouped-list gig-card">'+
           '<div class="row" data-open-id="'+x.v.id+'">'+
             '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
-            '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+' · stagione '+esc(x.g.season)+'</div></div>'+
+            '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+
+              (x.v.city ? ' · '+dato(x.v.city) : '')+' · stagione '+esc(x.g.season)+'</div></div>'+
           '</div>'+
           '<div class="gig-panel">'+
             '<div class="field-row stacked"><label>Com\'è andata</label>'+
