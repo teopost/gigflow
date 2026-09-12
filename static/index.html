@@ -209,8 +209,10 @@
   .member-seen{font-size:12px;color:var(--text-tertiary);margin-top:2px;display:flex;align-items:center;gap:5px;}
   .seen-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none;}
   .member-role{font-size:11px;font-weight:600;padding:2.5px 8px;border-radius:999px;background:var(--fill);color:var(--text-secondary);white-space:nowrap;}
-  .admin-warning{margin:4px 16px 6px;padding:12px 14px;border-radius:10px;background:var(--fill);border-left:3px solid var(--orange);font-size:13.5px;line-height:1.5;color:var(--text-secondary);}
-  .admin-warning strong{display:block;color:var(--text);margin-bottom:3px;}
+  /* Il rosso qui non decora: e' l'unico segno che distingue una voce che
+     tocca tutte le band da quelle che toccano solo la tua. */
+  .admin-row{border-left:3px solid var(--destructive);}
+  .admin-row .row-title{color:var(--destructive);}
   .section-footer code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--fill);padding:1px 4px;border-radius:4px;}
   .map-user-dot{background:none;border:none;}
   .map-user-dot i{display:block;width:16px;height:16px;border-radius:50%;background:#0a84ff;border:2.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.35);}
@@ -458,6 +460,15 @@
      regola di pari specificita' ma di priorita' piu' bassa. */
   .filter-dot[hidden]{display:none;}
   /* L'esito del controllo versione, sotto il riquadro della build. */
+  /* Due sole scelte: due pastiglie affiancate dicono tutto senza aprire un
+     elenco per due voci. */
+  .tag-choice{display:flex;gap:8px;width:100%;}
+  .tag-opt{flex:1;border:1px solid var(--separator-opaque);background:var(--bg-elevated);color:var(--text-secondary);
+    font:inherit;font-size:14px;font-weight:600;padding:9px 12px;border-radius:11px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
+  .tag-opt.on{background:var(--tint);border-color:var(--tint);color:#fff;}
+  .add-note-row button[disabled]{opacity:.4;cursor:default;}
+  .report-kind{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+    padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:1px;}
   .report-text{font-size:15px;color:var(--text);white-space:normal;line-height:1.4;}
   .report-meta{font-size:12.5px;color:var(--text-secondary);margin-top:3px;}
   .about-update{margin-top:12px;font-size:13px;color:var(--text-secondary);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
@@ -685,13 +696,6 @@
       </div>
     </header>
     <div class="screen-scroll">
-      <div class="admin-warning">
-        <strong>⚠️ Funzione amministrativa, non sono le impostazioni della tua band.</strong>
-        Qui si modificano i template con cui vengono precaricate le band
-        <em>nuove</em>: cambiarli non tocca le band che esistono già, comprese le tue.
-        Vedi questa schermata perché il tuo indirizzo è fra gli amministratori dell'app.
-      </div>
-
       <div class="section-header">TEMPLATE PER LE BAND NUOVE</div>
       <div class="grouped-list">
         <div class="row" id="rowAdminTypes">
@@ -900,14 +904,14 @@
       <div class="section-footer" id="settingsTemplatesFooter"></div>
       <div class="section-header" id="sectionAdminHeader" hidden>AMMINISTRAZIONE DELL'APP</div>
       <div class="grouped-list" id="rowSettingsAdminWrap" hidden>
-        <div class="row" id="rowSettingsAdmin">
+        <div class="row admin-row" id="rowSettingsAdmin">
           <div class="row-main"><div class="row-title">Admin</div>
-          <div class="row-sub">Template per le band nuove</div></div>
-          <div class="row-trail"><span class="row-badge" style="background:var(--orange-soft);color:#a35a00;">solo admin</span>
+          <div class="row-sub">Amministrazione dell'applicazione</div></div>
+          <div class="row-trail"><span class="row-badge" style="background:var(--destructive-soft);color:var(--destructive);">solo admin</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
-      <div class="section-footer" id="sectionAdminFooter" hidden>Funzione amministrativa: quello che si cambia lì vale per le band che verranno create da qui in avanti, non per la tua e non per quelle che esistono già. Vedi questa voce perché il tuo indirizzo è fra gli amministratori dell'app.</div>
+      <div class="section-footer" id="sectionAdminFooter" hidden></div>
 
       <div class="section-header">INFORMAZIONI</div>
       <div class="grouped-list">
@@ -1021,13 +1025,19 @@
       <div class="section-header">SCRIVINE UNA</div>
       <div class="grouped-list">
         <div class="field-row stacked">
+          <div class="tag-choice" id="newReportKind">
+            <button type="button" class="tag-opt" data-kind="anomalia">Anomalia</button>
+            <button type="button" class="tag-opt" data-kind="suggerimento">Suggerimento</button>
+          </div>
+        </div>
+        <div class="field-row stacked">
           <textarea id="newReportText" rows="3" placeholder="Che cosa è successo, o che cosa ti servirebbe…" style="text-align:left;"></textarea>
         </div>
       </div>
       <div class="grouped-list" style="margin-top:10px;">
         <div class="add-note-row">
           <span style="flex:1;"></span>
-          <button id="btnSendReport">Invia</button>
+          <button id="btnSendReport" disabled>Invia</button>
         </div>
       </div>
       <div class="section-header" id="reportsListHeader">LE TUE SEGNALAZIONI</div>
@@ -5998,11 +6008,15 @@
      scorrendo la riga a sinistra. */
   var reports = [];
   var REPORT_STATI = {
-    aperta:    {label:"Aperta",    color:"var(--text-secondary)", soft:"var(--fill)"},
-    fatto:     {label:"Fatto",     color:"var(--green)",          soft:"var(--green-soft)"},
-    rifiutato: {label:"Rifiutato", color:"var(--red)",            soft:"var(--red-soft)"}
+    da_valutare: {label:"Da valutare", color:"var(--orange)", soft:"var(--orange-soft)"},
+    fatto:       {label:"Fatto",       color:"var(--green)",  soft:"var(--green-soft)"},
+    rifiutato:   {label:"Rifiutato",   color:"var(--red)",    soft:"var(--red-soft)"}
   };
-  function reportStato(k){ return REPORT_STATI[k] || REPORT_STATI.aperta; }
+  function reportStato(k){ return REPORT_STATI[k] || REPORT_STATI.da_valutare; }
+  var REPORT_TIPI = {
+    anomalia:     {label:"Anomalia",     color:"var(--red)",  soft:"var(--red-soft)"},
+    suggerimento: {label:"Suggerimento", color:"var(--blue)", soft:"var(--blue-soft)"}
+  };
 
   function loadReports(){
     return api("GET", "/api/reports").then(function(data){
@@ -6012,13 +6026,13 @@
     }).catch(function(){ /* senza segnalazioni il resto dell'app funziona lo stesso */ });
   }
   function updateReportsCount(){
-    var aperte = reports.filter(function(r){ return r.status === "aperta"; }).length;
+    var aperte = reports.filter(function(r){ return r.status === "da_valutare"; }).length;
     var el = document.getElementById("aboutReportsCount");
     // Il numero conta le aperte: quelle chiuse non chiedono piu' niente.
     el.textContent = aperte ? aperte : "";
     document.getElementById("aboutReportsSub").textContent = reports.length
       ? (reports.length + (reports.length === 1 ? " segnalazione" : " segnalazioni") +
-         (aperte ? " · " + aperte + " da guardare" : ""))
+         (aperte ? " · " + aperte + " da valutare" : ""))
       : "Qualcosa non va, o manca?";
   }
 
@@ -6032,9 +6046,12 @@
     // Il codice serve a parlarne: "la 14" è più corta di mezza frase di
     // citazione, e resta valida anche quando il testo viene rivisto.
     var meta = ["#" + r.id].concat([chi, r.band_name, reportQuando(r)].filter(Boolean)).join(" · ");
+    var tipo = REPORT_TIPI[r.kind];
     var riga = '<div class="row" style="cursor:default;align-items:flex-start;">'+
       '<div class="row-main">'+
-        '<div class="report-text">'+dato(r.text)+'</div>'+
+        '<div class="report-text">'+
+          (tipo ? '<span class="report-kind" style="background:'+tipo.soft+';color:'+tipo.color+';">'+esc(tipo.label)+'</span>' : '')+
+          dato(r.text)+'</div>'+
         '<div class="report-meta">'+dato(meta)+(r.build ? ' · <span translate="no">'+esc(r.build)+'</span>' : '')+'</div>'+
       '</div>'+
       '<div class="row-trail"><span class="row-badge" style="background:'+st.soft+';color:'+st.color+';">'+esc(st.label)+'</span></div>'+
@@ -6042,12 +6059,12 @@
     // Senza azioni la riga non si apre nemmeno scorrendola: non promette
     // qualcosa che li' non si puo' fare.
     if(!conAzioni) return '<div class="swipe-row">'+riga+'</div>';
-    var azioni = r.status === "aperta"
+    var azioni = r.status === "da_valutare"
       ? '<button class="role" data-report-done="'+r.id+'">Fatto</button>'+
         '<button data-report-reject="'+r.id+'">Rifiutato</button>'
-      : '<button class="role" data-report-open="'+r.id+'">Riapri</button>';
+      : '<button class="role" data-report-open="'+r.id+'">Da valutare</button>';
     return '<div class="swipe-row"><div class="row-content">'+riga+'</div>'+
-      '<div class="row-actions'+(r.status === "aperta" ? ' two' : '')+'">'+azioni+'</div></div>';
+      '<div class="row-actions'+(r.status === "da_valutare" ? ' two' : '')+'">'+azioni+'</div></div>';
   }
 
   /* L'elenco dentro "Informazioni sull'app" è quello personale, e lo è
@@ -6068,7 +6085,7 @@
   // Le aperte stanno in cima: cambiando stato la riga cambia posto.
   function ordinaSegnalazioni(elenco){
     elenco.sort(function(a,b){
-      var aa = a.status === "aperta" ? 0 : 1, bb = b.status === "aperta" ? 0 : 1;
+      var aa = a.status === "da_valutare" ? 0 : 1, bb = b.status === "da_valutare" ? 0 : 1;
       return aa - bb || (a.created_at < b.created_at ? 1 : -1);
     });
   }
@@ -6094,7 +6111,7 @@
     var rej = e.target.closest("[data-report-reject]");
     if(rej) return setReportStatus(Number(rej.getAttribute("data-report-reject")), "rifiutato");
     var reo = e.target.closest("[data-report-open]");
-    if(reo) return setReportStatus(Number(reo.getAttribute("data-report-open")), "aperta");
+    if(reo) return setReportStatus(Number(reo.getAttribute("data-report-open")), "da_valutare");
   });
 
   /* ---- la schermata di lavorazione, sotto Admin ---- */
@@ -6110,19 +6127,19 @@
   function updateAdminReportsCount(){
     var el = document.getElementById("adminReportsCount");
     if(!el) return;
-    var aperte = adminReports.filter(function(r){ return r.status === "aperta"; }).length;
+    var aperte = adminReports.filter(function(r){ return r.status === "da_valutare"; }).length;
     el.textContent = aperte ? aperte : "";
     document.getElementById("adminReportsSub").textContent = adminReports.length
       ? (adminReports.length + (adminReports.length === 1 ? " segnalazione" : " segnalazioni") +
-         (aperte ? " · " + aperte + " da guardare" : " · tutte chiuse"))
+         (aperte ? " · " + aperte + " da valutare" : " · tutte chiuse"))
       : "Di tutte le band";
   }
   function renderAdminReportsList(){
     var el = document.getElementById("adminReportsList");
     if(!el) return;
-    var aperte = adminReports.filter(function(r){ return r.status === "aperta"; }).length;
+    var aperte = adminReports.filter(function(r){ return r.status === "da_valutare"; }).length;
     document.getElementById("adminReportsHeader").textContent =
-      aperte ? (aperte === 1 ? "1 DA GUARDARE" : aperte + " DA GUARDARE") : "NESSUNA APERTA";
+      aperte ? (aperte === 1 ? "1 DA VALUTARE" : aperte + " DA VALUTARE") : "NESSUNA DA VALUTARE";
     if(!adminReports.length){
       el.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessuna segnalazione da nessuna band.</div>';
       return;
@@ -6143,22 +6160,46 @@
   document.getElementById("rowAdminReports").addEventListener("click", openAdminReportsScreen);
   document.getElementById("btnAdminReportsBack").addEventListener("click", closeAdminReportsScreen);
 
+  /* Il tipo si sceglie fra due pastiglie, e finché non ne scegli una il
+     pulsante resta spento: chiederlo dopo, con un errore, vorrebbe dire
+     far riscrivere a qualcuno una segnalazione che aveva già finito. */
+  var reportKind = null;
+  var elReportKind = document.getElementById("newReportKind");
+  function aggiornaInvio(){
+    document.getElementById("btnSendReport").disabled = !reportKind;
+  }
+  elReportKind.addEventListener("click", function(e){
+    var b = e.target.closest("[data-kind]");
+    if(!b) return;
+    // Toccare la pastiglia già scelta la toglie: chi ha sbagliato non deve
+    // cercare un modo per annullare.
+    reportKind = (reportKind === b.getAttribute("data-kind")) ? null : b.getAttribute("data-kind");
+    [].forEach.call(elReportKind.querySelectorAll("[data-kind]"), function(x){
+      x.classList.toggle("on", x.getAttribute("data-kind") === reportKind);
+    });
+    aggiornaInvio();
+  });
+
   document.getElementById("btnSendReport").addEventListener("click", function(){
     var ta = document.getElementById("newReportText");
     var text = ta.value.trim();
     if(!text){ toast("Scrivi che cosa è successo"); return; }
+    if(!reportKind){ toast("Scegli se è un'anomalia o un suggerimento"); return; }
     var btn = this;
     // La versione in uso viaggia con la segnalazione: senza, "non funziona"
     // e' una frase senza appigli.
     var motore = window.gigflowUpdate;
     (motore ? motore.versioneInUso() : Promise.resolve(null)).then(function(build){
       return withButtonBusy(btn, function(){
-        return api("POST", "/api/reports", {text:text, build:build || ""});
+        return api("POST", "/api/reports", {text:text, kind:reportKind, build:build || ""});
       });
     }).then(function(creata){
       reports.unshift(creata);
       if(me && me.is_admin){ adminReports.unshift(creata); updateAdminReportsCount(); renderAdminReportsList(); }
       ta.value = "";
+      reportKind = null;
+      [].forEach.call(elReportKind.querySelectorAll("[data-kind]"), function(x){ x.classList.remove("on"); });
+      aggiornaInvio();
       renderReportsList();
       updateReportsCount();
       toast("Segnalazione inviata");

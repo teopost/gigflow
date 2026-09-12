@@ -244,10 +244,14 @@ VENUE_LISTS = {
 ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
 
-# Una segnalazione nasce aperta; l'amministratore dell'app la chiude in uno
-# dei due modi. "Rifiutato" non e' una scortesia: e' la risposta onesta a
-# qualcosa che non verra' fatto, e vale piu' di un silenzio.
-REPORT_STATUSES = {"aperta", "fatto", "rifiutato"}
+# Una segnalazione nasce "da valutare"; l'amministratore dell'app la chiude
+# in uno dei due modi. "Rifiutato" non e' una scortesia: e' la risposta
+# onesta a qualcosa che non verra' fatto, e vale piu' di un silenzio.
+REPORT_STATUSES = {"da_valutare", "fatto", "rifiutato"}
+# Un'anomalia e' qualcosa che non funziona, un suggerimento qualcosa che
+# manca: due mestieri diversi per chi le legge, e sapere quale e' prima di
+# aprirla cambia l'ordine in cui le guardi.
+REPORT_KINDS = {"anomalia", "suggerimento"}
 MAX_REPORT_CHARS = 4000
 
 STATUS_VALUES = {
@@ -391,7 +395,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS reports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             text TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'aperta',
+            kind TEXT,
+            status TEXT NOT NULL DEFAULT 'da_valutare',
             email TEXT,
             workspace_id INTEGER,
             build TEXT,
@@ -573,6 +578,13 @@ def migrate_schema(conn):
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{table}_workspace ON {table}(workspace_id)"
             )
+
+    report_cols = {row["name"] for row in conn.execute("PRAGMA table_info(reports)").fetchall()}
+    if "kind" not in report_cols:
+        conn.execute("ALTER TABLE reports ADD COLUMN kind TEXT")
+    # "aperta" si chiamava cosi' prima che gli stati diventassero tre.
+    # Idempotente: dopo il primo giro non c'e' piu' niente da cambiare.
+    conn.execute("UPDATE reports SET status = 'da_valutare' WHERE status = 'aperta'")
 
     note_cols = {row["name"] for row in conn.execute("PRAGMA table_info(notes)").fetchall()}
     if "kind" not in note_cols:
@@ -2848,8 +2860,8 @@ def _report_rows(conn, where, args):
         "LEFT JOIN user_profiles p ON p.email = r.email "
         "LEFT JOIN workspaces w ON w.id = r.workspace_id "
         + where +
-        # Le aperte in cima: sono le uniche su cui c'e' qualcosa da fare.
-        " ORDER BY (r.status != 'aperta'), r.created_at DESC",
+        # Quelle da valutare in cima: sono le uniche su cui c'e' qualcosa da fare.
+        " ORDER BY (r.status != 'da_valutare'), r.created_at DESC",
         args,
     ).fetchall()
     return [dict(r) for r in rows]
@@ -2881,6 +2893,9 @@ def create_report(conn, ctx, body):
     text = (body.get("text") or "").strip()
     if not text:
         raise ApiError(400, "Scrivi che cosa è successo")
+    kind = (body.get("kind") or "").strip()
+    if kind not in REPORT_KINDS:
+        raise ApiError(400, "Scegli se è un'anomalia o un suggerimento")
     if len(text) > MAX_REPORT_CHARS:
         raise ApiError(400, "Segnalazione troppo lunga")
     # La build arriva dall'app: una segnalazione senza sapere su quale
@@ -2889,9 +2904,9 @@ def create_report(conn, ctx, body):
     build = (body.get("build") or "").strip()[:64] or build_version()
     ts = now_iso()
     cur = conn.execute(
-        "INSERT INTO reports (text, status, email, workspace_id, build, created_at, updated_at) "
-        "VALUES (?, 'aperta', ?, ?, ?, ?, ?)",
-        (text, ctx.email, ctx.ws, build, ts, ts),
+        "INSERT INTO reports (text, kind, status, email, workspace_id, build, created_at, updated_at) "
+        "VALUES (?, ?, 'da_valutare', ?, ?, ?, ?, ?)",
+        (text, kind, ctx.email, ctx.ws, build, ts, ts),
     )
     conn.commit()
     return _report_rows(conn, "WHERE r.id = ?", (cur.lastrowid,))[0]
@@ -2908,7 +2923,7 @@ def update_report(conn, ctx, report_id, body):
     if status not in REPORT_STATUSES:
         raise ApiError(400, "Stato non valido")
     ts = now_iso()
-    chiusa = status != "aperta"
+    chiusa = status != "da_valutare"
     conn.execute(
         "UPDATE reports SET status = ?, updated_at = ?, resolved_at = ?, resolved_by = ? WHERE id = ?",
         (status, ts, ts if chiusa else None, ctx.email if chiusa else None, report_id),
@@ -3017,8 +3032,8 @@ def export_zip(conn):
             "ORDER BY 1, 2, 3")])))
 
     fogli.append(("segnalazioni.csv", _csv_bytes(
-        ["id", "stato", "testo", "autore", "email", "band", "build", "creata_il", "chiusa_il", "chiusa_da"],
-        [(r["id"], r["status"], r["text"], r["author_name"], r["email"], r["band_name"],
+        ["id", "tipo", "stato", "testo", "autore", "email", "band", "build", "creata_il", "chiusa_il", "chiusa_da"],
+        [(r["id"], r["kind"], r["status"], r["text"], r["author_name"], r["email"], r["band_name"],
           r["build"], r["created_at"], r["resolved_at"], r["resolved_by"])
          for r in _report_rows(conn, "", ())])))
 
