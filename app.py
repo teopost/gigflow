@@ -255,21 +255,33 @@ REPORT_KINDS = {"anomalia", "suggerimento"}
 MAX_REPORT_CHARS = 4000
 
 STATUS_VALUES = {
-    "da_contattare", "potenziale", "contattato", "trattativa",
+    "lead", "da_contattare", "contattato", "trattativa",
     "confermato", "rifiutato", "suonato", "annullato",
 }
 
-# Prima di aver alzato la cornetta gli stati sono due e non uno: "da
-# contattare" e' la lista di partenza, "potenziale" e' il posto che hai
+# "Lead" e' come nasce tutto: un posto finito in rubrica da un import o da
+# due righe scritte al volo. Non dice che vada contattato — dice solo che
+# esiste, ed e' l'unica cosa vera di un indirizzo che nessuno ha ancora
+# guardato. Scegliere un lead e decidere di provarci sono lo stesso gesto,
+# ed e' li' che nasce la prima serata: per questo "lead" non e' mai lo
+# stato di una serata, ma solo di un palcoscenico che non ne ha nessuna.
+LEAD_STATUS = "lead"
+
+# Gli stati di una serata sono tutti gli altri: una serata esiste perche'
+# hai deciso di provarci, e il suo punto di partenza e' "da contattare".
+GIG_STATUS_VALUES = STATUS_VALUES - {LEAD_STATUS}
+
+# Prima di aver alzato la cornetta gli stati sono due e non uno: "lead" e'
+# tutto quello che e' finito in rubrica, "da contattare" quello che hai
 # guardato da vicino e su cui vuoi davvero provarci. Nessuno dei due dice
 # che qualcuno ti abbia risposto, quindi registrare un'attivita' li fa
 # avanzare tutti e due a "contattato".
-PRE_CONTACT_STATUSES = {"da_contattare", "potenziale"}
+PRE_CONTACT_STATUSES = {LEAD_STATUS, "da_contattare"}
 
 # Gli stessi otto stati, ma applicati alla singola serata invece che al
 # palcoscenico: e' quello che permette di ripartire da zero ogni stagione
 # senza cancellare com'e' andata l'anno prima.
-GIG_FIELDS = ["season", "status", "gig_date", "fee", "outcome_note"]
+GIG_FIELDS = ["status", "gig_date", "fee", "outcome_note"]
 
 # I tre modi in cui una serata finisce, e sono diversi fra loro: "suonato"
 # ci sei andato, "rifiutato" il titolare ha detto di no, "annullato" era
@@ -283,7 +295,6 @@ GIG_FIELDS = ["season", "status", "gig_date", "fee", "outcome_note"]
 CLOSING_STATUSES = {"suonato", "rifiutato", "annullato"}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SEASON_YEAR_RE = re.compile(r"(\d{4})")
 
 # Il tipo di attivita' fatta sul palcoscenico. "nota" e' il default e copre
 # tutto quello che si scriveva prima che le attivita' avessero un tipo.
@@ -505,7 +516,6 @@ def init_db():
         CREATE TABLE IF NOT EXISTS gigs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
-            season TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'da_contattare',
             gig_date TEXT,
             fee REAL,
@@ -515,7 +525,7 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
-        CREATE INDEX IF NOT EXISTS idx_gigs_location ON gigs(location_id, season);
+        CREATE INDEX IF NOT EXISTS idx_gigs_location ON gigs(location_id);
         CREATE INDEX IF NOT EXISTS idx_gigs_date ON gigs(gig_date);
         CREATE INDEX IF NOT EXISTS idx_templates_kind ON app_templates(kind, position);
         CREATE INDEX IF NOT EXISTS idx_members_email ON workspace_members(email);
@@ -625,25 +635,77 @@ def migrate_schema(conn):
 
     migrate_to_workspaces(conn)
     migrate_to_gigs(conn)
+    migrate_drop_season(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
 
-    # Un palcoscenico rimasto senza serate non e' un errore — vuol dire che
-    # nessuna stagione e' ancora aperta — ma il suo stato deve dirlo. Le
-    # versioni prima di questa lasciavano appeso il valore vecchio quando si
-    # eliminava l'ultima serata: qui si ripara, ed e' idempotente.
+    # Un palcoscenico senza nessuna serata e' un lead, e basta: nessuno ha
+    # ancora deciso di provarci. Questa riga e' la stessa di prima — allora
+    # riparava lo stato appeso dopo l'eliminazione dell'ultima serata — ma
+    # ora dice "lead" invece di "da contattare", e con quel cambio fa anche
+    # la scrematura: tutto quello che era in rubrica senza mai una serata
+    # smette di dichiararsi da contattare. E' idempotente, gira a ogni
+    # avvio, e da qui in poi non ha piu' niente da spostare perche' un
+    # palcoscenico nuovo nasce gia' lead.
     conn.execute(
-        "UPDATE locations SET status = 'da_contattare', updated_at = ? "
-        "WHERE status != 'da_contattare' "
+        "UPDATE locations SET status = ?, updated_at = ? "
+        "WHERE status != ? "
         "AND NOT EXISTS (SELECT 1 FROM gigs g WHERE g.location_id = locations.id)",
-        (now_iso(),),
+        (LEAD_STATUS, now_iso(), LEAD_STATUS),
     )
 
     # Svuotare il promemoria scriveva stringa vuota invece di NULL: due modi
     # di dire "nessuna data" che le query devono distinguere. Qui restano in
     # uno solo, ed e' idempotente.
     conn.execute("UPDATE locations SET next_contact_date = NULL WHERE next_contact_date = ''")
+
+
+def migrate_drop_season(conn):
+    """Toglie la colonna della stagione dalle serate.
+
+    La stagione era il nome del tentativo: serviva quando la serata nasceva
+    insieme al palcoscenico e non aveva nient'altro addosso. Adesso un
+    tentativo comincia quando decidi di provarci, l'anno lo dice la data e
+    l'ordine lo dice la riga stessa, quindi quella colonna era rimasta a
+    dire una cosa che nessuno guardava e che nessuno poteva piu' correggere:
+    un anno scritto dall'app, plausibile e mai verificato.
+
+    Gira una volta sola — al riavvio dopo la colonna non c'e' piu' — e non
+    perde niente: le serate restano tutte, con lo stesso id.
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(gigs)").fetchall()}
+    if "season" not in cols:
+        return
+    # SQLite non sapeva togliere una colonna prima della 3.35, e comunque la
+    # tabella va ricostruita per rifare gli indici: si copia, si scambia.
+    conn.executescript(
+        """
+        PRAGMA foreign_keys = OFF;
+        BEGIN;
+        CREATE TABLE gigs_senza_stagione (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            status TEXT NOT NULL DEFAULT 'da_contattare',
+            gig_date TEXT,
+            fee REAL,
+            outcome_note TEXT,
+            closed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        INSERT INTO gigs_senza_stagione
+            (id, location_id, status, gig_date, fee, outcome_note, closed_at, created_at, updated_at)
+            SELECT id, location_id, status, gig_date, fee, outcome_note, closed_at, created_at, updated_at
+            FROM gigs;
+        DROP TABLE gigs;
+        ALTER TABLE gigs_senza_stagione RENAME TO gigs;
+        CREATE INDEX IF NOT EXISTS idx_gigs_location ON gigs(location_id);
+        CREATE INDEX IF NOT EXISTS idx_gigs_date ON gigs(gig_date);
+        COMMIT;
+        PRAGMA foreign_keys = ON;
+        """
+    )
 
 
 def migrate_to_mail_templates(conn):
@@ -749,15 +811,13 @@ def migrate_to_gigs(conn):
     rows = conn.execute("SELECT id, status, created_at FROM locations").fetchall()
     if not rows:
         return
-    season = current_season()
     ts = now_iso()
     conn.executemany(
-        "INSERT INTO gigs (location_id, season, status, closed_at, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO gigs (location_id, status, closed_at, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?)",
         [
             (
                 r["id"],
-                season,
                 r["status"] or "da_contattare",
                 ts if (r["status"] or "") in CLOSING_STATUSES else None,
                 r["created_at"] or ts,
@@ -1649,16 +1709,10 @@ def to_number_or_none(value, kind=float):
         raise ApiError(400, "Valore numerico non valido")
 
 
-# Una serata = un tentativo di suonare in quel posto in quella stagione.
-# L'ordine e' sempre lo stesso: la stagione piu' recente in cima, e dentro la
-# stessa stagione prima le date fissate.
-GIG_ORDER = "ORDER BY season DESC, gig_date IS NULL, gig_date DESC, id DESC"
-
-
-def current_season():
-    """La stagione di default e' l'anno: chi pianifica per periodi diversi
-    ("Estate 2027") puo' scriverci quello che vuole, e' testo libero."""
-    return str(datetime.now(timezone.utc).year)
+# Una serata = un tentativo di suonare in quel posto. L'ordine e' sempre lo
+# stesso: in cima il tentativo in corso — che una data non ce l'ha ancora —
+# e sotto la storia, dalla serata piu' recente alla piu' vecchia.
+GIG_ORDER = "ORDER BY (gig_date IS NULL) DESC, gig_date DESC, id DESC"
 
 
 def gig_to_dict(row):
@@ -1668,13 +1722,13 @@ def gig_to_dict(row):
 
 
 def current_gig_row(conn, loc_id):
-    """La serata che conta adesso: quella aperta della stagione piu' recente,
-    e se non ce ne sono aperte l'ultima chiusa. E' da qui che il palcoscenico
-    prende lo stato mostrato negli elenchi, ed e' a questa che si attaccano le
-    attivita' registrate."""
+    """La serata che conta adesso: quella aperta, e se non ce ne sono aperte
+    l'ultima chiusa. E' da qui che il palcoscenico prende lo stato mostrato
+    negli elenchi, ed e' a questa che si attaccano le attivita' registrate.
+    Di aperte ce n'e' al massimo una: aprirne una chiude quella di prima."""
     return conn.execute(
         "SELECT * FROM gigs WHERE location_id = ? "
-        "ORDER BY (closed_at IS NULL) DESC, season DESC, id DESC LIMIT 1",
+        "ORDER BY (closed_at IS NULL) DESC, " + GIG_ORDER[len("ORDER BY "):] + " LIMIT 1",
         (loc_id,),
     ).fetchone()
 
@@ -1684,24 +1738,24 @@ def refresh_location_status(conn, loc_id):
     Tenerla aggiornata qui vuol dire che elenchi, filtri e badge continuano a
     funzionare esattamente come prima, senza sapere niente delle serate.
 
-    Senza nessuna serata lo stato torna a "da contattare": e' un posto in
-    rubrica su cui non e' ancora stata aperta nessuna stagione. Lasciare il
-    valore vecchio mostrerebbe "Confermato" su un palcoscenico che non ha
-    nessuna serata confermata.
+    Senza nessuna serata lo stato torna a "lead": e' un posto in rubrica su
+    cui non e' ancora stata aperta nessuna stagione. Lasciare il valore
+    vecchio mostrerebbe "Confermato" su un palcoscenico che non ha nessuna
+    serata confermata.
     """
     row = current_gig_row(conn, loc_id)
     conn.execute(
         "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
-        (row["status"] if row else "da_contattare", now_iso(), loc_id),
+        (row["status"] if row else LEAD_STATUS, now_iso(), loc_id),
     )
 
 
-def insert_gig(conn, loc_id, season, status, ts=None):
+def insert_gig(conn, loc_id, status, ts=None):
     ts = ts or now_iso()
     cur = conn.execute(
-        "INSERT INTO gigs (location_id, season, status, closed_at, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (loc_id, season, status, ts if status in CLOSING_STATUSES else None, ts, ts),
+        "INSERT INTO gigs (location_id, status, closed_at, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (loc_id, status, ts if status in CLOSING_STATUSES else None, ts, ts),
     )
     return cur.lastrowid
 
@@ -1730,17 +1784,26 @@ def next_contact_after_gig(conn, loc_id, gig_row):
     return plus_one_year(base or date.today().isoformat())
 
 
-def next_season_for(conn, loc_id):
-    """La stagione da aprire: l'anno corrente, o l'anno dopo l'ultima stagione
-    gia' usata se si e' andati avanti. Legge le quattro cifre dentro
-    l'etichetta, cosi' funziona anche con "Estate 2027"."""
-    cur = int(current_season())
-    best = cur - 1
-    for r in conn.execute("SELECT season FROM gigs WHERE location_id = ?", (loc_id,)).fetchall():
-        m = SEASON_YEAR_RE.search(str(r["season"] or ""))
-        if m:
-            best = max(best, int(m.group(1)))
-    return str(max(cur, best + 1))
+def require_gig_date_if_confirmed(status, gig_date):
+    """"Confermato" vuol dire che quella sera si suona: senza la data non e'
+    una conferma, e' una speranza. E' anche l'unico stato che mette la serata
+    in calendario — in Agenda e nel riquadro "in calendario" della Home — e
+    senza data lei non ci entra e non la ritrovi piu' finche' non riapri la
+    scheda. Gli altri stati la data la possono non avere: una trattativa
+    aperta senza giorno e' normale."""
+    if status == "confermato" and not (gig_date or "").strip():
+        raise ApiError(400, "Una serata confermata ha una data: mettila prima di salvare.")
+
+
+def gig_is_empty(conn, gig):
+    """Una serata su cui non e' ancora successo niente: nessuna data, nessun
+    compenso, niente scritto su com'e' andata e nessuna attivita' appesa."""
+    if gig["gig_date"] or gig["fee"] is not None or (gig["outcome_note"] or "").strip():
+        return False
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM notes WHERE gig_id = ?", (gig["id"],)
+    ).fetchone()
+    return row["n"] == 0
 
 
 def set_location_status(conn, loc_id, status):
@@ -1756,8 +1819,25 @@ def set_location_status(conn, loc_id, status):
     """
     row = current_gig_row(conn, loc_id)
     ts = now_iso()
+    # Se non c'e' niente di aperto qui sotto nasce una serata nuova, che una
+    # data non ce l'ha: confermarla da qui non si puo'.
+    aperta = row if (row is not None and row["closed_at"] is None) else None
+    require_gig_date_if_confirmed(status, aperta["gig_date"] if aperta else None)
+    if status == LEAD_STATUS:
+        # Rimettere lead non e' cambiare etichetta: e' dire che quel
+        # tentativo non c'e' mai stato. Si puo' solo finche' la serata in
+        # corso e' vuota — un tocco sbagliato si annulla, una trattativa
+        # cominciata no. La strada normale per tornare indietro resta
+        # eliminare la serata dalla scheda, che finisce qui sotto lo stesso.
+        if row is not None and row["closed_at"] is None and gig_is_empty(conn, row):
+            conn.execute("UPDATE notes SET gig_id = NULL WHERE gig_id = ?", (row["id"],))
+            conn.execute("DELETE FROM gigs WHERE id = ?", (row["id"],))
+        elif row is not None:
+            raise ApiError(400, "Questa serata è già cominciata: per toglierla eliminala.")
+        refresh_location_status(conn, loc_id)
+        return
     if row is None or row["closed_at"] is not None:
-        insert_gig(conn, loc_id, next_season_for(conn, loc_id), status, ts)
+        insert_gig(conn, loc_id, status, ts)
     else:
         conn.execute(
             "UPDATE gigs SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?",
@@ -1775,13 +1855,9 @@ def clean_gig_payload(body, partial):
             continue
         value = body[field]
         if field == "status":
-            if value and value not in STATUS_VALUES:
+            if value and value not in GIG_STATUS_VALUES:
                 raise ApiError(400, "Stato non valido")
             value = value or "da_contattare"
-        elif field == "season":
-            value = (value or "").strip()
-            if not value:
-                raise ApiError(400, "La stagione è obbligatoria")
         elif field == "gig_date":
             value = (value or "").strip() or None
             if value and not GIG_DATE_RE.match(value):
@@ -1806,17 +1882,17 @@ def require_location(conn, ws, loc_id):
 def create_gig(conn, ws, loc_id, body):
     require_location(conn, ws, loc_id)
     data = clean_gig_payload(body or {}, partial=False)
-    data.setdefault("season", current_season())
     data.setdefault("status", "da_contattare")
+    require_gig_date_if_confirmed(data["status"], data.get("gig_date"))
     ts = now_iso()
-    # Ripartire per una stagione nuova chiude quelle vecchie rimaste in
-    # sospeso: se di quella trattativa non se n'e' fatto niente per un anno,
-    # aperta non e' piu'. Lo stato resta scritto com'era, la storia non si
-    # riscrive.
+    # Ricominciare chiude il tentativo rimasto in sospeso: di aperta ce n'e'
+    # una sola per volta, ed e' quella che il palcoscenico mostra come stato.
+    # Lo stato di quella vecchia resta scritto com'era: la storia non si
+    # riscrive, si chiude.
     conn.execute(
         "UPDATE gigs SET closed_at = ?, updated_at = ? "
-        "WHERE location_id = ? AND closed_at IS NULL AND season < ?",
-        (ts, ts, loc_id, data["season"]),
+        "WHERE location_id = ? AND closed_at IS NULL",
+        (ts, ts, loc_id),
     )
     fields = ["location_id"] + list(data.keys()) + ["closed_at", "created_at", "updated_at"]
     values = [loc_id] + list(data.values()) + [
@@ -1859,6 +1935,12 @@ def update_gig(conn, ws, gig_id, body):
     loc_id = gig_location_id(conn, ws, gig_id)
     before = conn.execute("SELECT * FROM gigs WHERE id = ?", (gig_id,)).fetchone()
     data = clean_gig_payload(body, partial=True)
+    # La riga come sara' dopo: chi manda solo lo stato lascia in piedi la
+    # data che c'era, chi manda solo la data lascia in piedi lo stato.
+    require_gig_date_if_confirmed(
+        data.get("status", before["status"]),
+        data["gig_date"] if "gig_date" in data else before["gig_date"],
+    )
     closing = (
         "status" in data
         and data["status"] in CLOSING_STATUSES
@@ -1921,7 +2003,11 @@ def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None,
     # vale la pena richiamare questo posto, e viene gratis dalle righe.
     played = [g for g in gigs if g["status"] == "suonato"]
     d["gigs_played"] = len(played)
-    d["seasons_played"] = sorted({g["season"] for g in played}, reverse=True)
+    # Gli anni in cui ci hai suonato, letti dalle date: sono l'unico posto in
+    # cui quell'anno e' un fatto invece di un'etichetta messa dall'app.
+    d["seasons_played"] = sorted(
+        {g["gig_date"][:4] for g in played if g["gig_date"]}, reverse=True
+    )
     open_gigs = [g for g in gigs if g["open"]]
     d["current_gig_id"] = open_gigs[0]["id"] if open_gigs else (gigs[0]["id"] if gigs else None)
     return d
@@ -2019,7 +2105,7 @@ def clean_location_payload(body, partial):
         elif field == "status":
             if value and value not in STATUS_VALUES:
                 raise ApiError(400, "Stato non valido")
-            value = value or "da_contattare"
+            value = value or LEAD_STATUS
         elif field == "favorite":
             value = 1 if value else 0
         elif field == "next_contact_date":
@@ -2038,7 +2124,7 @@ def clean_location_payload(body, partial):
 def create_location(conn, ws, body, owner_email=None):
     data = clean_location_payload(body, partial=False)
     data.setdefault("name", "")
-    data.setdefault("status", "da_contattare")
+    data.setdefault("status", LEAD_STATUS)
     data["owner_email"] = owner_email
     data["workspace_id"] = ws
     ts = now_iso()
@@ -2048,9 +2134,13 @@ def create_location(conn, ws, body, owner_email=None):
     cur = conn.execute(
         f"INSERT INTO locations ({','.join(fields)}) VALUES ({placeholders})", values
     )
-    # Un palcoscenico nuovo e' un tentativo di serata per la stagione in corso:
-    # senza questa riga non ci sarebbe niente su cui registrare la trattativa.
-    insert_gig(conn, cur.lastrowid, current_season(), data["status"], ts)
+    # Un palcoscenico nuovo e' un lead: esiste, e basta. La serata nasce
+    # quando decidi di provarci — aprirla qui vorrebbe dire contare come
+    # tentativo ogni indirizzo trascritto, e a fine stagione il numero dei
+    # tentativi sarebbe una bugia. Chi invece arriva gia' con uno stato di
+    # trattativa la serata ce l'ha subito: li' un tentativo c'e' davvero.
+    if data["status"] != LEAD_STATUS:
+        insert_gig(conn, cur.lastrowid, data["status"], ts)
     conn.commit()
     return fetch_location(conn, ws, cur.lastrowid)
 
@@ -2149,7 +2239,7 @@ def add_note(conn, ws, loc_id, body):
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
     # Aver contattato il posto e' esattamente cosa distingue i due stati di
-    # partenza ("da contattare", "potenziale") da "contattato": avanzarlo qui
+    # partenza ("lead", "da contattare") da "contattato": avanzarlo qui
     # evita di dover cambiare lo stato a mano ogni volta. Da "contattato" in
     # poi non si tocca piu' niente: dove sia arrivata la trattativa lo sa solo
     # chi la sta portando avanti.
@@ -2985,9 +3075,9 @@ def export_zip(conn):
             "ORDER BY w.name, l.name")])))
 
     fogli.append(("serate.csv", _csv_bytes(
-        ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "stagione", "stato",
-         "data", "compenso", "come_e_andata", "chiusa_il", "creata_il"],
-        [(g["id"], g["band"], g["location_id"], g["palco"], g["city"], g["season"], g["status"],
+        ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "stato",
+         "data", "compenso", "note", "chiusa_il", "creata_il"],
+        [(g["id"], g["band"], g["location_id"], g["palco"], g["city"], g["status"],
           g["gig_date"], g["fee"], g["outcome_note"], g["closed_at"], g["created_at"])
          for g in _query(conn,
             "SELECT g.*, l.name AS palco, l.city, w.name AS band FROM gigs g "

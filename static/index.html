@@ -352,7 +352,7 @@
      stella e il pallino di stato — tengono la stessa larghezza anche se
      non crescono, altrimenti i titoli delle righe con e senza foto non
      sarebbero più incolonnati. */
-  .row-cover{flex:none;width:48px;height:48px;border-radius:12px;object-fit:cover;background:var(--fill);}
+  .row-cover{flex:none;width:48px;height:48px;border-radius:8px;object-fit:cover;background:var(--fill);}
   .fav-star-lead{flex:none;width:48px;height:48px;border-radius:12px;background:var(--fill);}
   .avatar{flex:none;width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--fill);margin-right:2px;}
   .avatar-lg{width:84px;height:84px;border-radius:50%;object-fit:cover;background:var(--fill);margin:0 auto 14px;display:block;}
@@ -367,6 +367,10 @@
   .add-note-row textarea:focus, .add-note-row input[type="text"]:focus{outline:none;}
   .add-note-row button{flex:none;background:none;border:none;color:var(--tint);font-weight:600;font-size:16px;cursor:pointer;padding:2px 0 0;}
   .add-note-row button:disabled{color:var(--text-tertiary);}
+  /* Un pulsante rimasto solo nella riga non e' un pulsante in un modulo: e'
+     la riga stessa. Si prende tutta la larghezza, cosi' il tocco non deve
+     cercare due parole in fondo a destra. */
+  .add-note-row button.wide{flex:1;text-align:left;}
   /* ---------- serate ---------- */
   /* La sezione Serate non è un campo del modulo come gli altri: è quello per
      cui la scheda esiste, e in mezzo a Dove, Info, Contatti e Note si
@@ -383,7 +387,6 @@
      dopo il bordo, quindi la linea grigia resta rientrata — che è poi come
      si comportano gli elenchi di sistema. */
   .grouped-list > .swipe-row:not(:first-child) .row-content .gig-row{box-shadow:inset 0 .5px 0 var(--separator);}
-  .gig-season{flex:none;min-width:52px;font-size:13px;font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums;}
   .gig-main{flex:1;min-width:0;}
   .gig-date{font-size:16px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .gig-sub{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
@@ -1725,20 +1728,26 @@
       <div class="section-header">STATO DELLA TRATTATIVA</div>
       <div class="grouped-list">
         <div class="field-row" id="rowStatus">
-          <label id="statusSeasonLabel">Serata</label>
+          <label>Serata</label>
           <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Da contattare</span></div>
         </div>
       </div>
-      <div class="section-footer" id="statusFooter">È lo stato della serata in corso.</div>
-
       <div class="section-header" id="gigsHeader">SERATE</div>
       <div class="grouped-list" id="gigsList"></div>
       <div class="grouped-list" style="margin-top:10px;">
         <div class="add-note-row">
-          <input type="text" id="newGigInput" placeholder="Nuova stagione…" autocomplete="off">
-          <button id="btnNewGig">Aggiungi</button>
+          <button id="btnNewGig" class="wide">Aggiungi serata</button>
         </div>
         <div class="gig-panel" id="newGigFields" hidden></div>
+      </div>
+
+      <div class="section-header">QUANDO RICONTATTARE</div>
+      <div class="grouped-list">
+        <div class="field-row"><label for="fNextContact">Prossimo contatto</label><input id="fNextContact" type="date"><button type="button" class="date-clear" id="btnClearNextContact" aria-label="Togli il promemoria" hidden>Togli</button></div>
+        <div class="field-row stacked">
+          <label for="fPlanningNote">Nota sulla pianificazione</label>
+          <input id="fPlanningNote" type="text" placeholder="es. Pianificano il cartellone a feb/mar" style="text-align:left;">
+        </div>
       </div>
 
       <div class="section-header">PROPRIETARIO</div>
@@ -1751,15 +1760,6 @@
       </div>
       <div class="section-footer">Chi in GigFlow gestisce questo palcoscenico nel gestionale — diverso dal titolare del locale indicato sopra.</div>
 
-      <div class="section-header">QUANDO RICONTATTARE</div>
-      <div class="grouped-list">
-        <div class="field-row"><label for="fNextContact">Prossimo contatto</label><input id="fNextContact" type="date"><button type="button" class="date-clear" id="btnClearNextContact" aria-label="Togli il promemoria" hidden>Togli</button></div>
-        <div class="field-row stacked">
-          <label for="fPlanningNote">Nota sulla pianificazione</label>
-          <input id="fPlanningNote" type="text" placeholder="es. Pianificano il cartellone a feb/mar" style="text-align:left;">
-        </div>
-      </div>
-
       <div class="section-header">ATTIVITÀ</div>
       <div class="grouped-list">
         <div class="act-strip" id="actStrip">
@@ -1769,7 +1769,7 @@
           <button type="button" class="act-chip" data-act="email">✉️ Email</button>
         </div>
       </div>
-      <div class="section-footer">Un tocco la registra con la data di oggi. Se la trattativa era "Da contattare" o "Potenziale" passa a "Contattato".</div>
+      <div class="section-footer">Un tocco la registra con la data di oggi. Se la trattativa era "Lead" o "Da contattare" passa a "Contattato".</div>
 
       <div class="section-header">STORICO CONTATTI</div>
       <div class="grouped-list" id="notesList"></div>
@@ -1886,15 +1886,20 @@
 (function(){
   "use strict";
 
-  /* "Potenziale" sta fra i due stati di partenza per un motivo preciso: "da
-     contattare" e' tutto quello che e' finito in rubrica, "potenziale" e'
-     quello che ci hai guardato dentro e su cui vuoi davvero provarci.
-     Nessuno dei due dice che qualcuno ti abbia risposto, quindi registrare
-     un'attivita' li fa avanzare tutti e due a "contattato" (lo fa il
-     server, vedi PRE_CONTACT_STATUSES in app.py). */
+  /* I due stati di partenza sono due e non uno, e la differenza e' tutta
+     qui: "lead" e' quello che e' finito in rubrica — un import, un nome
+     scritto al volo — e non promette niente; "da contattare" e' quello che
+     hai guardato da vicino e su cui vuoi davvero provarci. Sono due code di
+     lavoro diverse: la prima si smaltisce guardando i social, la seconda col
+     telefono in mano. Nessuna delle due dice che qualcuno ti abbia risposto,
+     quindi registrare un'attivita' le fa avanzare tutte e due a "contattato"
+     (lo fa il server, vedi PRE_CONTACT_STATUSES in app.py).
+
+     Il grigio spento sta sul lead apposta: in un elenco dove quasi tutto e'
+     ancora in rubrica, il colore deve restare a chi si sta muovendo. */
   var STATUSES = [
-    {key:"da_contattare", label:"Da contattare", color:"var(--slate)", soft:"var(--slate-soft)"},
-    {key:"potenziale",    label:"Potenziale",    color:"var(--teal)",  soft:"var(--teal-soft)"},
+    {key:"lead",          label:"Lead",          color:"var(--slate)", soft:"var(--slate-soft)"},
+    {key:"da_contattare", label:"Da contattare", color:"var(--teal)",  soft:"var(--teal-soft)"},
     {key:"contattato",    label:"Contattato",    color:"var(--blue)",  soft:"var(--blue-soft)"},
     {key:"trattativa",    label:"In trattativa", color:"var(--orange)",soft:"var(--orange-soft)"},
     {key:"confermato",    label:"Confermato",    color:"var(--green)", soft:"var(--green-soft)"},
@@ -1903,6 +1908,11 @@
     {key:"annullato",     label:"Annullato",     color:"var(--brown)", soft:"var(--brown-soft)"}
   ];
   function statusInfo(k){ return STATUSES.find(function(s){return s.key===k;}) || STATUSES[0]; }
+  /* Gli stati che una serata puo' avere: tutti tranne "lead". Un lead e' un
+     palcoscenico su cui non hai ancora aperto niente, e nel momento in cui
+     apri la serata quel momento e' passato. Per tornare indietro si elimina
+     la serata, non si rimette l'etichetta. */
+  var GIG_STATUSES = STATUSES.filter(function(s){ return s.key !== "lead"; });
 
   /* I tre modi in cui una serata finisce, e dirli diversi conta: "rifiutato"
      e' un no del titolare, "annullato" e' una serata che era fissata e poi
@@ -1915,10 +1925,11 @@
   var CHEVRON = '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>';
 
   /* ---------------- serate ----------------
-     Una serata e' un tentativo di suonare in quel posto in quella stagione:
-     se va a buon fine ha una data, se sfuma resta la riga con com'e' andata.
-     Lo stato mostrato sul palcoscenico e' quello della serata in corso, per
-     questo ripartire l'anno dopo non cancella niente. */
+     Una serata e' un tentativo di suonare in quel posto: se va a buon fine
+     ha una data, se sfuma resta la riga con quello che ci hai scritto. Lo
+     stato mostrato sul palcoscenico e' quello della serata in corso — e
+     aperta ce n'e' una sola per volta — per questo ripartire l'anno dopo
+     non cancella niente. */
   var NOTE_KIND_META = {
     visita:    {icon:"🚗", label:"Visita"},
     chiamata:  {icon:"📞", label:"Telefonata"},
@@ -1950,13 +1961,6 @@
     return plusOneYearStr(v.next_contact_date || (g && g.gig_date) || todayStr());
   }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
-  function nextSeasonFor(v){
-    var cur = Number(currentSeason());
-    var nums = venueGigs(v).map(function(g){ return parseInt(g.season, 10); })
-      .filter(function(n){ return !isNaN(n); });
-    var max = nums.length ? Math.max.apply(null, nums) : cur - 1;
-    return String(Math.max(cur, max + 1));
-  }
   /* Una stagione chiusa che non e' finita in nessuno dei tre modi buoni e'
      semplicemente finita nel nulla: dirlo e' piu' onesto che mostrare "In
      trattativa" su una trattativa di tre anni fa. */
@@ -2143,15 +2147,10 @@
     });
     return out;
   }
-  /* L'anno di una serata e' quello della sua data. Le stagioni vecchie messe
-     a mano spesso la data non ce l'hanno: li' vale l'anno scritto nella
-     stagione, che e' il meglio che si sa di quella riga. */
-  function gigYear(g){
-    var d = (g.gig_date || "").slice(0, 4);
-    if(d) return d;
-    var m = String(g.season || "").match(/(\d{4})/);
-    return m ? m[1] : "";
-  }
+  /* L'anno di una serata e' quello della sua data. Non c'e' un ripiego:
+     una serata senza data non e' ancora successa, e nei conti di un anno
+     non ci deve entrare. */
+  function gigYear(g){ return (g.gig_date || "").slice(0, 4); }
   /* Migliaia col punto senza passare da toLocaleString: la stessa app gira su
      telefoni con localizzazioni diverse e qui basta la regola italiana. */
   function fmtEuro(n){
@@ -3285,17 +3284,17 @@
      sotto: prima il riquadro ne nominava tre con "e altri 2", sopra una lista
      di palcoscenici scelti con un criterio diverso, e non si capiva su quali
      dei due si stesse premendo. Adesso i candidati sono una lista vera, ogni
-     riga dice la stagione che aprirebbe — non e' la stessa per tutti — e si
-     puo' riproporre anche uno solo. */
+     riga dice quand'e' stata l'ultima volta, e si puo' riproporre anche uno
+     solo. */
   function lastPlayedGig(v){
-    // Le serate arrivano gia' ordinate dal server (stagione e data DESC):
-    // la prima suonata e' la piu' recente.
+    // Le serate arrivano gia' ordinate dal server (in corso in cima, poi per
+    // data DESC): la prima suonata e' la piu' recente.
     return venueGigs(v).filter(function(g){ return g.status === "suonato"; })[0] || null;
   }
   function renewRowHtml(v){
     var g = lastPlayedGig(v);
-    var quando = g ? (g.gig_date ? fmtDateShort(g.gig_date) : ("stagione " + g.season)) : "";
-    var sub = (quando ? "suonato " + esc(quando) + " · " : "") + "apre " + esc(nextSeasonFor(v));
+    var quando = g && g.gig_date ? fmtDateShort(g.gig_date) : "";
+    var sub = quando ? "suonato " + esc(quando) : "ci hai suonato";
     return '<div class="row" data-open-id="'+v.id+'">'+
       '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
       '<div class="row-sub">'+sub+'</div>'+
@@ -3304,7 +3303,7 @@
     '</div>';
   }
   function renewVenue(v){
-    return api("POST", "/api/locations/" + v.id + "/gigs", {season: nextSeasonFor(v)})
+    return api("POST", "/api/locations/" + v.id + "/gigs", {})
       .then(applyUpdatedVenue);
   }
   function renderRenewNudge(){
@@ -3317,7 +3316,7 @@
       ? '<button class="nudge-btn" id="btnRenewAll">Riproponi tutti</button>' : '';
     el.innerHTML = '<div class="nudge"><div class="nudge-head"><div class="nudge-main">'+
         '<div class="nudge-title">'+cands.length+(cands.length===1 ? " palcoscenico dove hai suonato" : " palcoscenici dove hai suonato")+', senza trattativa aperta</div>'+
-        '<div class="nudge-text">Riproporre apre una serata nuova per la stagione scritta qui sotto, in stato «da contattare» e senza data. Le serate degli anni scorsi restano dove sono e non parte nessun messaggio.</div>'+
+        '<div class="nudge-text">Riproporre apre una serata nuova, in stato «da contattare» e senza data. Le serate degli anni scorsi restano dove sono e non parte nessun messaggio.</div>'+
       '</div>'+bulk+'</div></div>'+
       '<div class="grouped-list renew-list">'+cands.map(renewRowHtml).join("")+'</div>';
     var all = document.getElementById("btnRenewAll");
@@ -3341,10 +3340,10 @@
       var id = btn.getAttribute("data-renew");
       var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
       if(!v) return;
-      var stagione = nextSeasonFor(v), nome = v.name || "Senza nome";
+      var nome = v.name || "Senza nome";
       withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
         renderAll();
-        toast("Serata " + stagione + " aperta · " + nome + " ora è in Da ricontattare");
+        toast("Serata aperta · " + nome + " ora è in Da ricontattare");
       }).catch(function(err){ toast(err.message); });
       return;
     }
@@ -3397,7 +3396,7 @@
           return '<div class="grouped-list gig-card">'+
           '<div class="row" data-open-id="'+x.v.id+'">'+
             '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
-            '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+' · stagione '+esc(x.g.season)+'</div>'+
+            '<div class="row-sub">'+fmtDateShort(x.g.gig_date)+'</div>'+
             (x.v.city ? '<div class="row-sub">'+dato(x.v.city)+'</div>' : '')+'</div>'+
           '</div>'+
           '<div class="gig-panel">'+
@@ -3942,12 +3941,10 @@
     });
   });
 
-  /* Lo stato si legge qui e si scrive solo sulla riga della sua stagione,
-     dove si vede sempre quale si sta muovendo. Prima era modificabile in due
-     posti per la stessa cosa: comodo, ma su un palcoscenico con tre stagioni
-     alle spalle non era piu' chiaro quale delle tre stessi cambiando. */
-  var elStatusSeasonLabel = document.getElementById("statusSeasonLabel");
-  var elStatusFooter = document.getElementById("statusFooter");
+  /* Lo stato si legge qui e si scrive solo sulla riga della sua serata, dove
+     si vede sempre quale si sta muovendo. Prima era modificabile in due posti
+     per la stessa cosa: comodo, ma su un palcoscenico con tre serate alle
+     spalle non era piu' chiaro quale delle tre stessi cambiando. */
   function renderStatusRow(v){
     var gigs = venueGigs(v);
     var open = gigs.filter(function(g){ return g.open; })[0];
@@ -3955,20 +3952,11 @@
     var colors = g ? gigStateColors(g) : {color: statusInfo(v.status).color};
     document.getElementById("statusDot").style.background = colors.color;
     document.getElementById("statusValue").textContent = g ? gigStateLabel(g) : statusInfo(v.status).label;
-    elStatusSeasonLabel.textContent = g ? ("Serata " + g.season) : "Serata";
-    if(!g){
-      elStatusFooter.textContent = "Non c'è ancora nessuna serata: aprine una qui sotto per seguire la trattativa.";
-    } else if(open){
-      elStatusFooter.textContent = "Per cambiarlo apri la serata " + g.season + " nell'elenco qui sotto.";
-    } else {
-      elStatusFooter.textContent = "La stagione " + g.season + " è chiusa. Aggiungi una serata qui sotto per ripartire: lo stato seguirà quella nuova.";
-    }
   }
 
   /* ---------------- SERATE nella scheda ---------------- */
   var elGigsList = document.getElementById("gigsList");
   var elGigsHeader = document.getElementById("gigsHeader");
-  var elNewGigInput = document.getElementById("newGigInput");
   var elNewGigFields = document.getElementById("newGigFields");
   var elBtnNewGig = document.getElementById("btnNewGig");
   var expandedGigId = null;
@@ -3981,7 +3969,6 @@
 
   function openGigDraft(g){
     gigDraft = {
-      season: g.season || "",
       status: g.status,
       gig_date: g.gig_date || "",
       fee: (g.fee != null ? String(g.fee) : ""),
@@ -3996,7 +3983,7 @@
   }
   function readGigDraft(){
     if(!gigDraft) return;
-    ["season","gig_date","fee","outcome_note"].forEach(function(f){
+    ["gig_date","fee","outcome_note"].forEach(function(f){
       var el = elGigsList.querySelector('[data-gig-field="'+f+'"]');
       if(el) gigDraft[f] = el.value;
     });
@@ -4011,16 +3998,14 @@
     var d = gigDraft || g;
     var st = statusInfo(d.status);
     return '<div class="gig-panel">'+
-      '<div class="field-row"><label>Stagione</label>'+
-        '<input type="text" placeholder="2027" data-gig-field="season" data-gig-id="'+g.id+'" value="'+esc(d.season)+'"></div>'+
       '<div class="field-row picker" data-gig-status="'+g.id+'"><label>Stato</label>'+
         '<div class="picker-value"><span class="dot" style="background:'+st.color+'"></span><span>'+esc(st.label)+'</span>'+CHEVRON+'</div></div>'+
       '<div class="field-row"><label>Data serata</label>'+
         '<input type="date" data-gig-field="gig_date" data-gig-id="'+g.id+'" value="'+esc(d.gig_date)+'"></div>'+
       '<div class="field-row"><label>Compenso €</label>'+
         '<input type="number" inputmode="decimal" placeholder="350" data-gig-field="fee" data-gig-id="'+g.id+'" value="'+esc(d.fee)+'"></div>'+
-      '<div class="field-row stacked"><label>Com\'è andata</label>'+
-        '<textarea rows="2" placeholder="es. serata piena, ci richiamano a settembre" data-gig-field="outcome_note" data-gig-id="'+g.id+'">'+esc(d.outcome_note)+'</textarea></div>'+
+      '<div class="field-row stacked"><label>Note</label>'+
+        '<textarea rows="2" placeholder="es. accordi presi, a chi chiedere, cosa portare" data-gig-field="outcome_note" data-gig-id="'+g.id+'">'+esc(d.outcome_note)+'</textarea></div>'+
       '<div class="add-note-row" style="justify-content:flex-end;gap:18px;">'+
         '<button type="button" id="btnGigCancel" style="color:var(--text-secondary);">Annulla</button>'+
         '<button type="button" id="btnGigSave" data-gig-id="'+g.id+'">Salva</button>'+
@@ -4034,12 +4019,13 @@
     var fee = fmtFee(g.fee);
     if(fee) sub.push(fee);
     if(g.outcome_note) sub.push(dato(g.outcome_note));
+    /* Senza data non c'e' anno da scrivere, e va bene cosi': e' il tentativo
+       in corso, sta in cima, e l'anno arrivera' quando arrivera' la data. */
     var dateHtml = g.gig_date
       ? fmtDateShort(g.gig_date)
       : '<span style="color:var(--text-tertiary);">Data da fissare</span>';
     var html = '<div class="swipe-row"><div class="row-content">'+
       '<div class="gig-row" data-gig-row="'+g.id+'">'+
-        '<span class="gig-season">'+esc(g.season)+'</span>'+
         '<div class="gig-main"><div class="gig-date">'+dateHtml+'</div>'+
         (sub.length ? '<div class="gig-sub">'+sub.join(" · ")+'</div>' : '')+'</div>'+
         '<div class="row-trail"><span class="row-badge" style="background:'+c.soft+';color:'+c.color+';">'+esc(gigStateLabel(g))+'</span>'+
@@ -4057,7 +4043,6 @@
       : '<div class="gig-empty">Nessuna serata ancora.</div>';
     var played = seasonsPlayedText(v);
     elGigsHeader.textContent = played ? ("Serate · " + played) : "Serate";
-    elNewGigInput.placeholder = nextSeasonFor(v);
   }
 
   /* Chiudere una serata sposta il promemoria di un anno lato server: se la
@@ -4075,13 +4060,24 @@
     if(rerender) renderGigs(updated);
     renderAll();
   }
+  /* "Confermato" senza data non e' una conferma: e' anche l'unico stato che
+     mette la serata in calendario, e senza giorno non ci entra. Lo dice qui
+     prima di partire, e lo ridice il server per chi arriva da un'altra
+     strada (vedi require_gig_date_if_confirmed in app.py). */
+  function mancaLaData(draft){
+    if(draft.status === "confermato" && !draft.gig_date){
+      toast("Una serata confermata ha una data: mettila prima di salvare.");
+      return true;
+    }
+    return false;
+  }
   function saveGigDraft(gigId, btn){
     readGigDraft();
     var v = currentVenue(); if(!v || !gigDraft) return;
+    if(mancaLaData(gigDraft)) return;
     var g = venueGigs(v).filter(function(x){ return String(x.id) === String(gigId); })[0];
     var chiude = !!g && g.open && isClosingStatus(gigDraft.status);
     var body = {
-      season: gigDraft.season,
       status: gigDraft.status,
       gig_date: gigDraft.gig_date,
       fee: gigDraft.fee,
@@ -4110,18 +4106,38 @@
     if(del){
       var delId = del.getAttribute("data-gig-del");
       // Come per l'eliminazione definitiva di un palcoscenico: dire prima
-      // quale stagione si porta via, perche' non si annulla.
+      // quale serata si porta via, perche' non si annulla.
       var dv = currentVenue();
       var dg = dv ? venueGigs(dv).filter(function(x){ return String(x.id) === String(delId); })[0] : null;
       var what = dg
-        ? ("Serata " + dg.season + " · " + (dg.gig_date ? fmtDateShort(dg.gig_date) : gigStateLabel(dg)))
+        ? ("Serata " + (dg.gig_date ? fmtDateShort(dg.gig_date) : gigStateLabel(dg)))
         : "Questa serata";
-      confirmDestructive(what, "Elimina serata", function(){
+      var eliminaSerata = function(){
         api("DELETE", "/api/gigs/" + delId).then(function(updated){
           closeGigDraft();
           applyGigResponse(updated, true);
           toast("Serata eliminata");
         }).catch(function(err){ toast(err.message); });
+      };
+      confirmDestructive(what, "Elimina serata", function(){
+        if(!dg || dg.status !== "suonato"){ eliminaSerata(); return; }
+        /* Una serata suonata non e' una riga come le altre: la data, il
+           compenso e il fatto che ci sei andato stanno scritti li' e da
+           nessun'altra parte, e spariscono anche dai conti della home.
+           Quindi si chiede due volte, e la seconda volta si dice cosa si
+           sta buttando via invece di ripetere "sei sicuro?".
+
+           Il secondo foglio aspetta che il primo sia sceso (.28s di
+           transizione): aperto subito verrebbe chiuso dalla stessa scelta
+           che lo ha appena aperto. */
+        var quanto = fmtFee(dg.fee);
+        var cosa = "Ci hai suonato" +
+          (dg.gig_date ? " il " + fmtDateShort(dg.gig_date) : "") +
+          (quanto ? " per " + quanto : "") +
+          ": sparisce dalle serate suonate e dall'incasso della stagione.";
+        setTimeout(function(){
+          confirmDestructive(cosa, "Elimina lo stesso", eliminaSerata);
+        }, 300);
       });
       return;
     }
@@ -4133,7 +4149,7 @@
       // Il pannello si ridisegna dopo la scelta: prima si mette al riparo
       // quello che e' gia' stato scritto negli altri campi.
       readGigDraft();
-      openSheet({title:"Stato della serata", options: STATUSES.map(function(sv){
+      openSheet({title:"Stato della serata", options: GIG_STATUSES.map(function(sv){
         return {label:sv.label, color:sv.color, checkmark: !!gigDraft && gigDraft.status === sv.key, onSelect:function(){
           if(!gigDraft) return;
           gigDraft.status = sv.key;
@@ -4163,8 +4179,7 @@
   });
 
   /* Aggiungere una serata si compila dove sta il pulsante: i campi si aprono
-     sotto il campo della stagione e la riga nell'elenco compare solo quando
-     salvi. Cosi' non si vede una riga vuota comparire in cima mentre la stai
+     sotto di lui e la riga nell'elenco compare solo quando salvi. Cosi' non si vede una riga vuota comparire in cima mentre la stai
      ancora riempiendo, e se cambi idea non resta niente da cancellare. */
   var newGigOpen = false;
   var newGigDraft = null;
@@ -4183,8 +4198,8 @@
         '<input type="date" id="newGigDate" value="'+esc(newGigDraft.gig_date)+'"></div>'+
       '<div class="field-row"><label>Compenso €</label>'+
         '<input type="number" inputmode="decimal" placeholder="350" id="newGigFee" value="'+esc(newGigDraft.fee)+'"></div>'+
-      '<div class="field-row stacked"><label>Com\'è andata</label>'+
-        '<textarea rows="2" id="newGigNote" placeholder="es. serata piena, ci richiamano a settembre">'+esc(newGigDraft.outcome_note)+'</textarea></div>'+
+      '<div class="field-row stacked"><label>Note</label>'+
+        '<textarea rows="2" id="newGigNote" placeholder="es. accordi presi, a chi chiedere, cosa portare">'+esc(newGigDraft.outcome_note)+'</textarea></div>'+
       '<div class="add-note-row" style="justify-content:flex-end;gap:18px;">'+
         '<button type="button" id="btnNewGigCancel" style="color:var(--text-secondary);">Annulla</button>'+
         '<button type="button" id="btnNewGigSave">Salva</button>'+
@@ -4214,7 +4229,7 @@
     // I campi si ridisegnano dopo la scelta: prima si mette al riparo quello
     // che e' gia' stato scritto.
     readNewGigFields();
-    openSheet({title:"Stato della serata", options: STATUSES.map(function(sv){
+    openSheet({title:"Stato della serata", options: GIG_STATUSES.map(function(sv){
       return {label:sv.label, color:sv.color, checkmark: newGigDraft.status === sv.key, onSelect:function(){
         newGigDraft.status = sv.key;
         renderNewGigFields();
@@ -4225,21 +4240,17 @@
   function saveNewGig(btn){
     var v = currentVenue(); if(!v || !newGigDraft) return;
     readNewGigFields();
-    // Vuoto vuol dire "quella che mi stai proponendo": il segnaposto mostra
-    // gia' la stagione giusta, scriverla a mano serve solo per etichette come
-    // "Estate 2027".
-    var body = {season: elNewGigInput.value.trim() || nextSeasonFor(v), status: newGigDraft.status};
+    if(mancaLaData(newGigDraft)) return;
+    var body = {status: newGigDraft.status};
     if(newGigDraft.gig_date) body.gig_date = newGigDraft.gig_date;
     if(newGigDraft.fee !== "") body.fee = newGigDraft.fee;
     if(newGigDraft.outcome_note) body.outcome_note = newGigDraft.outcome_note;
-    var season = body.season;
     withButtonBusy(btn, function(){
       return api("POST", "/api/locations/" + v.id + "/gigs", body);
     }).then(function(updated){
-      elNewGigInput.value = "";
       closeNewGig();
       applyGigResponse(updated, true);
-      toast("Serata aggiunta: stagione " + season);
+      toast("Serata aggiunta");
     }).catch(function(err){ toast(err.message); });
   }
 
@@ -4410,19 +4421,43 @@
     var v = currentVenue();
     if(!v) return;
     closeGigDraft();
-    elNewGigInput.value = "";
     closeNewGig();
     fillVenueForm(v);
     elDetail.hidden = false;
     requestAnimationFrame(function(){ elDetail.classList.add("in"); });
     if(!v.name){ setTimeout(function(){ fName.focus(); }, 260); }
   }
+  /* Il "+" crea la riga sul server prima che tu abbia scritto qualcosa —
+     serve un id per attaccarci foto e note — quindi aprire la scheda e
+     tornare indietro senza toccare niente lascerebbe un palcoscenico vuoto.
+     Chiudendo si porta via, ma solo se e' rimasto esattamente com'e' nato:
+     "vuoto" si verifica su tutto quello che la scheda sa scrivere e non su
+     quattro campi scelti a mano, altrimenti basta una foto o un indirizzo
+     per perdere una riga che valeva piu' del tocco che l'ha creata. */
+  var CAMPI_DI_SERVIZIO = {
+    id:1, workspace_id:1, status:1, created_at:1, updated_at:1,
+    deleted_at:1, owner_email:1
+  };
+  function venueIsPristine(v){
+    for(var k in v){
+      if(!Object.prototype.hasOwnProperty.call(v, k) || CAMPI_DI_SERVIZIO[k]) continue;
+      var val = v[k];
+      if(val === null || val === undefined || val === "" || val === 0) continue;
+      if(Array.isArray(val) && !val.length) continue;
+      return false;
+    }
+    return true;
+  }
   function closeDetail(){
     var v = currentVenue();
     elDetail.classList.remove("in");
     setTimeout(function(){ elDetail.hidden = true; }, 320);
-    if(v && !v.name && !v.city && !v.phone && !v.email && (!v.notes || !v.notes.length)){
-      api("DELETE", "/api/locations/" + v.id).then(function(){
+    if(v && venueIsPristine(v)){
+      // Definitivo, non archiviato: una riga nata da un tocco e chiusa un
+      // secondo dopo non e' roba da tenere in archivio "per sicurezza".
+      // Archiviarla la faceva sparire dalla lista — e quindi sembrava
+      // cancellata — ma restava li' senza nome, e la ritrovavi mesi dopo.
+      api("DELETE", "/api/locations/" + v.id + "/permanent").then(function(){
         venues = venues.filter(function(x){ return x.id !== v.id; });
         renderAll();
       });
@@ -4446,7 +4481,7 @@
     });
   });
   document.getElementById("fabAdd").addEventListener("click", function(){
-    api("POST", "/api/locations", {name:"", status:"da_contattare"}).then(function(created){
+    api("POST", "/api/locations", {name:"", status:"lead"}).then(function(created){
       venues.push(created);
       openDetail(created.id);
     }).catch(function(err){ toast(err.message); });

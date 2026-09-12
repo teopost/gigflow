@@ -32,7 +32,7 @@ VENUE_TYPE_MAP = {
 }
 
 LEAD_STATUS_MAP = {
-    "non contattato": "da_contattare",
+    "non contattato": "lead",
     "inviata mail": "contattato",
     "inviato whatsapp": "contattato",
     "inviata sia mail che whatsapp": "contattato",
@@ -169,7 +169,7 @@ def import_venues_sheet(conn, rows, existing_names, source_label):
             "city": citta or None,
             "website": website,
             "type": build_venue_type(tipo_raw, name),
-            "status": "da_contattare",
+            "status": "lead",
         }
         location = piazze_app.create_location(conn, data)
 
@@ -231,7 +231,7 @@ def import_bands_sheet(conn, rows, existing_names, source_label):
 # ---------------------------------------------------------------- lead Zoho CRM -> palcoscenici
 
 def build_lead_status(stato_raw):
-    return LEAD_STATUS_MAP.get(stato_raw.lower().strip(), "da_contattare")
+    return LEAD_STATUS_MAP.get(stato_raw.lower().strip(), "lead")
 
 
 def import_leads_sheet(conn, rows, existing_names, source_label):
