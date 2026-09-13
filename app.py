@@ -143,6 +143,13 @@ def is_admin(email):
 # la notifica e' di chi tiene su l'installazione, non del singolo workspace.
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+# L'interruttore per farle tacere senza cancellare token e chat dal .env.
+# Vuoto vuol dire accese: chi ha gia' messo il bot non deve aggiungere niente
+# per continuare a ricevere. Si spegne scrivendo no, off, 0 o false.
+TELEGRAM_SPENTO = {"0", "no", "off", "false"}
+TELEGRAM_ENABLED = (
+    os.environ.get("TELEGRAM_ENABLED", "").strip().lower() not in TELEGRAM_SPENTO
+)
 TELEGRAM_API = "https://api.telegram.org/bot%s/sendMessage"
 # Dopo quanta inattivita' un ritorno nell'app vale come un ingresso nuovo.
 # Le sessioni durano trenta giorni: senza questa soglia si notificherebbe il
@@ -1136,7 +1143,7 @@ def google_fetch_userinfo(access_token):
 # un'altra notify_* e chiamarla dove il fatto succede.
 
 def telegram_enabled():
-    return bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
+    return bool(TELEGRAM_ENABLED and TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
 
 
 def telegram_send(text):
@@ -4413,6 +4420,15 @@ def main():
     init_db()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print("Palcoscenici CRM avviato.")
+    # Scritto all'avvio perche' e' l'unico modo di sapere da fuori se sono
+    # accese: se sono spente per sbaglio, non arriva nessun messaggio e non
+    # arriva nemmeno nessun errore.
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("  Notifiche Telegram: non configurate.")
+    elif not TELEGRAM_ENABLED:
+        print("  Notifiche Telegram: spente da TELEGRAM_ENABLED.")
+    else:
+        print("  Notifiche Telegram: attive.")
     print(f"  Su questo computer: http://localhost:{port}")
     print(f"  Da smartphone (stessa Wi-Fi): http://{local_ip()}:{port}")
     print("Premi Ctrl+C per fermare il server.")

@@ -6,6 +6,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Senza questa, Python tiene lo stdout in un buffer da blocchi e "docker logs"
+# resta vuoto per ore: gli avvisi (compresi quelli delle notifiche Telegram
+# che non partono) si vedrebbero solo al riavvio del container.
+ENV PYTHONUNBUFFERED=1
+
 COPY app.py import_excel.py geocode_venues.py ./
 COPY static/ ./static/
 RUN mkdir -p /app/data
