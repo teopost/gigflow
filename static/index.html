@@ -3254,9 +3254,16 @@
   });
 
   /* Ogni riga si porta dietro quando tocca: la data non e' scritta da
-     nessuna parte, si calcola dal periodo e da oggi. Ordinate per quella. */
+     nessuna parte, si calcola dal periodo e da oggi. Ordinate per quella.
+
+     Chi ha appena suonato resta fuori: "da ricontattare" e' un elenco di
+     cose da fare, e una serata andata a buon fine non lo e'. Si riparte
+     dalla sua riga in Serate, dove lo scorrimento offre "Riproponi" — e da
+     li' il palcoscenico torna "da contattare", quindi ricompare qui. */
   function venuesToRecontact(){
-    return venues.filter(function(v){ return !v.deleted_at && v.recontact_period; })
+    return venues.filter(function(v){
+      return !v.deleted_at && v.recontact_period && v.status !== "suonato";
+    })
       .map(function(v){ return {v: v, due: recontactDue(v)}; })
       .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
   }
@@ -3313,15 +3320,18 @@
     return '<span class="row-badge" style="background:'+colors.soft+';color:'+colors.color+';">'+
       esc(label)+'</span>';
   }
-  /* Lo stato di un palcoscenico e' quello della sua serata in corso, come
-     nella scheda: se non ce n'e' nessuna vale la copia su locations. */
   function whenHtml(tag, color){
     return '<span style="color:'+color+';">'+esc(tag)+'</span>';
   }
+  /* Lo stato di un palcoscenico e' quello che sta su locations: la stessa
+     riga che leggono l'elenco palcoscenici e i preferiti, quindi la stessa
+     pastiglia ovunque. Ricalcolarlo qui dalle serate sembrava equivalente e
+     non lo e': quale sia "la serata in corso" fra tre chiuse lo decide il
+     server (vedi current_gig_row e GIG_ORDER in app.py), e rifare quel conto
+     a mano vuol dire vedere "Suonato" in Agenda e "Da contattare" nella
+     lista, sullo stesso posto. Le righe delle serate invece mostrano lo
+     stato della loro serata, che e' un'altra cosa e sta scritta li'. */
   function venueStatusPill(v){
-    var gigs = venueGigs(v);
-    var g = gigs.filter(function(x){ return x.open; })[0] || gigs[0] || null;
-    if(g) return statusPillHtml(gigStateLabel(g), gigStateColors(g));
     var st = statusInfo(v.status);
     return statusPillHtml(st.label, {color: st.color, soft: st.soft});
   }
@@ -3400,13 +3410,28 @@
     return api("POST", "/api/locations/" + v.id + "/gigs", {})
       .then(applyUpdatedVenue);
   }
+  /* Riproporre da una serata suonata apre la serata nuova sul palcoscenico,
+     non sulla riga toccata: quella e' storia e resta com'e'.
+
+     Aprire una serata chiude quella aperta, qualunque fosse. Se ce n'e' gia'
+     una in corso, riproporre la chiuderebbe di nascosto — una trattativa in
+     piedi buttata via con uno scorrimento. Meglio dirlo e non fare niente. */
+  function renewFromGig(id, btn){
+    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
+    if(!v) return;
+    if(venueGigs(v).some(function(g){ return g.open; })){
+      toast("Qui c'è già una serata aperta: continua da quella.");
+      return;
+    }
+    renewOne(id, btn);
+  }
   function renewOne(id, btn){
     var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
     if(!v) return;
     var nome = v.name || "Senza nome";
     withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
       renderAll();
-      toast("Serata aperta · " + nome);
+      toast("Nuova serata · " + nome + " · da contattare");
     }).catch(function(err){ toast(err.message); });
   }
   /* Il cumulativo solo da due in su: con uno solo direbbe la stessa cosa del
@@ -3441,18 +3466,30 @@
 
   /* La coda dice lo stato, come in ogni altro elenco. Quanto manca sta
      accanto alla data, che e' la cosa a cui si riferisce. Fra le gia'
-     passate non c'e' nessun conto da fare: "tra -400g" non serve a niente. */
+     passate non c'e' nessun conto da fare: "tra -400g" non serve a niente.
+
+     Tre righe come le celle dei palcoscenici — nome, quando, dove e quanto —
+     invece di una riga sola lunga il doppio dello schermo.
+
+     Su una serata suonata lo scorrimento scopre "Riproponi": e' li' che
+     comincia il giro dell'anno dopo, sulla riga della volta scorsa. */
   function gigAgendaRowHtml(x, tag, tagColor){
-    var sub = [fmtDateShort(x.g.gig_date)];
-    if(tag) sub.push(whenHtml(tag, tagColor));
-    if(x.v.city) sub.push(dato(x.v.city));
+    var quando = [fmtDateShort(x.g.gig_date)];
+    if(tag) quando.push(whenHtml(tag, tagColor));
+    var dove = [];
+    if(x.v.city) dove.push(dato(x.v.city));
     var fee = fmtFee(x.g.fee);
-    if(fee) sub.push(fee);
-    return '<div class="row" data-open-id="'+x.v.id+'">'+
+    if(fee) dove.push(fee);
+    var riga = '<div class="row" data-open-id="'+x.v.id+'">'+
       '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
-      '<div class="row-sub">'+sub.join(" · ")+'</div></div>'+
+        '<div class="row-sub">'+quando.join(" · ")+'</div>'+
+        (dove.length ? '<div class="row-sub">'+dove.join(" · ")+'</div>' : '')+'</div>'+
       '<div class="row-trail">'+statusPillHtml(gigStateLabel(x.g), gigStateColors(x.g))+
       CHEVRON+'</div>'+
+    '</div>';
+    if(x.g.status !== "suonato") return riga;
+    return '<div class="swipe-row"><div class="row-content">'+riga+'</div>'+
+      '<div class="row-actions"><button class="role" data-renew="'+x.v.id+'">Riproponi</button></div>'+
     '</div>';
   }
 
@@ -3578,6 +3615,8 @@
       });
       return;
     }
+    var ripr = e.target.closest("[data-renew]");
+    if(ripr){ renewFromGig(ripr.getAttribute("data-renew"), ripr); return; }
     var yes = e.target.closest("[data-played]");
     var no = yes ? null : e.target.closest("[data-cancelled]");
     if(yes || no){
