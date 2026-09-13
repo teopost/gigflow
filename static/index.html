@@ -2877,12 +2877,12 @@
     var st = statusInfo(v.status);
     var subParts = [];
     if(v.type) subParts.push('<span class="type-tag">'+dato(v.type)+'</span>');
-    // Solo l'icona: il nome del titolare finiva in una riga gia' piena di
-    // tipo e art director, e veniva tagliato a meta' quasi sempre. Un nome
-    // troncato non si legge e non si riconosce — che ci sia un titolare si',
-    // quello e' il dato utile da qui, e per sapere chi e' si apre la scheda.
+    // Solo le icone: i nomi finivano in una riga gia' occupata dal tipo, e
+    // venivano tagliati a meta' quasi sempre. Un nome troncato non si legge
+    // e non si riconosce — che ci sia un titolare, o un art director, quello
+    // si' che e' il dato utile da qui. Chi siano si legge nella scheda.
     if(v.contact_name) subParts.push('👤');
-    if(v.art_director_name) subParts.push('🎨 '+dato(v.art_director_name));
+    if(v.art_director_name) subParts.push('🎨');
     var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
     var favHtml = '<button class="fav-star fav-star-lead'+(v.favorite ? ' active' : '')+'" data-fav-id="'+v.id+'" aria-label="Preferito">'+
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="'+(v.favorite ? 'currentColor' : 'none')+'" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>'+
