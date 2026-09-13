@@ -2859,6 +2859,14 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
+  /* Filtri e ricerca non sono la stessa cosa, e la mappa lo dimostra. I
+     filtri dicono quali palcoscenici ti interessano adesso, ed e' esattamente
+     quello che la mappa deve disegnare. La ricerca invece serve a trovarne
+     uno: applicarla alla mappa la svuotava fino a lasciarci un pallino solo,
+     e un pallino solo non e' una mappa — mentre stai cercando un posto per
+     nome, quello che vuoi vedere intorno e' tutto il resto.
+
+     Sull'elenco valgono tutti e due, sulla mappa solo matchesFilter. */
   function matchesFilter(v){
     if(filterStatus !== "all" && v.status !== filterStatus) return false;
     if(filterType !== "all" && v.type !== filterType) return false;
@@ -2871,11 +2879,12 @@
       var dist = haversineKm(nearMeCoords.lat, nearMeCoords.lng, v.lat, v.lng);
       if(dist > nearMeRadiusKm) return false;
     }
-    if(searchText){
-      var hay = ((v.name||"") + " " + (v.city||"") + " " + (v.type||"")).toLowerCase();
-      if(hay.indexOf(searchText.toLowerCase()) === -1) return false;
-    }
     return true;
+  }
+  function matchesSearch(v){
+    if(!searchText) return true;
+    var hay = ((v.name||"") + " " + (v.city||"") + " " + (v.type||"")).toLowerCase();
+    return hay.indexOf(searchText.toLowerCase()) > -1;
   }
 
   function venueRowHtml(v, opts){
@@ -2991,7 +3000,7 @@
   });
 
   function renderList(){
-    var filtered = venues.filter(matchesFilter);
+    var filtered = venues.filter(function(v){ return matchesFilter(v) && matchesSearch(v); });
     // Prima di ogni uscita: l'elenco vuoto esce subito qui sotto, e la
     // mappa non deve restare con i segnalini di prima.
     renderMapMarkers();
@@ -3161,8 +3170,10 @@
     if(!force && firma === mapSignature) return;
     mapSignature = firma;
     mapMarkersLayer.clearLayers();
-    // Gli stessi filtri dell'elenco: una mappa che mostra tutto mentre
-    // l'elenco accanto ne mostra dodici non e' una mappa, e' un inganno.
+    // I filtri dell'elenco, non la sua ricerca: una mappa che mostra tutto
+    // mentre i filtri ne tengono dodici sarebbe un inganno, ma una mappa che
+    // si svuota perche' stai cercando un nome non serve a niente. Cercando
+    // un posto, quello che vuoi vedere e' cosa c'e' intorno.
     var withCoords = visibili;
     var bounds = [];
     withCoords.forEach(function(v){
