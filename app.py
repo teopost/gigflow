@@ -448,6 +448,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
             filename TEXT NOT NULL,
+            is_cover INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
 
@@ -664,6 +665,7 @@ def migrate_schema(conn):
     migrate_drop_season(conn)
     migrate_to_recontact_period(conn)
     migrate_drop_rifiutato(conn)
+    migrate_photos_cover(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
@@ -687,6 +689,16 @@ def migrate_schema(conn):
     # di dire "nessun promemoria" che le query devono distinguere. Qui restano
     # in uno solo, ed e' idempotente.
     conn.execute("UPDATE locations SET recontact_period = NULL WHERE recontact_period = ''")
+
+
+def migrate_photos_cover(conn):
+    """Il segno della copertina sulle foto. Chi non ce l'ha resta com'era:
+    senza nessun segno l'ordine e' quello di arrivo, e la prima foto e' la
+    piu' vecchia — esattamente la copertina che vedeva prima."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(photos)").fetchall()}
+    if "is_cover" in cols:
+        return
+    conn.execute("ALTER TABLE photos ADD COLUMN is_cover INTEGER NOT NULL DEFAULT 0")
 
 
 def migrate_drop_rifiutato(conn):
@@ -1809,6 +1821,12 @@ def to_number_or_none(value, kind=float):
 # e sotto la storia, dalla serata piu' recente alla piu' vecchia.
 GIG_ORDER = "ORDER BY (gig_date IS NULL) DESC, gig_date DESC, id DESC"
 
+# La copertina e' semplicemente la prima foto della striscia: e' quella che
+# si vede nella cella degli elenchi. Finche' "prima" voleva dire "la piu'
+# vecchia", l'unico modo di cambiarla era cancellare tutte quelle davanti.
+# Con il segno la scegli, e le altre restano in ordine di arrivo.
+PHOTO_ORDER = "ORDER BY is_cover DESC, created_at ASC"
+
 
 def gig_to_dict(row):
     d = dict(row)
@@ -2098,8 +2116,10 @@ def fetch_locations(conn, ws, status=None, search=None, include_deleted=False):
         notes_by_location.setdefault(n["location_id"], []).append(dict(n))
 
     photo_rows = conn.execute(
+        # Stesso ordine di PHOTO_ORDER, scritto con il prefisso: qui c'e' un
+        # JOIN, e created_at ce l'hanno tutte e due le tabelle.
         "SELECT p.* FROM photos p JOIN locations l ON l.id = p.location_id "
-        "WHERE l.workspace_id = ? ORDER BY p.created_at ASC", (ws,)
+        "WHERE l.workspace_id = ? ORDER BY p.is_cover DESC, p.created_at ASC", (ws,)
     ).fetchall()
     photos_by_location = {}
     for p in photo_rows:
@@ -2132,7 +2152,7 @@ def fetch_location(conn, ws, loc_id):
     ).fetchall()
     notes_by_location = {loc_id: [dict(n) for n in note_rows]}
     photo_rows = conn.execute(
-        "SELECT * FROM photos WHERE location_id = ? ORDER BY created_at ASC", (loc_id,)
+        "SELECT * FROM photos WHERE location_id = ? " + PHOTO_ORDER, (loc_id,)
     ).fetchall()
     photos_by_location = {loc_id: [dict(p) for p in photo_rows]}
     gig_rows = conn.execute(
@@ -2387,6 +2407,26 @@ def delete_photo(conn, ws, photo_id):
         os.remove(os.path.join(PHOTOS_DIR, row["filename"]))
     except OSError:
         pass
+
+
+def set_photo_cover(conn, ws, photo_id):
+    """Una sola copertina per palcoscenico: si spegne il segno su tutte e lo
+    si accende su questa. Cancellarla non lascia la striscia senza: senza
+    nessun segno torna a comandare l'ordine di arrivo, e la prima e' la piu'
+    vecchia — che e' come si comportava prima di poter scegliere."""
+    row = conn.execute(
+        "SELECT p.location_id FROM photos p JOIN locations l ON l.id = p.location_id "
+        "WHERE p.id = ? AND l.workspace_id = ?", (photo_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Foto non trovata")
+    loc_id = row["location_id"]
+    ts = now_iso()
+    conn.execute("UPDATE photos SET is_cover = 0 WHERE location_id = ?", (loc_id,))
+    conn.execute("UPDATE photos SET is_cover = 1 WHERE id = ?", (photo_id,))
+    conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
+    conn.commit()
+    return fetch_location(conn, ws, loc_id)
 
 
 def art_director_to_dict(row, counts):
@@ -3309,6 +3349,10 @@ def _h_add_photo(conn, match, query, body, ctx):
     return 201, add_photo(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_set_photo_cover(conn, match, query, body, ctx):
+    return 200, set_photo_cover(conn, require_ws(ctx), int(match.group(1)))
+
+
 def _h_delete_photo(conn, match, query, body, ctx):
     delete_photo(conn, require_ws(ctx), int(match.group(1)))
     return 204, {}
@@ -3563,6 +3607,7 @@ ROUTES = [
     ("PUT", re.compile(r"^/api/gigs/(\d+)$"), _h_update_gig),
     ("DELETE", re.compile(r"^/api/gigs/(\d+)$"), _h_delete_gig),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
+    ("PUT", re.compile(r"^/api/photos/(\d+)/cover$"), _h_set_photo_cover),
     ("DELETE", re.compile(r"^/api/photos/(\d+)$"), _h_delete_photo),
     ("GET", re.compile(r"^/api/art_directors$"), _h_list_art_directors),
     ("POST", re.compile(r"^/api/art_directors$"), _h_create_art_director),
