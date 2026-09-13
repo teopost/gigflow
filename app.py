@@ -21,7 +21,7 @@ import urllib.request
 import io
 import uuid
 import zipfile
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, urlencode, unquote, quote
 
@@ -194,7 +194,7 @@ LOCATION_FIELDS = [
     # Rinominare la colonna avrebbe voluto dire spostare i numeri gia'
     # inseriti, quindi il fisso arriva accanto come "landline".
     "contact_name", "landline", "phone", "email", "website", "capacity", "genre",
-    "art_director_id", "status", "next_contact_date", "planning_note", "favorite",
+    "art_director_id", "status", "recontact_period", "planning_note", "favorite",
     "owner_email",
 ]
 
@@ -296,6 +296,29 @@ CLOSING_STATUSES = {"suonato", "rifiutato", "annullato"}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+# Il promemoria di ricontatto non e' una data: e' un periodo dell'anno. Un
+# locale si richiama piu' o meno quando lo si richiamava l'anno prima —
+# "PalaRubicone a ottobre" — e l'anno di quella frase non lo sa nessuno,
+# perche' sono tutti. Scriverci dentro un anno voleva dire inventarselo, e
+# poi correggerlo a ogni serata chiusa: il promemoria camminava avanti di un
+# anno per volta e finiva nel 2029. Qui dentro c'e' solo quello che sai:
+# "10" (in ottobre) oppure "10-15" (il 15 di ottobre). L'anno lo mette la
+# vista, che sa che giorno e' oggi.
+RECONTACT_PERIOD_RE = re.compile(r"^(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?$")
+
+# Il 29 febbraio si puo' scrivere: ci sono anni in cui esiste, e l'occorrenza
+# lo scala al 28 dove non c'e'. Il 31 di novembre no: non esiste mai.
+GIORNI_NEL_MESE = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+
+def valid_recontact_period(value):
+    if not RECONTACT_PERIOD_RE.match(value):
+        return False
+    if len(value) == 2:
+        return True
+    return int(value[3:]) <= GIORNI_NEL_MESE[int(value[:2]) - 1]
+
+
 # Il tipo di attivita' fatta sul palcoscenico. "nota" e' il default e copre
 # tutto quello che si scriveva prima che le attivita' avessero un tipo.
 NOTE_KINDS = {"nota", "visita", "chiamata", "messaggio", "email"}
@@ -348,7 +371,7 @@ def init_db():
             genre TEXT,
             art_director_id INTEGER REFERENCES art_directors(id) ON DELETE SET NULL,
             status TEXT NOT NULL DEFAULT 'da_contattare',
-            next_contact_date TEXT,
+            recontact_period TEXT,
             planning_note TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -532,7 +555,6 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_invites_workspace ON invites(workspace_id);
         CREATE INDEX IF NOT EXISTS idx_locations_status ON locations(status);
         CREATE INDEX IF NOT EXISTS idx_photos_location ON photos(location_id);
-        CREATE INDEX IF NOT EXISTS idx_locations_next_contact ON locations(next_contact_date);
         CREATE INDEX IF NOT EXISTS idx_notes_location ON notes(location_id);
         CREATE INDEX IF NOT EXISTS idx_venue_list_values ON venue_list_values(workspace_id, list_key);
         CREATE INDEX IF NOT EXISTS idx_reports_email ON reports(email);
@@ -636,6 +658,7 @@ def migrate_schema(conn):
     migrate_to_workspaces(conn)
     migrate_to_gigs(conn)
     migrate_drop_season(conn)
+    migrate_to_recontact_period(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
@@ -656,9 +679,47 @@ def migrate_schema(conn):
     )
 
     # Svuotare il promemoria scriveva stringa vuota invece di NULL: due modi
-    # di dire "nessuna data" che le query devono distinguere. Qui restano in
-    # uno solo, ed e' idempotente.
-    conn.execute("UPDATE locations SET next_contact_date = NULL WHERE next_contact_date = ''")
+    # di dire "nessun promemoria" che le query devono distinguere. Qui restano
+    # in uno solo, ed e' idempotente.
+    conn.execute("UPDATE locations SET recontact_period = NULL WHERE recontact_period = ''")
+
+
+def migrate_to_recontact_period(conn):
+    """Il promemoria di ricontatto smette di essere una data e diventa il
+    periodo dell'anno in cui quel posto si richiama.
+
+    L'anno li' dentro non l'aveva deciso nessuno. Chiudere una serata
+    riscriveva il promemoria come "quello di prima, piu' un anno": con tre
+    serate suonate il promemoria si trovava tre anni avanti, e infatti in
+    archivio c'era un palcoscenico suonato ad agosto 2026 da richiamare a
+    maggio 2029. Il periodo invece e' un fatto — "a ottobre" — e vale per
+    ogni anno, quindi non c'e' piu' niente da ricalcolare e niente che possa
+    camminare da solo.
+
+    Il rinomino gira una volta sola: al riavvio dopo la colonna si chiama
+    gia' cosi'. Dell'anno non si perde niente che valesse la pena tenere —
+    era sempre l'anno in corso piu' uno, scritto dall'app.
+
+    L'indice invece si rifa' ogni volta, ed e' l'unico che non sta insieme
+    agli altri in init_db: li' verrebbe creato prima di questa funzione, su
+    una colonna che su un archivio vecchio ha ancora il nome di prima.
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(locations)").fetchall()}
+    if "recontact_period" not in cols:
+        conn.execute("ALTER TABLE locations RENAME COLUMN next_contact_date TO recontact_period")
+        # "2027-10-15" -> "10-15": resta il giorno che avevi scelto, se
+        # l'avevi scelto. Chi aveva messo il primo del mese si ritrova "il 1
+        # di ottobre" invece di "in ottobre", ed e' giusto cosi': quella e'
+        # la data che aveva scritto, e per dire "in ottobre" bastera'
+        # togliere il giorno.
+        conn.execute(
+            "UPDATE locations SET recontact_period = substr(recontact_period, 6) "
+            "WHERE recontact_period LIKE '____-__-__'"
+        )
+    conn.execute("DROP INDEX IF EXISTS idx_locations_next_contact")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_locations_recontact ON locations(recontact_period)"
+    )
 
 
 def migrate_drop_season(conn):
@@ -1760,30 +1821,6 @@ def insert_gig(conn, loc_id, status, ts=None):
     return cur.lastrowid
 
 
-def plus_one_year(date_str):
-    """Stessa data, anno dopo. Il 29 febbraio scala al 28: meglio una data
-    buona che nessuna."""
-    try:
-        d = date.fromisoformat((date_str or "").strip())
-    except ValueError:
-        return None
-    try:
-        return d.replace(year=d.year + 1).isoformat()
-    except ValueError:
-        return d.replace(year=d.year + 1, day=28).isoformat()
-
-
-def next_contact_after_gig(conn, loc_id, gig_row):
-    """Un locale si ricontatta piu' o meno nello stesso periodo ogni anno.
-    La base migliore e' il promemoria che ti eri gia' dato per quel posto;
-    se non ce n'e' uno, la data della serata; in mancanza di tutto, oggi."""
-    row = conn.execute(
-        "SELECT next_contact_date FROM locations WHERE id = ?", (loc_id,)
-    ).fetchone()
-    base = (row["next_contact_date"] if row else None) or (gig_row["gig_date"] if gig_row else None)
-    return plus_one_year(base or date.today().isoformat())
-
-
 def require_gig_date_if_confirmed(status, gig_date):
     """"Confermato" vuol dire che quella sera si suona: senza la data non e'
     una conferma, e' una speranza. E' anche l'unico stato che mette la serata
@@ -1901,17 +1938,11 @@ def create_gig(conn, ws, loc_id, body):
     placeholders = ",".join("?" for _ in fields)
     conn.execute(f"INSERT INTO gigs ({','.join(fields)}) VALUES ({placeholders})", values)
     refresh_location_status(conn, loc_id)
-    # Aprire una stagione senza promemoria faceva sparire il palcoscenico
-    # dall'Agenda: fuori dal riquadro "Riproponi" perche' ormai una trattativa
-    # aperta ce l'ha, e fuori da "Da ricontattare" che va a data. Aprire una
-    # stagione vuol dire che da adesso li devi richiamare, quindi se un
-    # promemoria non c'e' la data e' oggi. Se ce n'era gia' uno non si tocca:
-    # "richiamali a febbraio" resta febbraio.
-    conn.execute(
-        "UPDATE locations SET next_contact_date = ?, updated_at = ? "
-        "WHERE id = ? AND COALESCE(next_contact_date, '') = ''",
-        (date.today().isoformat(), now_iso(), loc_id),
-    )
+    # Qui ci stava una riga che, aprendo una stagione senza promemoria, ne
+    # scriveva uno con la data di oggi: serviva solo a non far sparire il
+    # palcoscenico dall'Agenda, che allora erano due elenchi con due criteri
+    # diversi. Adesso l'elenco e' uno e va a periodo: aprire una serata non
+    # e' dire quando ririchiamarli, e l'app non lo scrive al posto tuo.
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 
@@ -1928,10 +1959,10 @@ def gig_location_id(conn, ws, gig_id):
 
 
 def update_gig(conn, ws, gig_id, body):
-    """`next_contact_date` non e' un campo della serata ma del palcoscenico:
-    si accetta lo stesso qui perche' chiudere una serata e darsi la data per
-    ripartire sono una cosa sola, e farne due chiamate lascerebbe la serata
-    chiusa senza promemoria se la seconda fallisce."""
+    """`recontact_period` non e' un campo della serata ma del palcoscenico:
+    si accetta lo stesso qui perche' chiudere una serata e dire quando
+    ririchiamarli sono una cosa sola, e farne due chiamate lascerebbe la
+    serata chiusa senza promemoria se la seconda fallisce."""
     loc_id = gig_location_id(conn, ws, gig_id)
     before = conn.execute("SELECT * FROM gigs WHERE id = ?", (gig_id,)).fetchone()
     data = clean_gig_payload(body, partial=True)
@@ -1940,11 +1971,6 @@ def update_gig(conn, ws, gig_id, body):
     require_gig_date_if_confirmed(
         data.get("status", before["status"]),
         data["gig_date"] if "gig_date" in data else before["gig_date"],
-    )
-    closing = (
-        "status" in data
-        and data["status"] in CLOSING_STATUSES
-        and before["closed_at"] is None
     )
     if data:
         if "status" in data:
@@ -1956,24 +1982,16 @@ def update_gig(conn, ws, gig_id, body):
         )
         refresh_location_status(conn, loc_id)
 
-    # Solo sul passaggio a chiusa: correggere il compenso di una serata gia'
-    # suonata non deve rispostare il promemoria.
-    if "next_contact_date" in body:
-        wanted = (body.get("next_contact_date") or "").strip() or None
-        if wanted and not GIG_DATE_RE.match(wanted):
-            raise ApiError(400, "Data di ricontatto non valida")
+    # Il pannello "Ho suonato" chiede anche quando ririchiamarli, e da li'
+    # arriva il periodo. Nessuno lo ricalcola per conto suo: "a ottobre" vale
+    # l'anno prossimo come quest'anno, non c'e' niente da spostare.
+    if "recontact_period" in body:
+        wanted = (body.get("recontact_period") or "").strip() or None
+        if wanted and not valid_recontact_period(wanted):
+            raise ApiError(400, "Periodo di ricontatto non valido")
         conn.execute(
-            "UPDATE locations SET next_contact_date = ?, updated_at = ? WHERE id = ?",
+            "UPDATE locations SET recontact_period = ?, updated_at = ? WHERE id = ?",
             (wanted, now_iso(), loc_id),
-        )
-    elif closing:
-        # La riga DOPO l'aggiornamento: il pannello salva data e chiusura in
-        # una volta sola, quindi guardando quella di prima la data della
-        # serata non ci sarebbe ancora e si ripiegherebbe su oggi.
-        after = conn.execute("SELECT * FROM gigs WHERE id = ?", (gig_id,)).fetchone()
-        conn.execute(
-            "UPDATE locations SET next_contact_date = ?, updated_at = ? WHERE id = ?",
-            (next_contact_after_gig(conn, loc_id, after or before), now_iso(), loc_id),
         )
     conn.commit()
     return fetch_location(conn, ws, loc_id)
@@ -2108,13 +2126,13 @@ def clean_location_payload(body, partial):
             value = value or LEAD_STATUS
         elif field == "favorite":
             value = 1 if value else 0
-        elif field == "next_contact_date":
+        elif field == "recontact_period":
             # Vuoto vuol dire "non ricontattarli": si scrive NULL, non "",
             # cosi' e' lo stesso niente con cui nasce un palcoscenico e le
             # query che cercano il promemoria non devono sapere di due vuoti.
             value = (value or "").strip() or None
-            if value and not GIG_DATE_RE.match(value):
-                raise ApiError(400, "Data di ricontatto non valida")
+            if value and not valid_recontact_period(value):
+                raise ApiError(400, "Periodo di ricontatto non valido")
         elif isinstance(value, str):
             value = value.strip()
         data[field] = value
@@ -3060,12 +3078,12 @@ def export_zip(conn):
     fogli.append(("palcoscenici.csv", _csv_bytes(
         ["id", "band", "nome", "tipo", "categoria", "contesto", "stagionalita", "periodo",
          "citta", "indirizzo", "lat", "lng", "capienza", "genere", "titolare", "telefono",
-         "cellulare", "email", "sito", "art_director", "stato", "prossimo_contatto",
+         "cellulare", "email", "sito", "art_director", "stato", "periodo_ricontatto",
          "promemoria", "preferito", "inserito_da", "archiviato_il", "creato_il", "aggiornato_il"],
         [(r["id"], r["band"], r["name"], r["type"], r["category"], r["context"], r["seasonality"],
           r["live_period"], r["city"], r["address"], r["lat"], r["lng"], r["capacity"], r["genre"],
           r["contact_name"], r["landline"], r["phone"], r["email"], r["website"], r["ad"],
-          r["status"], r["next_contact_date"], r["planning_note"],
+          r["status"], r["recontact_period"], r["planning_note"],
           "sì" if r["favorite"] else "", r["owner_email"], r["deleted_at"],
           r["created_at"], r["updated_at"])
          for r in _query(conn,

@@ -293,15 +293,13 @@
   /* ---------- field rows (forms, native settings-style) ---------- */
   .field-row{display:flex;align-items:center;gap:12px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);}
   .field-row + .field-row{border-top:.5px solid var(--separator);}
+  /* display:flex batte [hidden]: senza questa la riga del giorno resterebbe
+     li' anche quando un mese non c'e'. */
+  .field-row[hidden]{display:none;}
   .field-row label{flex:0 0 118px;font-size:16px;color:var(--text);}
   .field-row input, .field-row select{flex:1;min-width:0;border:none;background:transparent;font-size:16px;color:var(--text);text-align:right;padding:0;font-family:inherit;}
   .field-row input::placeholder{color:var(--text-tertiary);}
   .field-row input:focus{outline:none;}
-  /* Un <input type="date"> sul telefono non si svuota: il calendario
-     nativo sa solo scegliere un giorno. Senza questo pulsante una data
-     messa per sbaglio restava li' per sempre. */
-  .date-clear{flex:none;border:none;background:transparent;color:var(--tint);font-size:15px;font-family:inherit;padding:0 0 0 12px;cursor:pointer;}
-  .date-clear:active{opacity:.5;}
   .field-row.stacked{flex-direction:column;align-items:stretch;gap:6px;}
   .field-row.stacked label{flex:none;font-size:13px;color:var(--text-secondary);}
   .field-row.stacked textarea{border:none;background:transparent;font-size:16px;color:var(--text);font-family:inherit;resize:vertical;min-height:44px;padding:0;}
@@ -410,15 +408,13 @@
   .act-chip:active{opacity:.55;}
 
   /* ---------- avvisi dell'agenda ---------- */
-  .nudge{margin:12px 16px 2px;background:var(--tint-soft);border-radius:10px;padding:13px 14px;}
-  .nudge-title{font-size:15px;font-weight:600;color:var(--text);}
-  .nudge-text{font-size:13px;color:var(--text-secondary);line-height:1.45;margin-top:3px;}
-  .nudge-btn{margin-top:10px;border:none;border-radius:8px;background:var(--tint);color:#fff;font-size:14px;font-weight:600;font-family:inherit;padding:9px 15px;cursor:pointer;}
+  .nudge-btn{border:none;border-radius:8px;background:var(--tint);color:#fff;font-size:14px;font-weight:600;font-family:inherit;padding:9px 15px;cursor:pointer;}
   .nudge-btn:active{opacity:.7;}
-  .nudge-head{display:flex;align-items:flex-start;gap:10px;}
-  .nudge-main{flex:1;min-width:0;}
-  .nudge-head .nudge-btn{margin-top:2px;flex:none;}
-  .renew-list{margin-top:8px;}
+  /* Una riga sola sopra l'elenco: quello che resta del riquadro di prima,
+     che aveva un titolo, una spiegazione e una lista tutta sua. */
+  .bulk-row{display:flex;align-items:center;gap:10px;margin:12px 16px 2px;}
+  .bulk-row span{flex:1;min-width:0;font-size:13px;color:var(--text-secondary);}
+  .bulk-row .nudge-btn{flex:none;}
   .renew-btn{border:none;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:9px 13px;cursor:pointer;}
   .renew-btn:active{opacity:.7;}
   /* ---- Home: tessere e grafici. Nessuna libreria: barre in CSS, cosi'
@@ -672,7 +668,7 @@
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact">
-        <div id="renewNudge"></div>
+        <div id="recontactBulk"></div>
         <div id="recontactList"></div>
       </div>
       <div id="agendaPaneGigs" hidden>
@@ -1743,12 +1739,22 @@
 
       <div class="section-header">QUANDO RICONTATTARE</div>
       <div class="grouped-list">
-        <div class="field-row"><label for="fNextContact">Prossimo contatto</label><input id="fNextContact" type="date"><button type="button" class="date-clear" id="btnClearNextContact" aria-label="Togli il promemoria" hidden>Togli</button></div>
+        <div class="field-row picker" id="rowRecontactMonth">
+          <label>Periodo</label>
+          <div class="picker-value"><span id="recontactMonthValue">— nessun promemoria —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row picker" id="rowRecontactDay" hidden>
+          <label>Giorno</label>
+          <div class="picker-value"><span id="recontactDayValue">tutto il mese</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row stacked">
           <label for="fPlanningNote">Nota sulla pianificazione</label>
           <input id="fPlanningNote" type="text" placeholder="es. Pianificano il cartellone a feb/mar" style="text-align:left;">
         </div>
       </div>
+      <div class="section-footer">Il periodo vale ogni anno: «ottobre» torna ogni ottobre, e non c'è nessun anno da correggere. Il giorno mettilo solo se conta davvero. In Agenda il palcoscenico si accende quando il periodo arriva e si spegne quando apri la serata — perché riprovarci è proprio quello.</div>
 
       <div class="section-header">PROPRIETARIO</div>
       <div class="grouped-list">
@@ -1943,22 +1949,87 @@
     var m = String(d.getMonth()+1), day = String(d.getDate());
     return d.getFullYear() + "-" + (m.length<2 ? "0"+m : m) + "-" + (day.length<2 ? "0"+day : day);
   }
-  /* Un locale si ricontatta piu' o meno nello stesso periodo ogni anno: la
-     base e' il promemoria che ti eri gia' dato, poi la data della serata,
-     poi oggi. Stessa regola del server, cosi' quello che vedi proposto nel
-     form e' quello che verrebbe scritto comunque. */
-  function plusOneYearStr(dateStr){
-    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || "");
-    if(!m) return "";
-    var y = Number(m[1]) + 1, mm = m[2], dd = m[3];
-    if(mm === "02" && dd === "29"){
-      var bisestile = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-      if(!bisestile) dd = "28";
-    }
-    return y + "-" + mm + "-" + dd;
+  /* Il promemoria di ricontatto e' un periodo dell'anno, non una data:
+     "10" vuol dire "in ottobre", "10-15" "il 15 di ottobre". Un locale si
+     richiama piu' o meno quando lo si richiamava l'anno prima, e l'anno di
+     quella frase non lo sa nessuno perche' sono tutti: lo mette qui la
+     vista, che sa che giorno e' oggi. Stesse regole del server (vedi
+     RECONTACT_PERIOD_RE in app.py). */
+  var MESI = ["gennaio","febbraio","marzo","aprile","maggio","giugno",
+              "luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  var GIORNI_NEL_MESE = [31,29,31,30,31,30,31,31,30,31,30,31];
+  function pad2(n){ return n < 10 ? "0" + n : String(n); }
+  function periodParts(p){
+    var m = /^(\d{2})(?:-(\d{2}))?$/.exec(p || "");
+    return m ? {mese: Number(m[1]), giorno: m[2] ? Number(m[2]) : 0} : null;
   }
-  function proposedNextContact(v, g){
-    return plusOneYearStr(v.next_contact_date || (g && g.gig_date) || todayStr());
+  function periodLabel(p){
+    var q = periodParts(p);
+    return q ? ((q.giorno ? q.giorno + " " : "") + MESI[q.mese - 1]) : "";
+  }
+  function periodPhrase(p){
+    var q = periodParts(p);
+    return q ? (q.giorno ? "il " + periodLabel(p) : "a " + MESI[q.mese - 1]) : "";
+  }
+  /* Il periodo in un anno preciso. Il 29 febbraio si puo' scrivere — ci sono
+     anni in cui esiste — e negli altri scala al 28: meglio un giorno buono
+     che nessuno. Senza giorno vale il primo del mese. */
+  function periodOccurrence(p, anno){
+    var q = periodParts(p);
+    if(!q) return "";
+    var ultimo = new Date(anno, q.mese, 0).getDate();
+    return anno + "-" + pad2(q.mese) + "-" + pad2(Math.min(q.giorno || 1, ultimo));
+  }
+  /* Quando tocca, e se e' gia' passato senza che tu abbia fatto niente.
+
+     "Fatto per quest'anno" non e' una casella da spuntare: e' aver aperto
+     una serata dopo l'ultima occorrenza. Riprendere il giro *e'* aprire il
+     tentativo, e un pulsante "fatto" che non apre niente lascerebbe quel
+     tentativo fuori dal conto di fine stagione.
+
+     Il confronto con la data di nascita del palcoscenico serve a non dare
+     dell'inadempiente a chi a gennaio scrive "a ottobre": l'ottobre scorso
+     non era suo, e senza questo si accenderebbe rosso il giorno stesso. */
+  function recontactDue(v){
+    var p = v && v.recontact_period;
+    if(!p) return null;
+    var oggi = todayStr(), anno = Number(oggi.slice(0, 4));
+    var quest = periodOccurrence(p, anno);
+    var scorsa = quest <= oggi ? quest : periodOccurrence(p, anno - 1);
+    var nato = (v.created_at || "").slice(0, 10);
+    var ripreso = venueGigs(v).some(function(g){
+      return (g.created_at || "").slice(0, 10) >= scorsa;
+    });
+    if(scorsa >= nato && !ripreso) return {date: scorsa, late: true};
+    return {date: quest > oggi ? quest : periodOccurrence(p, anno + 1), late: false};
+  }
+  /* Il foglio dei mesi, uguale ovunque si scelga un periodo: nella scheda e
+     nel pannello "Ho suonato". Cambiare mese non butta via il giorno che
+     avevi scelto — lo accorcia, se in quel mese non ci sta. */
+  function openMonthSheet(current, onPick){
+    var q = periodParts(current);
+    var opts = [{label:"— nessun promemoria —", destructive: !!q, onSelect:function(){ onPick(""); }}];
+    MESI.forEach(function(nome, i){
+      var mm = pad2(i + 1);
+      opts.push({label: nome, checkmark: !!q && q.mese === i + 1, onSelect: function(){
+        onPick(q && q.giorno ? mm + "-" + pad2(Math.min(q.giorno, GIORNI_NEL_MESE[i])) : mm);
+      }});
+    });
+    openSheet({title:"Quando ricontattare", options: opts});
+  }
+  function openDaySheet(current, onPick){
+    var q = periodParts(current);
+    if(!q) return;
+    var mm = pad2(q.mese);
+    var opts = [{label:"tutto il mese", checkmark: !q.giorno, onSelect:function(){ onPick(mm); }}];
+    for(var d = 1; d <= GIORNI_NEL_MESE[q.mese - 1]; d++){
+      (function(d){
+        opts.push({label: d + " " + MESI[q.mese - 1], checkmark: q.giorno === d, onSelect:function(){
+          onPick(mm + "-" + pad2(d));
+        }});
+      })(d);
+    }
+    openSheet({title:"Il giorno", options: opts});
   }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
   /* Una stagione chiusa che non e' finita in nessuno dei tre modi buoni e'
@@ -2229,7 +2300,7 @@
       });
     });
     prossime.sort(function(a, b){ return a.gig_date < b.gig_date ? -1 : 1; });
-    var daFare = venuesToRecontact().filter(function(v){ return daysUntil(v.next_contact_date) <= 7; }).length;
+    var daFare = venuesToRecontact().filter(function(x){ return daysUntil(x.due.date) <= 7; }).length;
 
     var html = '<div class="home-tiles">'+
       tileHtml(String(quest.length), (quest.length === 1 ? "serata suonata" : "serate suonate") + " nel " + anno) +
@@ -3177,9 +3248,20 @@
     renderRecontact();
   });
 
+  /* Ogni riga si porta dietro quando tocca: la data non e' scritta da
+     nessuna parte, si calcola dal periodo e da oggi. Ordinate per quella. */
   function venuesToRecontact(){
-    return venues.filter(function(v){ return !v.deleted_at && v.next_contact_date; })
-      .slice().sort(function(a,b){ return a.next_contact_date < b.next_contact_date ? -1 : 1; });
+    return venues.filter(function(v){ return !v.deleted_at && v.recontact_period; })
+      .map(function(v){ return {v: v, due: recontactDue(v)}; })
+      .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
+  }
+  /* Chi e' in ritardo e non ha niente di aperto: sono le righe su cui
+     "Riproponi" ha senso, ed e' anche l'insieme su cui agisce il pulsante
+     cumulativo in cima. */
+  function dueToRenew(){
+    return venuesToRecontact().filter(function(x){
+      return x.due.late && !venueGigs(x.v).some(function(g){ return g.open; });
+    });
   }
   function datedGigRows(){
     var out = [];
@@ -3192,7 +3274,7 @@
 
   function renderRecontact(){
     renderRecontactList();
-    renderRenewNudge();
+    renderRenewAll();
     renderAgendaGigs();
     if(agendaView === "gigs"){
       var n = datedGigRows().length;
@@ -3214,18 +3296,27 @@
      promemoria non ha piu' senso — e fin qui l'unico modo di toglierlo era
      aprire la scheda. Un palcoscenico archiviato esce da solo dall'elenco:
      venuesToRecontact() salta chi ha deleted_at. */
-  function recontactRowHtml(v){
-    var d = daysUntil(v.next_contact_date);
-    var tag = d < 0 ? ("scaduto · "+Math.abs(d)+"g") : (d === 0 ? "oggi" : ("tra "+d+"g"));
-    var color = d < 0 ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
+  function recontactRowHtml(x){
+    var v = x.v, d = daysUntil(x.due.date);
+    var tag = d === 0 ? "oggi"
+      : (x.due.late ? ("scaduto · "+Math.abs(d)+"g") : ("tra "+d+"g"));
+    var color = x.due.late ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
+    // Il pulsante sta dove starebbe la freccia, e solo dove serve: se e'
+    // arrivato il momento e non c'e' niente di aperto, la cosa da fare e'
+    // una sola. Negli altri casi la riga si apre e basta.
+    var aperta = venueGigs(v).some(function(g){ return g.open; });
+    var trail = (x.due.late && !aperta)
+      ? '<button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button>'
+      : CHEVRON;
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+fmtDateShort(v.next_contact_date)+
+        '<div class="row-sub">'+esc(periodLabel(v.recontact_period))+
+          (aperta ? ' · trattativa aperta' : '')+
           (v.planning_note ? ' · '+dato(v.planning_note) : '')+'</div>'+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
-        CHEVRON+'</div>'+
+        trail+'</div>'+
       '</div></div>'+
       '<div class="row-actions two">'+
         '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
@@ -3237,24 +3328,24 @@
      quindi basta confrontare l'anno-mese con quello della riga precedente:
      "questo mese ne ho tre" e' la domanda vera quando pianifichi. */
   function renderRecontactList(){
-    var withDate = venuesToRecontact();
-    if(!withDate.length){
+    var righe = venuesToRecontact();
+    if(!righe.length){
       elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div><h2>Niente da ricontattare</h2>'+
-        '<p>Apri un palcoscenico e imposta "Prossimo contatto" per ricordarti quando richiamarlo — utile per chi pianifica presto, come i bagni al mare a febbraio/marzo.</p></div>';
+        '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p></div>';
       return;
     }
     var html = "";
     var currentMonth = null;
-    withDate.forEach(function(v){
-      var month = (v.next_contact_date || "").slice(0, 7);
+    righe.forEach(function(x){
+      var month = x.due.date.slice(0, 7);
       if(month !== currentMonth){
         if(currentMonth !== null) html += '</div>';
-        var quanti = withDate.filter(function(x){ return (x.next_contact_date || "").slice(0, 7) === month; }).length;
-        html += '<div class="agenda-group">'+esc(monthLabel(v.next_contact_date))+
+        var quanti = righe.filter(function(y){ return y.due.date.slice(0, 7) === month; }).length;
+        html += '<div class="agenda-group">'+esc(monthLabel(x.due.date))+
           '<span class="group-count">'+quanti+'</span></div><div class="grouped-list">';
         currentMonth = month;
       }
-      html += recontactRowHtml(v);
+      html += recontactRowHtml(x);
     });
     elRecontactList.innerHTML = html + '</div>';
   }
@@ -3263,93 +3354,62 @@
     if(purge){ purgeVenueRow(purge.getAttribute("data-purge-id")); return; }
     var del = e.target.closest("[data-del-id]");
     if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
+    var btn = e.target.closest("[data-renew]");
+    if(btn){ renewOne(btn.getAttribute("data-renew"), btn); return; }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
 
-  /* Il giro annuale non scatta da solo a mezzanotte: qui si vede chi ti ha
-     dato una serata e non ha piu' una trattativa aperta, e si riparte con un
-     tocco. Meglio un promemoria che un automatismo: la stagione nuova la
-     decidi tu, non il calendario. */
-  function renewCandidates(){
-    return venues.filter(function(v){
-      if(v.deleted_at) return false;
-      var gigs = venueGigs(v);
-      if(!gigs.length) return false;
-      if(gigs.some(function(g){ return g.open; })) return false;
-      return gigs.some(function(g){ return g.status === "suonato"; });
-    });
-  }
-  /* Il pulsante cumulativo agisce su un insieme che non e' quello elencato
-     sotto: prima il riquadro ne nominava tre con "e altri 2", sopra una lista
-     di palcoscenici scelti con un criterio diverso, e non si capiva su quali
-     dei due si stesse premendo. Adesso i candidati sono una lista vera, ogni
-     riga dice quand'e' stata l'ultima volta, e si puo' riproporre anche uno
-     solo. */
-  function lastPlayedGig(v){
-    // Le serate arrivano gia' ordinate dal server (in corso in cima, poi per
-    // data DESC): la prima suonata e' la piu' recente.
-    return venueGigs(v).filter(function(g){ return g.status === "suonato"; })[0] || null;
-  }
-  function renewRowHtml(v){
-    var g = lastPlayedGig(v);
-    var quando = g && g.gig_date ? fmtDateShort(g.gig_date) : "";
-    var sub = quando ? "suonato " + esc(quando) : "ci hai suonato";
-    return '<div class="row" data-open-id="'+v.id+'">'+
-      '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-      '<div class="row-sub">'+sub+'</div>'+
-      (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
-      '<div class="row-trail"><button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button></div>'+
-    '</div>';
-  }
+  /* Il giro annuale non scatta da solo a mezzanotte: il periodo dice quando
+     tocca, e riproporsi resta un tocco tuo. Meglio un promemoria che un
+     automatismo: la stagione nuova la decidi tu, non il calendario.
+
+     Prima questo stava in un riquadro suo, con una lista sua scelta con un
+     altro criterio: due elenchi uno sopra l'altro, e un palcoscenico poteva
+     stare in tutti e due o in nessuno. Adesso l'elenco e' uno solo e il
+     pulsante sta sulla riga di chi lo aspetta. */
   function renewVenue(v){
     return api("POST", "/api/locations/" + v.id + "/gigs", {})
       .then(applyUpdatedVenue);
   }
-  function renderRenewNudge(){
-    var el = document.getElementById("renewNudge");
-    var cands = renewCandidates();
-    if(!cands.length){ el.innerHTML = ""; return; }
-    // Con un solo candidato il pulsante in testa direbbe la stessa cosa del
-    // pulsante della sua unica riga.
-    var bulk = cands.length > 1
-      ? '<button class="nudge-btn" id="btnRenewAll">Riproponi tutti</button>' : '';
-    el.innerHTML = '<div class="nudge"><div class="nudge-head"><div class="nudge-main">'+
-        '<div class="nudge-title">'+cands.length+(cands.length===1 ? " palcoscenico dove hai suonato" : " palcoscenici dove hai suonato")+', senza trattativa aperta</div>'+
-        '<div class="nudge-text">Riproporre apre una serata nuova, in stato «da contattare» e senza data. Le serate degli anni scorsi restano dove sono e non parte nessun messaggio.</div>'+
-      '</div>'+bulk+'</div></div>'+
-      '<div class="grouped-list renew-list">'+cands.map(renewRowHtml).join("")+'</div>';
-    var all = document.getElementById("btnRenewAll");
-    if(!all) return;
-    all.addEventListener("click", function(){
+  function renewOne(id, btn){
+    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
+    if(!v) return;
+    var nome = v.name || "Senza nome";
+    withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
+      renderAll();
+      toast("Serata aperta · " + nome);
+    }).catch(function(err){ toast(err.message); });
+  }
+  /* Il cumulativo solo da due in su: con uno solo direbbe la stessa cosa del
+     pulsante della sua riga, due centimetri piu' in alto. */
+  function renderRenewAll(){
+    var el = document.getElementById("recontactBulk");
+    var cands = dueToRenew();
+    if(cands.length < 2){ el.innerHTML = ""; return; }
+    el.innerHTML = '<div class="bulk-row"><span>'+cands.length+' aspettano di essere ripresi</span>'+
+      '<button class="nudge-btn" id="btnRenewAll">Riproponi tutti</button></div>';
+    document.getElementById("btnRenewAll").addEventListener("click", function(){
       withButtonBusy(this, function(){
-        return cands.reduce(function(chain, v){
-          return chain.then(function(){ return renewVenue(v); });
+        return cands.reduce(function(chain, x){
+          return chain.then(function(){ return renewVenue(x.v); });
         }, Promise.resolve());
       }).then(function(){
         renderAll();
-        // Dire dove sono finiti: escono da questo riquadro appena hanno una
-        // trattativa aperta, e senza saperlo sembrano spariti.
-        toast(cands.length + (cands.length===1 ? " serata aperta" : " serate aperte") + " · ora in Da ricontattare");
+        toast(cands.length + " serate aperte, in stato «da contattare»");
       }).catch(function(err){ toast(err.message); });
     });
   }
-  document.getElementById("renewNudge").addEventListener("click", function(e){
-    var btn = e.target.closest("[data-renew]");
-    if(btn){
-      var id = btn.getAttribute("data-renew");
-      var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
-      if(!v) return;
-      var nome = v.name || "Senza nome";
-      withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
-        renderAll();
-        toast("Serata aperta · " + nome + " ora è in Da ricontattare");
-      }).catch(function(err){ toast(err.message); });
-      return;
-    }
-    var row = e.target.closest("[data-open-id]");
-    if(row) openDetail(row.getAttribute("data-open-id"));
-  });
+
+  /* Il periodo scelto nel pannello "Ho suonato", finche' non premi il
+     pulsante. Si parte da quello che il palcoscenico ha gia'; se non ha
+     niente, dal mese della serata — se hai suonato ad agosto, ad agosto ci
+     si riprova. Solo la prima volta: da li' in poi comanda la tua scelta,
+     che deve sopravvivere ai ridisegni dell'elenco. */
+  var confPeriodo = {};
+  function proposedPeriod(v, g){
+    return v.recontact_period || (g && g.gig_date ? g.gig_date.slice(5) : "");
+  }
 
   function gigAgendaRowHtml(x, tag, tagColor){
     var sub = [fmtDateShort(x.g.gig_date)];
@@ -3386,6 +3446,9 @@
     // Una data passata non vuol dire che hai suonato: le serate si annullano.
     // Meglio chiederlo che cambiare lo stato al posto tuo.
     var toConfirm = past.filter(function(x){ return x.g.status === "confermato"; });
+    toConfirm.forEach(function(x){
+      if(confPeriodo[x.g.id] === undefined) confPeriodo[x.g.id] = proposedPeriod(x.v, x.g);
+    });
     var html = "";
     if(toConfirm.length){
       // Una cella per serata invece di un elenco unico: ognuna e' alta tre
@@ -3402,9 +3465,10 @@
           '<div class="gig-panel">'+
             '<div class="field-row stacked"><label>Com\'è andata</label>'+
               '<textarea rows="2" id="conf-note-'+x.g.id+'" placeholder="es. serata piena, ci richiamano">'+esc(x.g.outcome_note || "")+'</textarea></div>'+
-            '<div class="field-row"><label>Prossimo contatto</label>'+
-              '<input type="date" id="conf-date-'+x.g.id+'" value="'+esc(proposedNextContact(x.v, x.g))+'">'+
-              '<button type="button" class="date-clear" data-clear-date="'+x.g.id+'" aria-label="Togli il promemoria">Togli</button></div>'+
+            '<div class="field-row picker" data-conf-period="'+x.g.id+'"><label>Quando ricontattarli</label>'+
+              '<div class="picker-value"><span>'+
+                (confPeriodo[x.g.id] ? esc(periodLabel(confPeriodo[x.g.id])) : "— nessun promemoria —")+
+              '</span><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div></div>'+
           '</div>'+
           '<div class="gig-confirm">'+
             '<button type="button" class="yes" data-played="'+x.g.id+'">Ho suonato</button>'+
@@ -3470,12 +3534,13 @@
     elAgendaGigs.innerHTML = html;
   }
   elAgendaGigs.addEventListener("click", function(e){
-    // Qui basta svuotare il campo: la data parte con la conferma, e
-    // vuota vuol dire gia' "non ricontattarli".
-    var clr = e.target.closest("[data-clear-date]");
-    if(clr){
-      var clrEl = document.getElementById("conf-date-" + clr.getAttribute("data-clear-date"));
-      if(clrEl) clrEl.value = "";
+    var per = e.target.closest("[data-conf-period]");
+    if(per){
+      var pid = per.getAttribute("data-conf-period");
+      openMonthSheet(confPeriodo[pid], function(scelto){
+        confPeriodo[pid] = scelto;
+        renderAgendaGigs();
+      });
       return;
     }
     var yes = e.target.closest("[data-played]");
@@ -3483,20 +3548,19 @@
     if(yes || no){
       var gigId = yes ? yes.getAttribute("data-played") : no.getAttribute("data-cancelled");
       var noteEl = document.getElementById("conf-note-" + gigId);
-      var dateEl = document.getElementById("conf-date-" + gigId);
       // "Annullata" qui vuol dire che la serata e' saltata, non che il
       // locale ha detto di no: prima dell'esistenza di "annullato" finiva
       // in "rifiutato", che raccontava una cosa diversa da quella successa.
       var payload = {status: yes ? "suonato" : "annullato"};
       if(noteEl) payload.outcome_note = noteEl.value;
-      // Anche se e' vuota: svuotare il campo vuol dire "non ricontattarli".
-      if(dateEl) payload.next_contact_date = dateEl.value;
+      // Anche se e' vuoto: "— nessun promemoria —" vuol dire non richiamarli.
+      payload.recontact_period = confPeriodo[gigId] || "";
       api("PUT", "/api/gigs/" + gigId, payload).then(function(updated){
         applyUpdatedVenue(updated);
         renderAll();
-        syncNextContactField(updated);
+        renderRecontactRows(updated);
         toast((yes ? "Segnata come suonata" : "Segnata come annullata") +
-          (updated.next_contact_date ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
+          (updated.recontact_period ? " · li richiami " + periodPhrase(updated.recontact_period) : ""));
       }).catch(function(err){ toast(err.message); });
       return;
     }
@@ -3512,7 +3576,7 @@
   });
 
   function updateRecontactBadge(){
-    var overdueOrSoon = venuesToRecontact().filter(function(v){ return daysUntil(v.next_contact_date) <= 7; }).length;
+    var overdueOrSoon = venuesToRecontact().filter(function(x){ return daysUntil(x.due.date) <= 7; }).length;
     var today = todayStr();
     var toConfirm = datedGigRows().filter(function(x){
       return x.g.status === "confermato" && x.g.gig_date < today;
@@ -3533,7 +3597,6 @@
       fPhone = document.getElementById("fPhone"),
       fEmail = document.getElementById("fEmail"),
       fWebsite = document.getElementById("fWebsite"),
-      fNextContact = document.getElementById("fNextContact"),
       fPlanningNote = document.getElementById("fPlanningNote"),
       fNewNote = document.getElementById("fNewNote"),
       notesList = document.getElementById("notesList"),
@@ -3573,27 +3636,42 @@
   bindField(fPhone, "phone");
   bindField(fEmail, "email");
   bindField(fWebsite, "website");
-  bindField(fNextContact, "next_contact_date");
-  /* Il pulsante compare solo se una data c'e': su un campo gia' vuoto
-     "Togli" non vuol dire niente. Il salvataggio e' immediato, non a
-     350ms come gli altri campi: qui non stai digitando, hai deciso. */
-  var elClearNextContact = document.getElementById("btnClearNextContact");
-  function syncClearNextContact(){
-    elClearNextContact.hidden = !fNextContact.value;
-  }
-  fNextContact.addEventListener("input", syncClearNextContact);
-  elClearNextContact.addEventListener("click", function(){
-    if(!currentId) return;
-    clearTimeout(saveTimers["next_contact_date"]);
-    fNextContact.value = "";
-    syncClearNextContact();
-    patchVenue("next_contact_date", "").then(function(updated){
-      applyUpdatedVenue(updated);
-      renderAll();
-      toast("Promemoria tolto");
-    }).catch(function(err){ toast(err.message); });
-  });
   bindField(fPlanningNote, "planning_note");
+
+  /* Il periodo si sceglie da un foglio, non si digita: i mesi sono dodici e
+     il giorno quasi sempre non serve. La riga del giorno esiste solo se un
+     mese c'e' — "il 15 di niente" non vuol dire niente — e il salvataggio e'
+     immediato, non a 350ms come i campi di testo: qui non stai digitando,
+     hai scelto. */
+  var elRowRecontactMonth = document.getElementById("rowRecontactMonth"),
+      elRowRecontactDay = document.getElementById("rowRecontactDay"),
+      elRecontactMonthValue = document.getElementById("recontactMonthValue"),
+      elRecontactDayValue = document.getElementById("recontactDayValue");
+
+  function renderRecontactRows(v){
+    if(!v || String(v.id) !== String(currentId)) return;
+    var q = periodParts(v.recontact_period);
+    elRecontactMonthValue.textContent = q ? MESI[q.mese - 1] : "— nessun promemoria —";
+    elRowRecontactDay.hidden = !q;
+    elRecontactDayValue.textContent = q && q.giorno ? String(q.giorno) : "tutto il mese";
+  }
+  function saveRecontactPeriod(p){
+    if(!currentId) return;
+    patchVenue("recontact_period", p).then(function(updated){
+      applyUpdatedVenue(updated);
+      renderRecontactRows(updated);
+      renderAll();
+      toast(p ? "Li richiami " + periodPhrase(p) : "Promemoria tolto");
+    }).catch(function(err){ toast(err.message); });
+  }
+  elRowRecontactMonth.addEventListener("click", function(){
+    var v = currentVenue();
+    if(v) openMonthSheet(v.recontact_period, saveRecontactPeriod);
+  });
+  elRowRecontactDay.addEventListener("click", function(){
+    var v = currentVenue();
+    if(v) openDaySheet(v.recontact_period, saveRecontactPeriod);
+  });
 
   function renderPhotosStrip(v){
     var photos = v.photos || [];
@@ -4045,18 +4123,10 @@
     elGigsHeader.textContent = played ? ("Serate · " + played) : "Serate";
   }
 
-  /* Chiudere una serata sposta il promemoria di un anno lato server: se la
-     scheda e' aperta, il campo deve mostrarlo subito invece di restare
-     fermo sul valore vecchio finche' non la si riapre. */
-  function syncNextContactField(updated){
-    if(String(updated.id) !== String(currentId)) return;
-    fNextContact.value = updated.next_contact_date || "";
-    syncClearNextContact();
-  }
   function applyGigResponse(updated, rerender){
     applyUpdatedVenue(updated);
     renderStatusRow(updated);
-    syncNextContactField(updated);
+    renderRecontactRows(updated);
     if(rerender) renderGigs(updated);
     renderAll();
   }
@@ -4075,8 +4145,6 @@
     readGigDraft();
     var v = currentVenue(); if(!v || !gigDraft) return;
     if(mancaLaData(gigDraft)) return;
-    var g = venueGigs(v).filter(function(x){ return String(x.id) === String(gigId); })[0];
-    var chiude = !!g && g.open && isClosingStatus(gigDraft.status);
     var body = {
       status: gigDraft.status,
       gig_date: gigDraft.gig_date,
@@ -4088,8 +4156,7 @@
     }).then(function(updated){
       closeGigDraft();
       applyGigResponse(updated, true);
-      toast("Serata salvata" + ((chiude && updated.next_contact_date)
-        ? " · ricontatto il " + fmtDateShort(updated.next_contact_date) : ""));
+      toast("Serata salvata");
     }).catch(function(err){ toast(err.message); });
   }
 
@@ -4362,8 +4429,7 @@
     fPhone.value = v.phone || "";
     fEmail.value = v.email || "";
     fWebsite.value = v.website || "";
-    fNextContact.value = v.next_contact_date || "";
-    syncClearNextContact();
+    renderRecontactRows(v);
     fPlanningNote.value = v.planning_note || "";
     setDato(elSaveIndicatorTitle, v.name, "Nuovo palcoscenico");
     renderPhotosStrip(v);
@@ -4400,7 +4466,6 @@
       phone: fPhone.value,
       email: fEmail.value,
       website: fWebsite.value,
-      next_contact_date: fNextContact.value,
       planning_note: fPlanningNote.value
     };
   }

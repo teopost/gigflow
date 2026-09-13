@@ -47,7 +47,7 @@ SERATA_VERA = """
 """
 
 DA_SCREMARE = """
-    SELECT l.id, l.name, l.city, l.next_contact_date,
+    SELECT l.id, l.name, l.city, l.recontact_period,
            (SELECT COUNT(*) FROM gigs g WHERE g.location_id = l.id) AS serate,
            (SELECT COUNT(*) FROM notes n WHERE n.location_id = l.id
               AND n.kind IS NOT NULL AND n.kind != 'nota') AS attivita
@@ -69,8 +69,8 @@ def main():
     print("%d palcoscenici tornano lead:\n" % len(righe))
     for r in righe:
         segni = []
-        if r["next_contact_date"]:
-            segni.append("promemoria " + r["next_contact_date"])
+        if r["recontact_period"]:
+            segni.append("promemoria " + r["recontact_period"])
         if r["attivita"]:
             segni.append("%d attività registrate" % r["attivita"])
         print("  %-38s %-26s %s" % (
