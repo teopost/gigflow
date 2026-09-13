@@ -277,6 +277,9 @@
   #btnFavorite.fav-active{color:#f5a623;}
   .row-chevron{flex:none;color:var(--text-tertiary);}
   .row-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
+  /* La stessa pastiglia dentro la riga di mezzo, in Agenda: alta quanto il
+     testo che le sta accanto, cosi' dice lo stato senza alzare la riga. */
+  .row-sub .row-badge{display:inline-block;vertical-align:text-bottom;padding:0 7px;line-height:16px;}
 
   /* Il plettro e' il marchio di GigFlow: e' quello che sta nell'icona
      dell'app, ed e' quello che deve comparire dove prima c'era un
@@ -351,6 +354,11 @@
      non crescono, altrimenti i titoli delle righe con e senza foto non
      sarebbero più incolonnati. */
   .row-cover{flex:none;width:48px;height:48px;border-radius:8px;object-fit:cover;background:var(--fill);}
+  /* Palcoscenici e preferiti: un pixel in meno sopra e sotto, e la copertina
+     due pixel piu' vicina al bordo. Sono le uniche righe che cominciano con
+     un'immagine, e con l'incolonnamento di tutte le altre restava troppo
+     staccata dal bordo della cella. */
+  .row.row-venue{padding:10px 16px 10px 14px;}
   .fav-star-lead{flex:none;width:48px;height:48px;border-radius:12px;background:var(--fill);}
   .avatar{flex:none;width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--fill);margin-right:2px;}
   .avatar-lg{width:84px;height:84px;border-radius:50%;object-fit:cover;background:var(--fill);margin:0 auto 14px;display:block;}
@@ -2884,7 +2892,7 @@
       : '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
         '<button data-purge-id="'+v.id+'">Elimina</button>';
     return '<div class="swipe-row" data-id="'+v.id+'">'+
-      '<div class="row-content"><div class="row'+(v.deleted_at ? ' row-deleted' : '')+'" data-open-id="'+v.id+'">'+
+      '<div class="row-content"><div class="row row-venue'+(v.deleted_at ? ' row-deleted' : '')+'" data-open-id="'+v.id+'">'+
         leadingHtml+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+
@@ -3296,6 +3304,25 @@
      promemoria non ha piu' senso — e fin qui l'unico modo di toglierlo era
      aprire la scheda. Un palcoscenico archiviato esce da solo dall'elenco:
      venuesToRecontact() salta chi ha deleted_at. */
+  /* La pastiglia dello stato, la stessa dell'elenco palcoscenici. In Agenda
+     non c'era: "quando" senza "a che punto siamo" costringe ad aprire la
+     scheda per saperlo. Sta in testa alla riga di mezzo e non nella coda,
+     dove c'e' gia' il conto dei giorni — due pastiglie in fila si mangiano
+     il nome del posto su uno schermo stretto. */
+  function statusPillHtml(label, colors){
+    return '<span class="row-badge" style="background:'+colors.soft+';color:'+colors.color+';">'+
+      esc(label)+'</span>';
+  }
+  /* Lo stato di un palcoscenico e' quello della sua serata in corso, come
+     nella scheda: se non ce n'e' nessuna vale la copia su locations. */
+  function venueStatusPill(v){
+    var gigs = venueGigs(v);
+    var g = gigs.filter(function(x){ return x.open; })[0] || gigs[0] || null;
+    if(g) return statusPillHtml(gigStateLabel(g), gigStateColors(g));
+    var st = statusInfo(v.status);
+    return statusPillHtml(st.label, {color: st.color, soft: st.soft});
+  }
+
   function recontactRowHtml(x){
     var v = x.v, d = daysUntil(x.due.date);
     var tag = d === 0 ? "oggi"
@@ -3311,8 +3338,7 @@
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+esc(periodLabel(v.recontact_period))+
-          (aperta ? ' · trattativa aperta' : '')+
+        '<div class="row-sub">'+venueStatusPill(v)+' '+esc(periodLabel(v.recontact_period))+
           (v.planning_note ? ' · '+dato(v.planning_note) : '')+'</div>'+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+color+';">'+tag+'</span>'+
@@ -3411,6 +3437,11 @@
     return v.recontact_period || (g && g.gig_date ? g.gig_date.slice(5) : "");
   }
 
+  /* La coda dice quanto manca, la riga di mezzo a che punto siamo. Prima lo
+     stato stava nella coda, ma solo dove non c'era altro da mettere: le
+     prossime serate mostravano i giorni e lo stato non lo diceva nessuno.
+     Fra le gia' passate la coda resta vuota — "tra -400g" non serve a niente
+     e la data e' li' sotto. */
   function gigAgendaRowHtml(x, tag, tagColor){
     var sub = [fmtDateShort(x.g.gig_date)];
     if(x.v.city) sub.push(dato(x.v.city));
@@ -3418,8 +3449,10 @@
     if(fee) sub.push(fee);
     return '<div class="row" data-open-id="'+x.v.id+'">'+
       '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
-      '<div class="row-sub">'+sub.join(" · ")+'</div></div>'+
-      '<div class="row-trail"><span class="row-badge" style="background:transparent;color:'+tagColor+';">'+esc(tag)+'</span>'+
+      '<div class="row-sub">'+statusPillHtml(gigStateLabel(x.g), gigStateColors(x.g))+' '+
+        sub.join(" · ")+'</div></div>'+
+      '<div class="row-trail">'+
+        (tag ? '<span class="row-badge" style="background:transparent;color:'+tagColor+';">'+esc(tag)+'</span>' : '')+
       CHEVRON+'</div>'+
     '</div>';
   }
@@ -3493,11 +3526,14 @@
     }
     if(proposte.length){
       // Non spariscono: una data che stai trattando serve almeno a non
-      // prenderne un'altra lo stesso giorno. Qui la pastiglia dice lo stato,
-      // che e' l'informazione che manca.
+      // prenderne un'altra lo stesso giorno. Sono date future come le
+      // confermate, quindi la coda conta i giorni come li'; a distinguerle
+      // dalle confermate ci pensa la pastiglia dello stato.
       html += '<div class="agenda-group">Date non confermate<span class="group-count">'+proposte.length+'</span></div><div class="grouped-list">' +
         proposte.map(function(x){
-          return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
+          var d = daysUntil(x.g.gig_date);
+          return gigAgendaRowHtml(x, d === 0 ? "oggi" : ("tra " + d + "g"),
+            d <= 7 ? "var(--orange)" : "var(--text-secondary)");
         }).join("") + '</div>';
     }
     /* Le passate si accumulano per sempre: una decina l'anno diventano cento
@@ -3526,7 +3562,7 @@
           (tot ? " · " + fmtEuro(tot) : "")+'</span>'+CHEVRON+'</div>';
         if(aperto){
           html += '<div class="grouped-list">'+ righe.map(function(x){
-            return gigAgendaRowHtml(x, gigStateLabel(x.g), gigStateColors(x.g).color);
+            return gigAgendaRowHtml(x);
           }).join("") +'</div>';
         }
       });
