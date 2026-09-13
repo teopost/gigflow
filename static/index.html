@@ -3333,7 +3333,8 @@
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
         (sub.length ? '<div class="row-sub">'+sub.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
-        '<div class="row-trail"><button type="button" class="renew-btn" data-period="'+v.id+'">Quando?</button></div>'+
+        '<div class="row-trail">'+venueStatusPill(v)+
+          '<button type="button" class="renew-btn" data-period="'+v.id+'">Quando?</button></div>'+
       '</div></div>'+
       '<div class="row-actions two">'+
         '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
@@ -3343,9 +3344,12 @@
   }
   /* Raggruppati per stato invece che in un elenco solo lungo duecento
      righe: cosi' si vede subito che l'arretrato vero sono i contattati, e
-     dentro ogni gruppo l'ordine e' alfabetico. Lo stato lo dice
-     l'intestazione, quindi sulla riga non serve la pastiglia e la coda resta
-     libera per il gesto che serve qui: scegliere il periodo. */
+     dentro ogni gruppo l'ordine e' alfabetico.
+
+     La pastiglia c'e' lo stesso, anche se l'intestazione del gruppo dice la
+     stessa cosa: e' nella stessa colonna di tutti gli altri elenchi, e una
+     riga che finisce sotto l'intestazione sbagliata mentre scorri non
+     dovrebbe costare una risalita per capire cos'e'. */
   function renderPlanList(){
     var righe = venuesToPlan();
     if(!righe.length){
