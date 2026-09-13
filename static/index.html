@@ -1914,7 +1914,6 @@
     {key:"contattato",    label:"Contattato",    color:"var(--blue)",  soft:"var(--blue-soft)"},
     {key:"trattativa",    label:"In trattativa", color:"var(--orange)",soft:"var(--orange-soft)"},
     {key:"confermato",    label:"Confermato",    color:"var(--green)", soft:"var(--green-soft)"},
-    {key:"rifiutato",     label:"Rifiutato",     color:"var(--red)",   soft:"var(--red-soft)"},
     {key:"suonato",       label:"Suonato",       color:"var(--purple)",soft:"var(--purple-soft)"},
     {key:"annullato",     label:"Annullato",     color:"var(--brown)", soft:"var(--brown-soft)"}
   ];
@@ -1925,12 +1924,12 @@
      la serata, non si rimette l'etichetta. */
   var GIG_STATUSES = STATUSES.filter(function(s){ return s.key !== "lead"; });
 
-  /* I tre modi in cui una serata finisce, e dirli diversi conta: "rifiutato"
-     e' un no del titolare, "annullato" e' una serata che era fissata e poi
-     e' saltata — piove, il locale chiude, succede. Riproporsi l'anno dopo
-     dopo una pioggia e' tutt'altra conversazione che dopo un no.
+  /* I due modi in cui una serata finisce davvero: ci sei andato, oppure era
+     fissata e poi e' saltata — piove, il locale chiude, succede. Un no del
+     titolare non e' la fine di niente: e' un anno che non si e' fatto, e
+     quel posto o lo richiami l'anno prossimo o esce dalla rubrica.
      Stessa lista di CLOSING_STATUSES in app.py. */
-  var CLOSING_STATUSES = ["suonato", "rifiutato", "annullato"];
+  var CLOSING_STATUSES = ["suonato", "annullato"];
   function isClosingStatus(s){ return CLOSING_STATUSES.indexOf(s) > -1; }
 
   var CHEVRON = '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>';
@@ -3622,9 +3621,10 @@
     if(yes || no){
       var gigId = yes ? yes.getAttribute("data-played") : no.getAttribute("data-cancelled");
       var noteEl = document.getElementById("conf-note-" + gigId);
-      // "Annullata" qui vuol dire che la serata e' saltata, non che il
-      // locale ha detto di no: prima dell'esistenza di "annullato" finiva
-      // in "rifiutato", che raccontava una cosa diversa da quella successa.
+      // "Annullata" vuol dire che la serata era fissata e poi e' saltata.
+      // Se invece il titolare ha detto di no la serata non finisce qui:
+      // resta aperta a "da contattare" per l'anno prossimo, oppure il posto
+      // si archivia dalla sua riga.
       var payload = {status: yes ? "suonato" : "annullato"};
       if(noteEl) payload.outcome_note = noteEl.value;
       // Anche se e' vuoto: "— nessun promemoria —" vuol dire non richiamarli.

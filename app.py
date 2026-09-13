@@ -254,9 +254,14 @@ REPORT_STATUSES = {"da_valutare", "fatto", "rifiutato"}
 REPORT_KINDS = {"anomalia", "suggerimento"}
 MAX_REPORT_CHARS = 4000
 
+# "Rifiutato" non c'e' piu' (13 settembre 2026). Un no del titolare non e'
+# un capolinea: o lo richiami l'anno prossimo, e allora e' "da contattare",
+# o quel posto non ti interessa piu', e allora si archivia o si elimina. Uno
+# stato che diceva "no" e basta lasciava in rubrica righe morte che non
+# erano ne' l'una ne' l'altra cosa.
 STATUS_VALUES = {
     "lead", "da_contattare", "contattato", "trattativa",
-    "confermato", "rifiutato", "suonato", "annullato",
+    "confermato", "suonato", "annullato",
 }
 
 # "Lead" e' come nasce tutto: un posto finito in rubrica da un import o da
@@ -283,16 +288,15 @@ PRE_CONTACT_STATUSES = {LEAD_STATUS, "da_contattare"}
 # senza cancellare com'e' andata l'anno prima.
 GIG_FIELDS = ["status", "gig_date", "fee", "outcome_note"]
 
-# I tre modi in cui una serata finisce, e sono diversi fra loro: "suonato"
-# ci sei andato, "rifiutato" il titolare ha detto di no, "annullato" era
-# fissata e poi e' saltata — piove, il locale chiude, succede. Dopo uno di
-# questi su quella stagione non c'e' piu' niente da fare: la serata si
-# chiude e la prossima nasce come riga nuova.
+# I due modi in cui una serata finisce davvero: "suonato" ci sei andato,
+# "annullato" era fissata e poi e' saltata — piove, il locale chiude,
+# succede. Dopo uno di questi su quella stagione non c'e' piu' niente da
+# fare: la serata si chiude e la prossima nasce come riga nuova.
 #
-# Distinguere annullato da rifiutato conta: una serata saltata per la
-# pioggia non dice niente su cosa pensa di te quel locale, e riproporsi
-# l'anno dopo e' tutt'altra conversazione che dopo un no.
-CLOSING_STATUSES = {"suonato", "rifiutato", "annullato"}
+# Un no del titolare non sta qui: non e' la fine di niente, e' solo un anno
+# che non si e' fatto. Quella serata resta aperta a "da contattare" finche'
+# non decidi tu — riprovarci, o togliere il posto dalla rubrica.
+CLOSING_STATUSES = {"suonato", "annullato"}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -659,6 +663,7 @@ def migrate_schema(conn):
     migrate_to_gigs(conn)
     migrate_drop_season(conn)
     migrate_to_recontact_period(conn)
+    migrate_drop_rifiutato(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
@@ -682,6 +687,35 @@ def migrate_schema(conn):
     # di dire "nessun promemoria" che le query devono distinguere. Qui restano
     # in uno solo, ed e' idempotente.
     conn.execute("UPDATE locations SET recontact_period = NULL WHERE recontact_period = ''")
+
+
+def migrate_drop_rifiutato(conn):
+    """Toglie lo stato "rifiutato" dalle serate e dai palcoscenici.
+
+    Un no del titolare non e' un capolinea: o lo richiami l'anno prossimo, e
+    allora quel posto e' "da contattare", o non ti interessa piu', e allora
+    si archivia o si elimina. "Rifiutato" era una terza casella che non
+    corrispondeva a nessuna delle due decisioni, e ci restavano dentro righe
+    che nessuno guardava piu'.
+
+    Diventano "da contattare" e restano chiuse: la serata dice "non
+    conclusa", che e' quello che e' successo davvero, e il palcoscenico
+    torna in circolo. Chi va tolto dalla rubrica si archivia a mano, che e'
+    una decisione e non un effetto collaterale di un aggiornamento.
+
+    Idempotente: gira a ogni avvio e dopo la prima volta non trova piu'
+    niente. Non tocca le segnalazioni, che hanno un "rifiutato" loro
+    (REPORT_STATUSES) e vuol dire un'altra cosa.
+    """
+    ts = now_iso()
+    conn.execute(
+        "UPDATE gigs SET status = 'da_contattare', updated_at = ? WHERE status = 'rifiutato'",
+        (ts,),
+    )
+    conn.execute(
+        "UPDATE locations SET status = 'da_contattare', updated_at = ? WHERE status = 'rifiutato'",
+        (ts,),
+    )
 
 
 def migrate_to_recontact_period(conn):
