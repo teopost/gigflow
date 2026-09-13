@@ -170,7 +170,7 @@
   .btn-spinner{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:btn-spin .6s linear infinite;vertical-align:-2px;}
   @keyframes btn-spin{to{transform:rotate(360deg);}}
   @media (prefers-reduced-motion:reduce){.btn-spinner{animation-duration:1.4s;}}
-  .navbar-trailing{display:flex;align-items:center;gap:15px;}
+  .navbar-trailing{display:flex;align-items:center;gap:13px;}
   .navbar-row .nav-btn svg{display:block;}
   .navbar-row .inline-title{position:absolute;left:50%;transform:translateX(-50%);font-size:17px;font-weight:600;opacity:0;transition:opacity .2s;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
   .navbar.scrolled .inline-title{opacity:1;}
@@ -3042,7 +3042,7 @@
       toast("Palcoscenico archiviato");
     });
   }
-  function purgeVenueRow(id){
+  function purgeVenueRow(id, dopo){
     var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
     var n = v && v.photos ? v.photos.length : 0;
     var note = v && v.notes ? v.notes.length : 0;
@@ -3058,6 +3058,7 @@
       function(){
         api("DELETE", "/api/locations/" + id + "/permanent").then(function(){
           venues = venues.filter(function(x){ return String(x.id) !== String(id); });
+          if(dopo) dopo();
           renderAll();
           toast("Palcoscenico eliminato definitivamente");
         }).catch(function(err){ toast(err.message); });
@@ -4760,16 +4761,32 @@
   document.getElementById("btnBack").addEventListener("click", closeDetail);
   document.getElementById("btnMore").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
-    confirmDestructive(v.name || "Questo palcoscenico", "Archivia palcoscenico", function(){
-      api("DELETE", "/api/locations/" + v.id).then(function(){
-        venues = venues.filter(function(x){ return x.id !== v.id; });
-        elDetail.classList.remove("in");
-        setTimeout(function(){ elDetail.hidden = true; }, 320);
-        currentId = null;
-        renderAll();
-        toast("Palcoscenico archiviato");
-      });
-    });
+    /* Il secondo foglio aspetta che il primo sia sceso (.28s di
+       transizione): aperto subito verrebbe chiuso dalla stessa scelta che
+       lo ha appena aperto. Stessa attesa delle serate. */
+    function poi(fn){ setTimeout(fn, 300); }
+    openSheet({title: v.name || "Questo palcoscenico", titleDato: !!v.name, options: [
+      {label: "Archivia", onSelect: function(){
+        poi(function(){
+          confirmDestructive(
+            "Sparisce dagli elenchi ma resta in archivio: si rivede con «Mostra archiviati» e si può rimettere a posto.",
+            "Archivia palcoscenico",
+            function(){
+              api("DELETE", "/api/locations/" + v.id).then(function(){
+                venues = venues.filter(function(x){ return x.id !== v.id; });
+                closeDetail();
+                toast("Palcoscenico archiviato");
+              }).catch(function(err){ toast(err.message); });
+            }
+          );
+        });
+      }},
+      // La conferma e' la stessa dello scorrimento sulla riga: dice per
+      // nome cosa sparisce e quante note e foto si porta dietro.
+      {label: "Elimina definitivamente", destructive: true, onSelect: function(){
+        poi(function(){ purgeVenueRow(v.id, closeDetail); });
+      }}
+    ]});
   });
   document.getElementById("fabAdd").addEventListener("click", function(){
     api("POST", "/api/locations", {name:"", status:"lead"}).then(function(created){
