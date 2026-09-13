@@ -2280,6 +2280,14 @@ def add_note(conn, ws, loc_id, body):
         # lo mette l'app, altrimenti registrare una telefonata costerebbe
         # quanto scriverne una nota.
         text = NOTE_KIND_LABELS.get(kind, "")
+        # E se quel messaggio veniva da un modello, quale. Due mesi dopo
+        # "Email inviata" non dice se avevi mandato il primo contatto o il
+        # sollecito, ed e' esattamente la cosa che serve sapere prima di
+        # scrivere di nuovo. Il nome lo compone il server perche' l'etichetta
+        # dell'attivita' e' scritta qui.
+        modello = (body.get("template") or "").strip()[:120]
+        if modello and text:
+            text += " · modello «" + modello + "»"
     if not text:
         raise ApiError(400, "Il testo della nota è obbligatorio")
     require_location(conn, ws, loc_id)

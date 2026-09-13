@@ -184,6 +184,9 @@
   .view-toggle{display:flex;background:var(--fill);border-radius:999px;padding:3px;gap:2px;}
   .view-toggle-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:none;background:none;border-radius:999px;padding:9px 4px;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:inherit;}
   .view-toggle-btn.active{background:var(--bg-elevated);color:var(--tint);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  /* Tre segmenti su uno schermo da telefono: un punto in meno e meno aria ai
+     lati, altrimenti "Da pianificare" va a capo dentro il suo bottone. */
+  .view-toggle.tre .view-toggle-btn{font-size:13px;padding:9px 2px;}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
   .map-pin-icon{background:none;border:none;}
@@ -654,8 +657,9 @@
   </section>
 
   <!-- ============ TAB: AGENDA ============
-       Due facce della stessa domanda: cosa devo fare (da ricontattare) e cosa
-       ho ottenuto (le serate). Stanno in un tab solo perche' la tabbar di un
+       Tre facce della stessa domanda: chi chiamare e quando (Da contattare),
+       a chi manca ancora la serata da aprire (Da pianificare), e cosa ne e'
+       uscito (Serate). Stanno in un tab solo perche' la tabbar di un
        telefono non regge una voce in piu'. -->
   <section class="screen tab-screen" id="tabRecontact" data-tab="recontact" hidden>
     <header class="navbar" id="navRecontact">
@@ -665,8 +669,9 @@
         <div class="subtitle-count" id="recontactSub">0 palcoscenici in programma</div>
       </div>
       <div class="view-toggle-wrap">
-        <div class="view-toggle" id="agendaToggle">
-          <button class="view-toggle-btn active" data-agenda="recontact">Da ricontattare</button>
+        <div class="view-toggle tre" id="agendaToggle">
+          <button class="view-toggle-btn active" data-agenda="recontact">Da contattare</button>
+          <button class="view-toggle-btn" data-agenda="plan">Da pianificare</button>
           <button class="view-toggle-btn" data-agenda="gigs">Serate</button>
         </div>
       </div>
@@ -675,6 +680,9 @@
       <div id="agendaPaneRecontact">
         <div id="recontactBulk"></div>
         <div id="recontactList"></div>
+      </div>
+      <div id="agendaPanePlan" hidden>
+        <div id="planList"></div>
       </div>
       <div id="agendaPaneGigs" hidden>
         <div id="agendaGigsList"></div>
@@ -1742,7 +1750,7 @@
         <div class="gig-panel" id="newGigFields" hidden></div>
       </div>
 
-      <div class="section-header">QUANDO RICONTATTARE</div>
+      <div class="section-header">QUANDO CONTATTARE</div>
       <div class="grouped-list">
         <div class="field-row picker" id="rowRecontactMonth">
           <label>Periodo</label>
@@ -2019,7 +2027,7 @@
         onPick(q && q.giorno ? mm + "-" + pad2(Math.min(q.giorno, GIORNI_NEL_MESE[i])) : mm);
       }});
     });
-    openSheet({title:"Quando ricontattare", options: opts});
+    openSheet({title:"Quando contattare", options: opts});
   }
   function openDaySheet(current, onPick){
     var q = periodParts(current);
@@ -2313,7 +2321,7 @@
       tileHtml(conFee.length ? fmtEuro(incasso / conFee.length) : "—", "media a serata") +
       tileHtml(String(prossime.length), prossime.length === 1 ? "serata in calendario" : "serate in calendario",
         prossime.length ? ("la prima il " + fmtDateShort(prossime[0].gig_date)) : "nessuna confermata") +
-      tileHtml(String(daFare), "da ricontattare entro una settimana", daFare ? "li trovi in Agenda" : "", true) +
+      tileHtml(String(daFare), "da contattare entro una settimana", daFare ? "li trovi in Agenda" : "", true) +
     '</div>';
 
     if(!played.length){
@@ -3232,12 +3240,14 @@
   });
 
   /* ---------------- AGENDA tab ----------------
-     Due segmenti: cosa devo fare (da ricontattare) e cosa ho ottenuto (le
-     serate con una data). I palcoscenici archiviati restano fuori da tutti
-     e due: in agenda ci va solo quello su cui si lavora davvero. */
+     Tre segmenti: quando chiamare (il periodo), a chi manca la serata
+     aperta, e cosa ne e' uscito (le serate con una data). I palcoscenici
+     archiviati restano fuori da tutti e tre: in agenda ci va solo quello su
+     cui si lavora davvero. */
   var elRecontactList = document.getElementById("recontactList");
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
+  var elPlanList = document.getElementById("planList");
   var agendaView = "recontact";
 
   document.getElementById("agendaToggle").addEventListener("click", function(e){
@@ -3248,6 +3258,7 @@
       b.classList.toggle("active", b.getAttribute("data-agenda") === agendaView);
     });
     document.getElementById("agendaPaneRecontact").hidden = agendaView !== "recontact";
+    document.getElementById("agendaPanePlan").hidden = agendaView !== "plan";
     document.getElementById("agendaPaneGigs").hidden = agendaView !== "gigs";
     renderRecontact();
   });
@@ -3255,7 +3266,7 @@
   /* Ogni riga si porta dietro quando tocca: la data non e' scritta da
      nessuna parte, si calcola dal periodo e da oggi. Ordinate per quella.
 
-     Chi ha appena suonato resta fuori: "da ricontattare" e' un elenco di
+     Chi ha appena suonato resta fuori: "Da contattare" e' un elenco di
      cose da fare, e una serata andata a buon fine non lo e'. Si riparte
      dalla sua riga in Serate, dove lo scorrimento offre "Riproponi" — e da
      li' il palcoscenico torna "da contattare", quindi ricompare qui. */
@@ -3283,13 +3294,66 @@
     return out;
   }
 
+  /* Hai deciso di provarci — lo stato lo dice — ma la serata non l'hai
+     ancora aperta. Finche' quella riga non c'e', il tentativo non esiste:
+     non ha una data, non ha un compenso, e a fine stagione non lo conta
+     nessuno. Sono i palcoscenici a cui manca il primo passo, ed e' un passo
+     solo. I lead non ci sono: un lead e' un indirizzo in rubrica su cui non
+     hai ancora deciso niente, e non c'e' niente da pianificare. */
+  function venuesToPlan(){
+    return venues.filter(function(v){
+      return !v.deleted_at && v.status === "da_contattare" &&
+        !venueGigs(v).some(function(g){ return g.open; });
+    }).slice().sort(function(a, b){
+      return String(a.name || "").localeCompare(String(b.name || ""), "it");
+    });
+  }
+  function planRowHtml(v){
+    var sub = [];
+    if(v.recontact_period) sub.push(esc(periodLabel(v.recontact_period)));
+    if(v.planning_note) sub.push(dato(v.planning_note));
+    return '<div class="swipe-row" data-id="'+v.id+'">'+
+      '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
+        '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
+        (sub.length ? '<div class="row-sub">'+sub.join(" · ")+'</div>' : '')+
+        (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
+        '<div class="row-trail"><button type="button" class="renew-btn" data-renew="'+v.id+'">Apri serata</button></div>'+
+      '</div></div>'+
+      '<div class="row-actions two">'+
+        '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
+        '<button data-purge-id="'+v.id+'">Elimina</button>'+
+      '</div>'+
+    '</div>';
+  }
+  function renderPlanList(){
+    var righe = venuesToPlan();
+    elPlanList.innerHTML = righe.length
+      ? '<div class="grouped-list">' + righe.map(planRowHtml).join("") + '</div>'
+      : '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
+        '<p>Qui finiscono i palcoscenici che hai messo in «da contattare» senza aver ancora aperto la serata. Aprirla è il gesto che fa esistere il tentativo: senza, a fine stagione non lo conta nessuno.</p></div>';
+  }
+  elPlanList.addEventListener("click", function(e){
+    var purge = e.target.closest("[data-purge-id]");
+    if(purge){ purgeVenueRow(purge.getAttribute("data-purge-id")); return; }
+    var del = e.target.closest("[data-del-id]");
+    if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
+    var btn = e.target.closest("[data-renew]");
+    if(btn){ renewOne(btn.getAttribute("data-renew"), btn); return; }
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
+  });
+
   function renderRecontact(){
     renderRecontactList();
     renderRenewAll();
+    renderPlanList();
     renderAgendaGigs();
     if(agendaView === "gigs"){
       var n = datedGigRows().length;
       elRecontactSub.textContent = n + (n===1 ? " serata in calendario" : " serate in calendario");
+    } else if(agendaView === "plan"){
+      var p = venuesToPlan().length;
+      elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza serata" : " palcoscenici senza serata");
     } else {
       var w = venuesToRecontact().length;
       elRecontactSub.textContent = w + (w===1 ? " palcoscenico in programma" : " palcoscenici in programma");
@@ -3367,7 +3431,7 @@
   function renderRecontactList(){
     var righe = venuesToRecontact();
     if(!righe.length){
-      elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div><h2>Niente da ricontattare</h2>'+
+      elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div><h2>Niente da contattare</h2>'+
         '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p></div>';
       return;
     }
@@ -3533,7 +3597,7 @@
           '<div class="gig-panel">'+
             '<div class="field-row stacked"><label>Com\'è andata</label>'+
               '<textarea rows="2" id="conf-note-'+x.g.id+'" placeholder="es. serata piena, ci richiamano">'+esc(x.g.outcome_note || "")+'</textarea></div>'+
-            '<div class="field-row picker" data-conf-period="'+x.g.id+'"><label>Quando ricontattarli</label>'+
+            '<div class="field-row picker" data-conf-period="'+x.g.id+'"><label>Quando contattarli</label>'+
               '<div class="picker-value"><span>'+
                 (confPeriodo[x.g.id] ? esc(periodLabel(confPeriodo[x.g.id])) : "— nessun promemoria —")+
               '</span><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div></div>'+
@@ -3951,14 +4015,14 @@
      quella dell'art director. L'attivita' si registra solo nel primo caso:
      e' il palcoscenico ad avere un diario. */
   function openMailPicker(target){
-    function send(subject, body){
+    function send(subject, body, modello){
       window.location.href = buildMailtoUrl(target.email, subject, body);
-      if(target.venue) logActivity("email");
+      if(target.venue) logActivity("email", modello);
     }
     var opts = [{label:"Apri la posta senza modello", onSelect:function(){ send("", ""); }}];
     mailTemplates.forEach(function(t){
       opts.push({label:t.name, dato:true, onSelect:function(){
-        send(fillTemplate(t.subject, target), fillTemplate(t.message, target));
+        send(fillTemplate(t.subject, target), fillTemplate(t.message, target), t.name);
       }});
     });
     openSheet({title:"Invia email", options:opts});
@@ -3981,15 +4045,15 @@
      palcoscenico, {phone, ad} da quella dell'art director. L'attivita' si
      registra solo nel primo caso — il diario ce l'ha il palcoscenico. */
   function openWhatsAppPicker(target){
-    function send(text){
+    function send(text, modello){
       var url = buildWhatsAppUrl(target.phone, text);
       if(!url) return;
       window.open(url, "_blank");
-      if(target.venue) logActivity("messaggio");
+      if(target.venue) logActivity("messaggio", modello);
     }
     var opts = [{label:"Apri WhatsApp senza modello", onSelect:function(){ send(""); }}];
     waTemplates.forEach(function(t){
-      opts.push({label:t.name, dato:true, onSelect:function(){ send(fillTemplate(t.message, target)); }});
+      opts.push({label:t.name, dato:true, onSelect:function(){ send(fillTemplate(t.message, target), t.name); }});
     });
     openSheet({title:"Invia messaggio", options:opts});
   }
@@ -4469,10 +4533,15 @@
   /* Registrare un'attivita' costa un tocco: il testo lo scrive il server, e
      se la trattativa era ancora "da contattare" avanza da sola — l'aver
      contattato il posto e' esattamente cosa distingue i due stati. */
-  function logActivity(kind){
+  /* `modello` c'e' solo quando il messaggio e' partito da un modello: il
+     testo della nota lo compone il server, che e' dove stanno le etichette
+     delle attivita' (vedi NOTE_KIND_LABELS in app.py). */
+  function logActivity(kind, modello){
     if(!currentId) return;
     var meta = NOTE_KIND_META[kind];
-    api("POST", "/api/locations/" + currentId + "/notes", {kind: kind}).then(function(updated){
+    var body = {kind: kind};
+    if(modello) body.template = modello;
+    api("POST", "/api/locations/" + currentId + "/notes", body).then(function(updated){
       applyUpdatedVenue(updated);
       renderNotes(updated);
       renderStatusRow(updated);
