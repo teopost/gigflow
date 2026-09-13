@@ -2877,7 +2877,11 @@
     var st = statusInfo(v.status);
     var subParts = [];
     if(v.type) subParts.push('<span class="type-tag">'+dato(v.type)+'</span>');
-    if(v.contact_name) subParts.push('👤 '+dato(v.contact_name));
+    // Solo l'icona: il nome del titolare finiva in una riga gia' piena di
+    // tipo e art director, e veniva tagliato a meta' quasi sempre. Un nome
+    // troncato non si legge e non si riconosce — che ci sia un titolare si',
+    // quello e' il dato utile da qui, e per sapere chi e' si apre la scheda.
+    if(v.contact_name) subParts.push('👤');
     if(v.art_director_name) subParts.push('🎨 '+dato(v.art_director_name));
     var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
     var favHtml = '<button class="fav-star fav-star-lead'+(v.favorite ? ' active' : '')+'" data-fav-id="'+v.id+'" aria-label="Preferito">'+
@@ -2932,7 +2936,7 @@
     // Lo stato non va in ordine alfabetico: ha un suo ordine, quello della
     // trattativa. "Annullato" prima di "Confermato" non direbbe niente.
     {key:"status",      label:"Stato",        get:function(v){ return v.status || ""; },
-     rank:function(v){ var i = STATUSES.findIndex(function(x){ return x.key === v.status; }); return i < 0 ? 99 : i; }},
+     rank:function(v){ return statusRank(v.status); }},
     {key:"type",        label:"Tipo",         get:function(v){ return v.type || ""; }},
     {key:"category",    label:"Categoria",    get:function(v){ return v.category || ""; }},
     {key:"regione",     label:"Regione",      get:venueRegione},
@@ -3294,21 +3298,29 @@
     return out;
   }
 
-  /* Hai deciso di provarci — lo stato lo dice — ma non hai ancora detto
-     quando. Senza periodo quel palcoscenico non compare in "Da contattare",
-     che va a calendario, e quindi non torna a galla mai piu': resta una
-     buona intenzione senza un giorno.
+  /* Tutti quelli su cui hai messo le mani e di cui non hai mai detto
+     quando richiamarli. Senza periodo un palcoscenico non compare in "Da
+     contattare", che va a calendario, e quindi non torna a galla mai piu':
+     una trattativa aperta due mesi fa e poi lasciata li' non la ritrova
+     nessuno. E' l'arretrato, ed e' la parte piu' grossa della rubrica.
 
      I due segmenti sono complementari e non si sovrappongono: qui chi non ha
      un periodo, li' chi ce l'ha. Scegliere il periodo e' l'unico gesto che
      serve, e sposta la riga da una parte all'altra.
 
-     I lead non ci sono: un lead e' un indirizzo in rubrica su cui non hai
-     ancora deciso niente, e non c'e' niente da pianificare. */
+     Fuori solo i lead: un indirizzo in rubrica su cui non hai ancora deciso
+     niente non e' un arretrato, e sono trecento — ci annegherebbe tutto il
+     resto. */
+  function statusRank(k){
+    var i = STATUSES.findIndex(function(x){ return x.key === k; });
+    return i < 0 ? 99 : i;
+  }
   function venuesToPlan(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.status === "da_contattare" && !v.recontact_period;
+      return !v.deleted_at && v.status !== "lead" && !v.recontact_period;
     }).slice().sort(function(a, b){
+      var ra = statusRank(a.status), rb = statusRank(b.status);
+      if(ra !== rb) return ra - rb;
       return String(a.name || "").localeCompare(String(b.name || ""), "it");
     });
   }
@@ -3329,12 +3341,30 @@
       '</div>'+
     '</div>';
   }
+  /* Raggruppati per stato invece che in un elenco solo lungo duecento
+     righe: cosi' si vede subito che l'arretrato vero sono i contattati, e
+     dentro ogni gruppo l'ordine e' alfabetico. Lo stato lo dice
+     l'intestazione, quindi sulla riga non serve la pastiglia e la coda resta
+     libera per il gesto che serve qui: scegliere il periodo. */
   function renderPlanList(){
     var righe = venuesToPlan();
-    elPlanList.innerHTML = righe.length
-      ? '<div class="grouped-list">' + righe.map(planRowHtml).join("") + '</div>'
-      : '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
-        '<p>Qui finiscono i palcoscenici che hai messo in «da contattare» senza aver ancora detto quando. Senza un periodo non compaiono in Da contattare, che va a calendario, e non tornano a galla da soli.</p></div>';
+    if(!righe.length){
+      elPlanList.innerHTML = '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
+        '<p>Ogni palcoscenico su cui hai cominciato a lavorare ha un periodo in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p></div>';
+      return;
+    }
+    var html = "", corrente = null;
+    righe.forEach(function(v){
+      if(v.status !== corrente){
+        if(corrente !== null) html += '</div>';
+        var quanti = righe.filter(function(x){ return x.status === v.status; }).length;
+        html += '<div class="agenda-group">'+esc(statusInfo(v.status).label)+
+          '<span class="group-count">'+quanti+'</span></div><div class="grouped-list">';
+        corrente = v.status;
+      }
+      html += planRowHtml(v);
+    });
+    elPlanList.innerHTML = html + '</div>';
   }
   elPlanList.addEventListener("click", function(e){
     var purge = e.target.closest("[data-purge-id]");
