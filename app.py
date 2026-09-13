@@ -16,6 +16,7 @@ import re
 import secrets
 import sqlite3
 import socket
+import threading
 import urllib.error
 import urllib.request
 import io
@@ -132,6 +133,17 @@ ADMIN_EMAILS = {
 
 def is_admin(email):
     return bool(email) and (email or "").strip().lower() in ADMIN_EMAILS
+
+
+# --- notifiche su Telegram (opzionale) ----------------------------------
+# Un filo diretto verso chi amministra questa installazione: chi entra, e in
+# futuro gli altri fatti che vale la pena sapere senza aprire l'app. Come per
+# il login, se le due variabili non ci sono la funzione e' spenta e l'app si
+# comporta esattamente come prima. Vivono nel .env e non nel database perche'
+# la notifica e' di chi tiene su l'installazione, non del singolo workspace.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+TELEGRAM_API = "https://api.telegram.org/bot%s/sendMessage"
 
 
 SESSION_COOKIE = "session_id"
@@ -1091,6 +1103,71 @@ def google_fetch_userinfo(access_token):
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.load(resp)
+
+
+# --- i messaggi su Telegram ---------------------------------------------
+# Sotto c'e' il trasporto, che vale per qualsiasi messaggio; piu' giu' una
+# funzione per ogni fatto da notificare. Aggiungerne uno nuovo e' scrivere
+# un'altra notify_* e chiamarla dove il fatto succede.
+
+def telegram_enabled():
+    return bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
+
+
+def telegram_send(text):
+    """Manda un messaggio senza far aspettare nessuno e senza poter rompere
+    niente: parte un thread a perdere e, se Telegram non risponde, resta solo
+    una riga nel log. Una notifica non deve mai poter impedire un accesso o
+    far fallire la richiesta dentro cui e' nata."""
+    if not telegram_enabled() or not text:
+        return
+    threading.Thread(target=_telegram_post, args=(text,), daemon=True).start()
+
+
+def _telegram_post(text):
+    data = json.dumps({
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }).encode()
+    req = urllib.request.Request(
+        TELEGRAM_API % TELEGRAM_BOT_TOKEN, data=data,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            esito = json.load(resp)
+        if not esito.get("ok"):
+            print("[telegram] messaggio rifiutato: %s" % esito.get("description"))
+    except Exception as errore:  # rete assente, token sbagliato, Telegram giu'
+        print("[telegram] %s: %s" % (type(errore).__name__, errore))
+
+
+def notify_login(conn, email, primo_accesso):
+    """Un messaggio per ogni accesso vero. Non per ogni apertura dell'app: la
+    sessione dura trenta giorni e la PWA resta dentro, quindi qui finisce solo
+    chi rifa' il giro da Google. L'ora non la scrivo, la mette Telegram."""
+    if not telegram_enabled():
+        return
+    riga = conn.execute(
+        "SELECT name FROM user_profiles WHERE email = ?", (email,)
+    ).fetchone()
+    nome = (riga["name"] if riga else None) or email.split("@")[0]
+    banda = None
+    workspace_id = resolve_active_workspace(conn, email)
+    if workspace_id:
+        riga = conn.execute(
+            "SELECT name FROM workspaces WHERE id = ?", (workspace_id,)
+        ).fetchone()
+        banda = riga["name"] if riga else None
+    telegram_send("%s <b>%s</b> è entrato in GigFlow%s\n%s · %s" % (
+        "🆕" if primo_accesso else "🎤",
+        html.escape(nome),
+        " per la prima volta" if primo_accesso else "",
+        html.escape(email),
+        html.escape(banda) if banda else "nessuna band",
+    ))
 
 
 # --- workspace (le band) e inviti ---------------------------------------
@@ -3998,6 +4075,11 @@ class Handler(BaseHTTPRequestHandler):
             invite_token = self._cookie(INVITE_COOKIE) or invite_from_state(state)
             conn = get_conn()
             try:
+                # Da chiedere prima dell'upsert: subito dopo il profilo c'e'
+                # comunque, e non si distinguerebbe piu' chi arriva adesso.
+                primo_accesso = not conn.execute(
+                    "SELECT 1 FROM user_profiles WHERE email = ?", (email,)
+                ).fetchone()
                 upsert_profile_from_google(conn, email, userinfo.get("name"), userinfo.get("picture"))
                 session_id = create_session(conn, email)
                 destination = "/"
@@ -4007,6 +4089,9 @@ class Handler(BaseHTTPRequestHandler):
                         "/?joined=" + urlencode({"n": joined})[2:] if joined
                         else "/?invite_error=" + urlencode({"e": invite_error})[2:]
                     )
+                # Per ultimo: cosi' chi entra con un invito si porta gia'
+                # dietro la band nel messaggio.
+                notify_login(conn, email, primo_accesso)
             finally:
                 conn.close()
             self._send_redirect(
