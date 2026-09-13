@@ -3294,30 +3294,34 @@
     return out;
   }
 
-  /* Hai deciso di provarci — lo stato lo dice — ma la serata non l'hai
-     ancora aperta. Finche' quella riga non c'e', il tentativo non esiste:
-     non ha una data, non ha un compenso, e a fine stagione non lo conta
-     nessuno. Sono i palcoscenici a cui manca il primo passo, ed e' un passo
-     solo. I lead non ci sono: un lead e' un indirizzo in rubrica su cui non
-     hai ancora deciso niente, e non c'e' niente da pianificare. */
+  /* Hai deciso di provarci — lo stato lo dice — ma non hai ancora detto
+     quando. Senza periodo quel palcoscenico non compare in "Da contattare",
+     che va a calendario, e quindi non torna a galla mai piu': resta una
+     buona intenzione senza un giorno.
+
+     I due segmenti sono complementari e non si sovrappongono: qui chi non ha
+     un periodo, li' chi ce l'ha. Scegliere il periodo e' l'unico gesto che
+     serve, e sposta la riga da una parte all'altra.
+
+     I lead non ci sono: un lead e' un indirizzo in rubrica su cui non hai
+     ancora deciso niente, e non c'e' niente da pianificare. */
   function venuesToPlan(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.status === "da_contattare" &&
-        !venueGigs(v).some(function(g){ return g.open; });
+      return !v.deleted_at && v.status === "da_contattare" && !v.recontact_period;
     }).slice().sort(function(a, b){
       return String(a.name || "").localeCompare(String(b.name || ""), "it");
     });
   }
   function planRowHtml(v){
     var sub = [];
-    if(v.recontact_period) sub.push(esc(periodLabel(v.recontact_period)));
     if(v.planning_note) sub.push(dato(v.planning_note));
+    if(v.type) sub.push('<span class="type-tag">'+dato(v.type)+'</span>');
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
         (sub.length ? '<div class="row-sub">'+sub.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
-        '<div class="row-trail"><button type="button" class="renew-btn" data-renew="'+v.id+'">Apri serata</button></div>'+
+        '<div class="row-trail"><button type="button" class="renew-btn" data-period="'+v.id+'">Quando?</button></div>'+
       '</div></div>'+
       '<div class="row-actions two">'+
         '<button class="role" data-del-id="'+v.id+'">Archivia</button>'+
@@ -3330,15 +3334,22 @@
     elPlanList.innerHTML = righe.length
       ? '<div class="grouped-list">' + righe.map(planRowHtml).join("") + '</div>'
       : '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
-        '<p>Qui finiscono i palcoscenici che hai messo in «da contattare» senza aver ancora aperto la serata. Aprirla è il gesto che fa esistere il tentativo: senza, a fine stagione non lo conta nessuno.</p></div>';
+        '<p>Qui finiscono i palcoscenici che hai messo in «da contattare» senza aver ancora detto quando. Senza un periodo non compaiono in Da contattare, che va a calendario, e non tornano a galla da soli.</p></div>';
   }
   elPlanList.addEventListener("click", function(e){
     var purge = e.target.closest("[data-purge-id]");
     if(purge){ purgeVenueRow(purge.getAttribute("data-purge-id")); return; }
     var del = e.target.closest("[data-del-id]");
     if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
-    var btn = e.target.closest("[data-renew]");
-    if(btn){ renewOne(btn.getAttribute("data-renew"), btn); return; }
+    // Un gesto solo, e la riga passa nell'altro segmento: il foglio dei mesi
+    // e' lo stesso della scheda, cosi' "a ottobre" si dice allo stesso modo
+    // da tutte e due le parti.
+    var quando = e.target.closest("[data-period]");
+    if(quando){
+      var id = quando.getAttribute("data-period");
+      openMonthSheet("", function(scelto){ if(scelto) savePeriodFor(id, scelto); });
+      return;
+    }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
@@ -3353,7 +3364,7 @@
       elRecontactSub.textContent = n + (n===1 ? " serata in calendario" : " serate in calendario");
     } else if(agendaView === "plan"){
       var p = venuesToPlan().length;
-      elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza serata" : " palcoscenici senza serata");
+      elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza periodo" : " palcoscenici senza periodo");
     } else {
       var w = venuesToRecontact().length;
       elRecontactSub.textContent = w + (w===1 ? " palcoscenico in programma" : " palcoscenici in programma");
@@ -3793,14 +3804,20 @@
     elRowRecontactDay.hidden = !q;
     elRecontactDayValue.textContent = q && q.giorno ? String(q.giorno) : "tutto il mese";
   }
-  function saveRecontactPeriod(p){
-    if(!currentId) return;
-    patchVenue("recontact_period", p).then(function(updated){
+  /* Il periodo si sceglie da due posti: la scheda del palcoscenico e la riga
+     di "Da pianificare". Il salvataggio e' lo stesso, e non passa da
+     patchVenue perche' quello scrive sempre sulla scheda aperta — che in
+     Agenda non c'e'. */
+  function savePeriodFor(id, p){
+    return api("PUT", "/api/locations/" + id, {recontact_period: p}).then(function(updated){
       applyUpdatedVenue(updated);
       renderRecontactRows(updated);
       renderAll();
-      toast(p ? "Li richiami " + periodPhrase(p) : "Promemoria tolto");
+      toast(p ? "Li contatti " + periodPhrase(p) : "Promemoria tolto");
     }).catch(function(err){ toast(err.message); });
+  }
+  function saveRecontactPeriod(p){
+    if(currentId) savePeriodFor(currentId, p);
   }
   elRowRecontactMonth.addEventListener("click", function(){
     var v = currentVenue();
