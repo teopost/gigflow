@@ -144,6 +144,13 @@ def is_admin(email):
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 TELEGRAM_API = "https://api.telegram.org/bot%s/sendMessage"
+# Dopo quanta inattivita' un ritorno nell'app vale come un ingresso nuovo.
+# Le sessioni durano trenta giorni: senza questa soglia si notificherebbe il
+# login e poi piu' niente per un mese, con "ultimo accesso" nell'elenco
+# utenti che intanto si muove ogni giorno. Con mezz'ora ogni ripresa in mano
+# del telefono e' un messaggio, ma un'app aperta e usata per un pomeriggio
+# non ne fa uno dietro l'altro. E' l'unico numero da girare se sono troppi.
+NOTIFY_VISIT_GAP_MINUTES = 30
 
 
 SESSION_COOKIE = "session_id"
@@ -1026,6 +1033,10 @@ def create_session(conn, email):
         "INSERT INTO sessions (id, email, created_at, expires_at) VALUES (?, ?, ?, ?)",
         (session_id, email, now.isoformat(), expires.isoformat()),
     )
+    # Chi ha appena fatto il login si e' appena fatto vedere. Serve anche a
+    # non mandare due messaggi per lo stesso ingresso: la prima richiesta
+    # dopo il login troverebbe altrimenti una pausa lunghissima alle spalle.
+    touch_last_seen(conn, email, notifica=False)
     conn.commit()
     return session_id
 
@@ -1037,9 +1048,17 @@ def create_session(conn, email):
 LAST_SEEN_THROTTLE_SECONDS = 60
 
 
-def touch_last_seen(conn, email):
+def touch_last_seen(conn, email, notifica=True):
     now = datetime.now(timezone.utc)
     soglia = (now - timedelta(seconds=LAST_SEEN_THROTTLE_SECONDS)).isoformat()
+    # Il valore di prima serve solo per misurare la pausa: senza notifiche da
+    # mandare non vale una lettura in piu' su ogni richiesta.
+    ultimo = None
+    if notifica and telegram_enabled():
+        riga = conn.execute(
+            "SELECT last_seen_at FROM user_profiles WHERE email = ?", (email,)
+        ).fetchone()
+        ultimo = riga["last_seen_at"] if riga else None
     cur = conn.execute(
         "UPDATE user_profiles SET last_seen_at = ? "
         "WHERE email = ? AND (last_seen_at IS NULL OR last_seen_at < ?)",
@@ -1047,8 +1066,14 @@ def touch_last_seen(conn, email):
     )
     # updated_at resta fermo: essersi fatti vedere non e' una modifica al
     # profilo, e sporcarlo confonderebbe chi guarda quando e' cambiato cosa.
-    if cur.rowcount:
-        conn.commit()
+    if not cur.rowcount:
+        return
+    conn.commit()
+    # Solo chi ha scritto davvero la riga puo' notificare: l'app installata
+    # apre dieci richieste insieme e la scrittura riesce a una sola, quindi
+    # e' quella la guardia contro il messaggio in doppio.
+    if ultimo and ultimo < (now - timedelta(minutes=NOTIFY_VISIT_GAP_MINUTES)).isoformat():
+        notify_visit(conn, email, ultimo, now)
 
 
 def get_session_email(conn, session_id):
@@ -1144,12 +1169,11 @@ def _telegram_post(text):
         print("[telegram] %s: %s" % (type(errore).__name__, errore))
 
 
-def notify_login(conn, email, primo_accesso):
-    """Un messaggio per ogni accesso vero. Non per ogni apertura dell'app: la
-    sessione dura trenta giorni e la PWA resta dentro, quindi qui finisce solo
-    chi rifa' il giro da Google. L'ora non la scrivo, la mette Telegram."""
-    if not telegram_enabled():
-        return
+def chi_e(conn, email):
+    """Come si presenta una persona dentro un messaggio: il nome che si e'
+    dato, e la band su cui sta lavorando adesso. Senza band vuol dire entrato
+    senza invito — e' il caso a cui vale la pena stare attenti, quindi si
+    scrive invece di lasciare la riga a meta'."""
     riga = conn.execute(
         "SELECT name FROM user_profiles WHERE email = ?", (email,)
     ).fetchone()
@@ -1161,12 +1185,53 @@ def notify_login(conn, email, primo_accesso):
             "SELECT name FROM workspaces WHERE id = ?", (workspace_id,)
         ).fetchone()
         banda = riga["name"] if riga else None
+    return html.escape(nome), html.escape(banda) if banda else "nessuna band"
+
+
+def da_quanto(prima_iso, adesso):
+    """"tre ore fa", non una data: quello che conta e' quant'e' stato via."""
+    try:
+        prima = datetime.fromisoformat(prima_iso)
+    except (TypeError, ValueError):
+        return None
+    if prima.tzinfo is None:
+        prima = prima.replace(tzinfo=timezone.utc)
+    minuti = int((adesso - prima).total_seconds() // 60)
+    if minuti < 60:
+        return "%d minuti fa" % max(minuti, 1)
+    ore = minuti // 60
+    if ore < 24:
+        return "un'ora fa" if ore == 1 else "%d ore fa" % ore
+    giorni = ore // 24
+    return "ieri" if giorni == 1 else "%d giorni fa" % giorni
+
+
+def notify_login(conn, email, primo_accesso):
+    """Il giro completo da Google: dispositivo nuovo, o sessione scaduta."""
+    if not telegram_enabled():
+        return
+    nome, banda = chi_e(conn, email)
     telegram_send("%s <b>%s</b> è entrato in GigFlow%s\n%s · %s" % (
         "🆕" if primo_accesso else "🎤",
-        html.escape(nome),
+        nome,
         " per la prima volta" if primo_accesso else "",
         html.escape(email),
-        html.escape(banda) if banda else "nessuna band",
+        banda,
+    ))
+
+
+def notify_visit(conn, email, ultimo_iso, adesso):
+    """Chi rientra nell'app con la sessione che ha gia'. E' il movimento che
+    si vede nell'elenco utenti sotto "ultimo accesso": li' cambia a ogni
+    giro, qui arriva solo quando e' stato via abbastanza da essere un
+    ingresso nuovo e non la stessa sessione di lavoro che continua."""
+    if not telegram_enabled():
+        return
+    nome, banda = chi_e(conn, email)
+    quando = da_quanto(ultimo_iso, adesso)
+    telegram_send("👋 <b>%s</b> è tornato in GigFlow\n%s · %s%s" % (
+        nome, html.escape(email), banda,
+        " · ultima volta " + quando if quando else "",
     ))
 
 
