@@ -2168,7 +2168,6 @@
   var showDeletedEnabled = false;
   var currentId = null;
   var currentAdId = null;
-  var saveTimers = {};
   var returnToPalcoscenicoAfterAd = null;
 
   var elToast = document.getElementById("toast");
@@ -2626,8 +2625,17 @@
   elSheetCancel.addEventListener("click", closeSheet);
   elSheetBackdrop.addEventListener("click", closeSheet);
 
-  function confirmDestructive(title, actionLabel, onConfirm){
-    openSheet({title:title, options:[{label:actionLabel, destructive:true, onSelect:onConfirm}]});
+  /* Due parole sole, sempre quelle: Conferma e Annulla. Il bottone non
+     ripete piu' l'azione ("Elimina serata"), quindi a dire cosa succede ci
+     pensa la domanda qui sopra — che infatti e' scritta per intero. */
+  /* Indietro non salva: a salvare c'e' Salva. Quello che e' stato scritto e
+     non salvato pero' non si butta via di nascosto — si chiede. */
+  function chiudiScartando(sporco, chiudi){
+    if(!sporco){ chiudi(); return; }
+    confirmDestructive("Uscire senza salvare le modifiche?", chiudi);
+  }
+  function confirmDestructive(domanda, onConfirm){
+    openSheet({title: domanda, options: [{label: "Conferma", destructive: true, onSelect: onConfirm}]});
   }
 
   /* ---------------- load ----------------
@@ -3052,9 +3060,8 @@
     // L'archiviazione si annulla, questa no: va detto prima, con dentro
     // cosa si porta via.
     confirmDestructive(
-      (v && v.name ? v.name : "Questo palcoscenico") +
-        (extra.length ? " · " + extra.join(", ") : ""),
-      "Elimina definitivamente",
+      "Eliminare definitivamente " + (v && v.name ? v.name : "questo palcoscenico") +
+        (extra.length ? ", con " + extra.join(" e ") : "") + "? Non si torna indietro.",
       function(){
         api("DELETE", "/api/locations/" + id + "/permanent").then(function(){
           venues = venues.filter(function(x){ return String(x.id) !== String(id); });
@@ -3809,35 +3816,34 @@
     var body = {}; body[field] = value;
     return api("PUT", "/api/locations/" + currentId, body);
   }
-  function scheduleSave(field, value){
-    clearTimeout(saveTimers[field]);
-    saveTimers[field] = setTimeout(function(){
-      patchVenue(field, value).then(applyUpdatedVenue);
-    }, 350);
-  }
   function applyUpdatedVenue(updated){
     var i = venues.findIndex(function(v){ return v.id === updated.id; });
     if(i > -1) venues[i] = updated; else venues.push(updated);
     if(String(updated.id) === String(currentId)){
-      setDato(elSaveIndicatorTitle, updated.name, "Nuovo palcoscenico");
+      // Col foglio aperto il titolo segue quello che stai scrivendo, non il
+      // server: se scegli il tipo mentre hai cambiato il nome, la riga in
+      // alto non deve tornare indietro al nome di prima.
+      setDato(elSaveIndicatorTitle,
+              elDetail.hidden ? updated.name : fName.value,
+              "Nuovo palcoscenico");
     }
   }
-  function bindField(el, field, transform){
-    el.addEventListener("input", function(){
-      scheduleSave(field, transform ? transform(el.value) : el.value);
-    });
-  }
-  bindField(fName, "name");
-  bindField(fAddress, "address");
-  bindField(fLat, "lat");
-  bindField(fLng, "lng");
-  bindField(fCapacity, "capacity", function(v){ return v ? Number(v) : ""; });
-  bindField(fContactName, "contact_name");
-  bindField(fLandline, "landline");
-  bindField(fPhone, "phone");
-  bindField(fEmail, "email");
-  bindField(fWebsite, "website");
-  bindField(fPlanningNote, "planning_note");
+  /* I campi che si scrivono sono una bozza: restano nella pagina finche' non
+     tocchi Salva. Prima andavano sul server da soli 350ms dopo l'ultima
+     lettera, e allora "Indietro" salvava lo stesso — il pulsante Salva
+     prometteva una cosa che non stava succedendo li'.
+
+     Le righe che si scelgono da un foglio (tipo, categoria, citta', genere,
+     periodo, proprietario, art director) restano a salvataggio immediato:
+     li' non stai scrivendo, stai scegliendo, e il foglio si chiude da solo. */
+  var venueDirty = false;
+  [fName, fAddress, fLat, fLng, fCapacity, fContactName, fLandline,
+   fPhone, fEmail, fWebsite, fPlanningNote].forEach(function(el){
+    el.addEventListener("input", function(){ venueDirty = true; });
+  });
+  fName.addEventListener("input", function(){
+    setDato(elSaveIndicatorTitle, fName.value, "Nuovo palcoscenico");
+  });
 
   /* Il periodo si sceglie da un foglio, non si digita: i mesi sono dodici e
      il giorno quasi sempre non serve. La riga del giorno esiste solo se un
@@ -4399,8 +4405,8 @@
       var dv = currentVenue();
       var dg = dv ? venueGigs(dv).filter(function(x){ return String(x.id) === String(delId); })[0] : null;
       var what = dg
-        ? ("Serata " + (dg.gig_date ? fmtDateShort(dg.gig_date) : gigStateLabel(dg)))
-        : "Questa serata";
+        ? ("la serata " + (dg.gig_date ? "del " + fmtDateShort(dg.gig_date) : "«" + gigStateLabel(dg) + "»"))
+        : "questa serata";
       var eliminaSerata = function(){
         api("DELETE", "/api/gigs/" + delId).then(function(updated){
           closeGigDraft();
@@ -4408,7 +4414,7 @@
           toast("Serata eliminata");
         }).catch(function(err){ toast(err.message); });
       };
-      confirmDestructive(what, "Elimina serata", function(){
+      confirmDestructive("Eliminare " + what + "?", function(){
         if(!dg || dg.status !== "suonato"){ eliminaSerata(); return; }
         /* Una serata suonata non e' una riga come le altre: la data, il
            compenso e il fatto che ci sei andato stanno scritti li' e da
@@ -4425,7 +4431,7 @@
           (quanto ? " per " + quanto : "") +
           ": sparisce dalle serate suonate e dall'incasso della stagione.";
         setTimeout(function(){
-          confirmDestructive(cosa, "Elimina lo stesso", eliminaSerata);
+          confirmDestructive(cosa + " Eliminarla lo stesso?", eliminaSerata);
         }, 300);
       });
       return;
@@ -4659,6 +4665,7 @@
     renderRecontactRows(v);
     fPlanningNote.value = v.planning_note || "";
     setDato(elSaveIndicatorTitle, v.name, "Nuovo palcoscenico");
+    venueDirty = false;
     renderPhotosStrip(v);
     renderQuickActions(v);
     renderStatusRow(v);
@@ -4690,6 +4697,7 @@
       lng: fLng.value,
       capacity: fCapacity.value ? Number(fCapacity.value) : "",
       contact_name: fContactName.value,
+      landline: fLandline.value,
       phone: fPhone.value,
       email: fEmail.value,
       website: fWebsite.value,
@@ -4697,8 +4705,10 @@
     };
   }
   function saveVenueNow(){
-    Object.keys(saveTimers).forEach(function(k){ if(k.indexOf("ad_")!==0 && k.indexOf("band_")!==0) clearTimeout(saveTimers[k]); });
-    return api("PUT", "/api/locations/" + currentId, collectVenuePayload()).then(applyUpdatedVenue);
+    return api("PUT", "/api/locations/" + currentId, collectVenuePayload()).then(function(updated){
+      venueDirty = false;
+      applyUpdatedVenue(updated);
+    });
   }
   document.getElementById("btnSave").addEventListener("click", function(){
     if(!currentId) return;
@@ -4758,7 +4768,9 @@
     }
     currentId = null;
   }
-  document.getElementById("btnBack").addEventListener("click", closeDetail);
+  document.getElementById("btnBack").addEventListener("click", function(){
+    chiudiScartando(venueDirty, closeDetail);
+  });
   document.getElementById("btnMore").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
     /* Il secondo foglio aspetta che il primo sia sceso (.28s di
@@ -4769,8 +4781,8 @@
       {label: "Archivia", onSelect: function(){
         poi(function(){
           confirmDestructive(
-            "Sparisce dagli elenchi ma resta in archivio: si rivede con «Mostra archiviati» e si può rimettere a posto.",
-            "Archivia palcoscenico",
+            "Archiviare " + (v.name || "questo palcoscenico") + "? Sparisce dagli elenchi ma resta in archivio: " +
+              "si rivede con «Mostra archiviati» e si può rimettere a posto.",
             function(){
               api("DELETE", "/api/locations/" + v.id).then(function(){
                 venues = venues.filter(function(x){ return x.id !== v.id; });
@@ -4804,24 +4816,16 @@
   var elAdInlineTitle = document.getElementById("adDetailInlineTitle");
 
   function currentAd(){ return artDirectors.find(function(a){ return a.id === currentAdId; }); }
-  function patchAd(field, value){
-    var body = {}; body[field] = value;
-    return api("PUT", "/api/art_directors/" + currentAdId, body);
-  }
-  function scheduleSaveAd(field, value){
-    clearTimeout(saveTimers["ad_"+field]);
-    saveTimers["ad_"+field] = setTimeout(function(){
-      patchAd(field, value).then(function(updated){
-        var i = artDirectors.findIndex(function(a){ return a.id === updated.id; });
-        if(i>-1) artDirectors[i] = updated;
-        if(currentAdId === updated.id) setDato(elAdInlineTitle, updated.name, "Nuovo art director");
-      });
-    }, 350);
-  }
-  adName.addEventListener("input", function(){ scheduleSaveAd("name", adName.value); });
-  adPhone.addEventListener("input", function(){ scheduleSaveAd("phone", adPhone.value); renderAdQuickActions(currentAd()||{phone:adPhone.value,email:adEmail.value}); });
-  adEmail.addEventListener("input", function(){ scheduleSaveAd("email", adEmail.value); renderAdQuickActions(currentAd()||{phone:adPhone.value,email:adEmail.value}); });
-  adNotes.addEventListener("input", function(){ scheduleSaveAd("notes", adNotes.value); });
+  // Bozza anche qui, per la stessa ragione della scheda del palcoscenico.
+  var adDirty = false;
+  [adName, adPhone, adEmail, adNotes].forEach(function(el){
+    el.addEventListener("input", function(){ adDirty = true; });
+  });
+  adName.addEventListener("input", function(){
+    setDato(elAdInlineTitle, adName.value, "Nuovo art director");
+  });
+  adPhone.addEventListener("input", function(){ renderAdQuickActions(collectAdPayload()); });
+  adEmail.addEventListener("input", function(){ renderAdQuickActions(collectAdPayload()); });
 
   /* Le stesse tre azioni della scheda del palcoscenico e nello stesso
      ordine: un art director si contatta come si contatta un locale, e
@@ -4906,6 +4910,7 @@
     adEmail.value = ad.email || "";
     adNotes.value = ad.notes || "";
     setDato(elAdInlineTitle, ad.name, "Nuovo art director");
+    adDirty = false;
     renderAdQuickActions(ad);
     renderAdVenues(ad);
     elAdDetail.hidden = false;
@@ -4916,8 +4921,8 @@
     return { name: adName.value, phone: adPhone.value, email: adEmail.value, notes: adNotes.value };
   }
   function saveAdNow(){
-    Object.keys(saveTimers).forEach(function(k){ if(k.indexOf("ad_")===0) clearTimeout(saveTimers[k]); });
     return api("PUT", "/api/art_directors/" + currentAdId, collectAdPayload()).then(function(updated){
+      adDirty = false;
       var i = artDirectors.findIndex(function(a){ return a.id === updated.id; });
       if(i>-1) artDirectors[i] = updated;
     });
@@ -4940,7 +4945,11 @@
       loadArtDirectors().then(function(){
         if(goBackId != null){
           if(String(currentId) !== String(goBackId)) openDetail(goBackId);
-          else { fillVenueForm(currentVenue()); }
+          // Rientrando nella scheda la bozza non si tocca: rileggere tutto
+          // dal server cancellerebbe quello che stavi scrivendo prima di
+          // andare a sistemare l'art director. Basta rifare la sua riga.
+          else if(venueDirty) renderArtDirectorRow(currentVenue());
+          else fillVenueForm(currentVenue());
           if(ad && !wasEmpty){
             patchVenue("art_director_id", ad.id).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); toast("Art director assegnato"); });
           }
@@ -4954,10 +4963,12 @@
     }
     currentAdId = null;
   }
-  document.getElementById("btnAdBack").addEventListener("click", closeAdDetail);
+  document.getElementById("btnAdBack").addEventListener("click", function(){
+    chiudiScartando(adDirty, closeAdDetail);
+  });
   document.getElementById("btnAdMore").addEventListener("click", function(){
     var ad = currentAd(); if(!ad) return;
-    confirmDestructive(ad.name || "Questo art director", "Elimina art director", function(){
+    confirmDestructive("Eliminare l'art director " + (ad.name || "senza nome") + "?", function(){
       api("DELETE", "/api/art_directors/" + ad.id).then(function(){
         elAdDetail.classList.remove("in");
         setTimeout(function(){ elAdDetail.hidden = true; }, 320);
@@ -5024,27 +5035,16 @@
     });
   }
   function currentBand(){ return bands.find(function(b){ return b.id === currentBandId; }); }
-  function patchBand(field, value){
-    var body = {}; body[field] = value;
-    return api("PUT", "/api/bands/" + currentBandId, body);
-  }
-  function scheduleSaveBand(field, value){
-    clearTimeout(saveTimers["band_"+field]);
-    saveTimers["band_"+field] = setTimeout(function(){
-      patchBand(field, value).then(function(updated){
-        var i = bands.findIndex(function(b){ return b.id === updated.id; });
-        if(i>-1) bands[i] = updated;
-        if(currentBandId === updated.id) setDato(elBandInlineTitle, updated.name, "Nuova band");
-      });
-    }, 350);
-  }
-  bandName.addEventListener("input", function(){ scheduleSaveBand("name", bandName.value); });
-  bandFacebook.addEventListener("input", function(){ scheduleSaveBand("facebook", bandFacebook.value); renderBandQuickActions(currentBand()||{facebook:bandFacebook.value}); });
-  bandFollowers.addEventListener("input", function(){ scheduleSaveBand("followers", bandFollowers.value ? Number(bandFollowers.value) : ""); });
-  bandBase.addEventListener("input", function(){ scheduleSaveBand("base", bandBase.value); });
-  bandContact.addEventListener("input", function(){ scheduleSaveBand("contact", bandContact.value); });
-  bandGigs.addEventListener("input", function(){ scheduleSaveBand("gigs_count", bandGigs.value ? Number(bandGigs.value) : ""); });
-  bandNotes.addEventListener("input", function(){ scheduleSaveBand("notes", bandNotes.value); });
+  // Bozza anche qui, per la stessa ragione della scheda del palcoscenico.
+  var bandDirty = false;
+  [bandName, bandFacebook, bandFollowers, bandBase, bandContact, bandGigs, bandNotes].forEach(function(el){
+    el.addEventListener("input", function(){ bandDirty = true; });
+  });
+  bandName.addEventListener("input", function(){
+    setDato(elBandInlineTitle, bandName.value, "Nuova band");
+  });
+  bandFacebook.addEventListener("input", function(){ renderBandQuickActions(collectBandPayload()); });
+  bandContact.addEventListener("input", function(){ renderBandQuickActions(collectBandPayload()); });
 
   function renderBandQuickActions(band){
     var actions = [];
@@ -5070,6 +5070,7 @@
     bandGigs.value = band.gigs_count != null ? band.gigs_count : "";
     bandNotes.value = band.notes || "";
     setDato(elBandInlineTitle, band.name, "Nuova band");
+    bandDirty = false;
     renderBandQuickActions(band);
     elBandDetail.hidden = false;
     requestAnimationFrame(function(){ elBandDetail.classList.add("in"); });
@@ -5099,8 +5100,8 @@
     };
   }
   function saveBandNow(){
-    Object.keys(saveTimers).forEach(function(k){ if(k.indexOf("band_")===0) clearTimeout(saveTimers[k]); });
     return api("PUT", "/api/bands/" + currentBandId, collectBandPayload()).then(function(updated){
+      bandDirty = false;
       var i = bands.findIndex(function(b){ return b.id === updated.id; });
       if(i>-1) bands[i] = updated;
     });
@@ -5112,10 +5113,12 @@
       closeBandDetail();
     }).catch(function(err){ toast(err.message); });
   });
-  document.getElementById("btnBandBack").addEventListener("click", closeBandDetail);
+  document.getElementById("btnBandBack").addEventListener("click", function(){
+    chiudiScartando(bandDirty, closeBandDetail);
+  });
   document.getElementById("btnBandMore").addEventListener("click", function(){
     var band = currentBand(); if(!band) return;
-    confirmDestructive(band.name || "Questa band", "Elimina band", function(){
+    confirmDestructive("Eliminare la band " + (band.name || "senza nome") + "?", function(){
       api("DELETE", "/api/bands/" + band.id).then(function(){
         elBandDetail.classList.remove("in");
         setTimeout(function(){ elBandDetail.hidden = true; }, 320);
@@ -7136,7 +7139,7 @@
   document.getElementById("rowSettingsProfile").addEventListener("click", openProfileScreen);
   document.getElementById("btnProfileBack").addEventListener("click", closeProfileScreen);
   document.getElementById("btnLogout").addEventListener("click", function(){
-    confirmDestructive("Vuoi uscire da GigFlow?", "Esci", function(){
+    confirmDestructive("Vuoi uscire da GigFlow?", function(){
       window.location.href = "/logout";
     });
   });
