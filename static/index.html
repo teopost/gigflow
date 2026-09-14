@@ -208,7 +208,9 @@
   .map-pin-popup{font-family:inherit;}
   .map-pin-popup .mp-name{font-weight:700;font-size:15px;margin-bottom:4px;line-height:1.25;}
   .map-pin-popup .mp-sub{font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
-  .map-pin-popup .mp-badge{margin-bottom:8px;}
+  .map-pin-popup .mp-badge{margin-bottom:8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .map-pin-popup .mp-type{font-size:12px;font-weight:600;color:var(--tint);}
+  .map-pin-popup .mp-type .ico{margin-right:3px;}
   .map-pin-popup .mp-rows{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
   .map-pin-popup .mp-row{display:flex;gap:7px;font-size:13px;line-height:1.35;color:var(--text);}
   .map-pin-popup .mp-row .mp-ico{flex:none;width:15px;text-align:center;}
@@ -3487,6 +3489,11 @@
      parli, dove entri, che numero fai. L'indirizzo tiene dentro anche la
      citta' perche' da soli "Via Roma 4" e "Cesenatico" non sono due
      informazioni, sono una. */
+  function mapTypeTagHtml(v){
+    if(!v.type) return "";
+    var ico = typeIcon(v.type);
+    return '<span class="mp-type">'+(ico ? '<span class="ico">'+esc(ico)+'</span>' : '')+dato(v.type)+'</span>';
+  }
   function mapPopupHtml(v, st){
     var righe = [];
     if(v.contact_name) righe.push('<div class="mp-row"><span class="mp-ico">👤</span><span>'+dato(v.contact_name)+'</span></div>');
@@ -3496,7 +3503,11 @@
       '<a href="tel:'+esc(v.phone.replace(/\s+/g,""))+'">'+dato(v.phone)+'</a></div>');
     return '<div class="map-pin-popup">'+
       '<div class="mp-name">'+dato(v.name||"Senza nome")+'</div>'+
-      '<div class="mp-badge">'+statusPillHtml(st.label, st)+'</div>'+
+      // La tipologia accanto allo stato, con la sua icona: e' la stessa che
+      // sta dentro il segnalino che hai appena toccato, e vederla scritta
+      // qui e' il modo in cui impari cosa vuol dire quel simbolo senza che
+      // nessuno ti dia una legenda.
+      '<div class="mp-badge">'+statusPillHtml(st.label, st)+ mapTypeTagHtml(v) +'</div>'+
       (righe.length ? '<div class="mp-rows">'+righe.join("")+'</div>' : '')+
       '<div class="mp-actions">'+
         '<a class="mp-route" target="_blank" rel="noopener" href="'+esc(directionsHref(v))+'">Portami qui</a>'+
