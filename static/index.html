@@ -198,7 +198,7 @@
   .mpin svg{display:block;}
   /* L'emoji sta sopra il cerchio bianco, non dentro l'SVG: come <text> ogni
      telefono la allinea a modo suo, come riga di testo sta ferma. */
-  .mpin-emoji{position:absolute;left:0;top:7px;width:32px;height:17px;line-height:17px;text-align:center;font-size:13px;}
+  .mpin-emoji{position:absolute;left:0;top:5px;width:32px;height:21px;line-height:21px;text-align:center;font-size:19px;}
   .type-tag .ico{margin-right:3px;}
   /* Una colonna sola per tutte le righe: le icone incolonnate si leggono
      come un elenco, sparse come disordine. Chi non ce l'ha tiene il posto
@@ -3346,7 +3346,12 @@
   function getMapPinIcon(color, emoji){
     var chiave = color + "|" + (emoji || "");
     if(mapPinIcons[chiave]) return mapPinIcons[chiave];
-    var r = emoji ? 7.5 : 5.5;
+    // Il segnalino resta com'e': a crescere e' il cerchio bianco dentro, che
+    // si mangia l'anello colorato fino a lasciarne un filo. L'anello serve
+    // ancora a dire lo stato, ma un'icona che non si riconosce non dice
+    // niente, e fra le due chi ha ragione e' l'icona. Senza icona resta il
+    // pallino piccolo di sempre.
+    var r = emoji ? 11.5 : 5.5;
     mapPinIcons[chiave] = L.divIcon({
       className: "map-pin-icon",
       html: '<div class="mpin"><svg width="32" height="44" viewBox="0 0 28 40">'+
