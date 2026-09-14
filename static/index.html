@@ -202,8 +202,11 @@
   .map-pin-popup .mp-row{display:flex;gap:7px;font-size:13px;line-height:1.35;color:var(--text);}
   .map-pin-popup .mp-row .mp-ico{flex:none;width:15px;text-align:center;}
   .map-pin-popup .mp-row a{color:var(--tint);text-decoration:none;font-weight:600;}
-  .map-pin-popup .mp-actions{display:flex;gap:6px;}
-  .map-pin-popup .mp-actions > *{flex:1;text-align:center;border:none;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;white-space:nowrap;}
+  /* Quattro pulsanti in fila non ci stanno nella larghezza di una
+     finestrella: vanno a due per riga, e se sono dispari l'ultimo si prende
+     la riga tutta per se'. */
+  .map-pin-popup .mp-actions{display:flex;flex-wrap:wrap;gap:6px;}
+  .map-pin-popup .mp-actions > *{flex:1 1 calc(50% - 3px);text-align:center;border:none;border-radius:8px;padding:7px 8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;white-space:nowrap;}
   .map-pin-popup .mp-route{background:var(--tint);color:#fff;}
   .map-pin-popup button{background:var(--fill);color:var(--text);}
   /* ---------- band attiva, inviti, membri ---------- */
@@ -240,7 +243,27 @@
   /* ---------- searchbar & scope chips ---------- */
   .searchbar-wrap{padding:0 16px 8px;}
   /* dentro la navbar la searchbar sta appiccicata al selettore che la segue */
-  .navbar .searchbar-wrap{padding:2px 16px 0;}
+  .navbar .searchbar-wrap{padding:2px 16px 0;position:relative;}
+  /* I risultati della ricerca in mappa: una scheda appesa sotto la barra,
+     sopra la mappa. Non filtra niente — la mappa resta piena — serve solo a
+     scegliere quale segnalino guardare. */
+  .map-search-results{position:absolute;left:16px;right:16px;top:100%;margin-top:5px;z-index:30;background:var(--bg-elevated);border-radius:12px;box-shadow:0 8px 26px rgba(0,0,0,.3);max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .msr-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:.5px solid var(--separator);}
+  .msr-row:last-child{border-bottom:none;}
+  .msr-row:active{background:var(--fill);}
+  .msr-dot{flex:none;width:10px;height:10px;border-radius:50%;}
+  .msr-main{flex:1;min-width:0;}
+  .msr-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .msr-sub{font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .msr-tag{flex:none;font-size:11px;color:var(--text-tertiary);white-space:nowrap;}
+  /* Chi non e' sulla mappa si vede che non c'e': spento, e con scritto perche'. */
+  .msr-row.msr-off .msr-name{color:var(--text-secondary);font-weight:600;}
+  .msr-row.msr-off .msr-dot{opacity:.35;}
+  .msr-note{padding:12px;font-size:13px;color:var(--text-secondary);text-align:center;}
+  /* Il saltello del segnalino trovato: fra dodici pin vicini, quello scelto
+     deve dire "sono io" senza che tu debba indovinare. */
+  @keyframes mapPinFound{0%{transform:translateY(-16px);}55%{transform:translateY(0);}72%{transform:translateY(-6px);}100%{transform:translateY(0);}}
+  .map-pin-icon.map-pin-found svg{animation:mapPinFound .6s ease-out;}
   /* la searchbar non e' piu' in cima allo scroll a fare da spazio: l'aria
      sopra la prima riga dell'elenco va rimessa qui. */
   #scrollList > #list{padding-top:8px;}
@@ -632,6 +655,7 @@
           <input id="searchInput" type="text" placeholder="Cerca per nome, città o tipo…" autocomplete="off">
           <button class="clear-btn" id="searchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
         </div>
+        <div class="map-search-results" id="mapSearchResults" hidden></div>
       </div>
       <div class="view-toggle-wrap">
         <div class="view-toggle" id="viewToggle">
@@ -2706,6 +2730,7 @@
   elSearch.addEventListener("input", function(){
     searchText = elSearch.value;
     renderList();
+    renderMapSearchResults();
   });
   wireClearBtn(elSearch, document.getElementById("searchClearBtn"));
 
@@ -2864,13 +2889,22 @@
   }
   document.getElementById("btnFilters").addEventListener("click", openFiltersScreen);
   document.getElementById("btnFiltersBack").addEventListener("click", closeFiltersScreen);
-  document.getElementById("btnFiltersReset").addEventListener("click", function(){
+  /* Azzerare i filtri lo chiede anche la ricerca in mappa, quando il posto
+     che hai trovato per nome e' proprio quello che i filtri stanno
+     nascondendo. Da li' pero' gli archiviati non si toccano: spegnere quel
+     lettore ricarica l'elenco e potrebbe portarsi via proprio il
+     palcoscenico che stavi andando a vedere. */
+  function azzeraFiltri(opts){
+    opts = opts || {};
     filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all";
     resetVenueListFilters();
     resetGeoFilters();
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
     renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderGeoFilterRows(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
-    if(showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); loadVenues(); }
+    if(!opts.tieniArchiviati && showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); loadVenues(); }
+  }
+  document.getElementById("btnFiltersReset").addEventListener("click", function(){
+    azzeraFiltri();
     toast("Filtri azzerati");
   });
 
@@ -3102,6 +3136,7 @@
   var leafletMap = null;
   var mapMarkersLayer = null;
   var mapPinIcons = {};
+  var mapMarkers = {};        /* id del palcoscenico -> segnalino, per ritrovarlo dalla ricerca */
   var mapUserIcon = null;
   var mapUserMarker = null;
   var mapUserCircle = null;
@@ -3134,6 +3169,19 @@
   function isAppleDevice(){
     return /iPad|iPhone|iPod/.test(navigator.userAgent)
       || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+  /* Il campo "sito" tiene quello che c'e': un sito vero, la pagina Facebook,
+     il profilo Instagram. Aprirlo vuol dire solo rimetterci davanti lo
+     https:// quando chi l'ha scritto l'ha lasciato fuori. */
+  function websiteHref(url){
+    return /^https?:\/\//i.test(url) ? url : ("https://" + url);
+  }
+  /* Quando il sito non c'e' — ed e' il caso di mezza rubrica — resta il
+     modo con cui lo cercheresti comunque: nome e citta' su Google. La citta'
+     serve: di "Bar Centrale" ce n'e' uno per paese. */
+  function webSearchHref(v){
+    var q = [v.name, v.city].filter(function(x){ return x; }).join(" ");
+    return "https://www.google.com/search?q=" + encodeURIComponent(q);
   }
   function directionsHref(v){
     var dest = v.lat + "," + v.lng;
@@ -3198,6 +3246,9 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
     }).addTo(leafletMap);
     mapMarkersLayer = L.layerGroup().addTo(leafletMap);
+    /* Appena rimetti le mani sulla mappa, la tendina dei risultati se ne va:
+       e' un passaggio, non un pannello da chiudere a mano. */
+    leafletMap.on("click dragstart popupopen", function(){ hideMapSearchResults(); });
   }
   var mapVenueBounds = [];
   function fitMapToVenues(){
@@ -3221,6 +3272,8 @@
       '<div class="mp-actions">'+
         '<a class="mp-route" target="_blank" rel="noopener" href="'+esc(directionsHref(v))+'">Portami qui</a>'+
         '<button data-open-map-id="'+v.id+'">Apri scheda</button>'+
+        (v.website ? '<a target="_blank" rel="noopener" href="'+esc(websiteHref(v.website))+'">Sito</a>' : '')+
+        (v.name ? '<a target="_blank" rel="noopener" href="'+esc(webSearchHref(v))+'">Cerca sul web</a>' : '')+
       '</div>'+
     '</div>';
   }
@@ -3234,6 +3287,7 @@
     if(!force && firma === mapSignature) return;
     mapSignature = firma;
     mapMarkersLayer.clearLayers();
+    mapMarkers = {};
     // I filtri dell'elenco, non la sua ricerca: una mappa che mostra tutto
     // mentre i filtri ne tengono dodici sarebbe un inganno, ma una mappa che
     // si svuota perche' stai cercando un nome non serve a niente. Cercando
@@ -3252,12 +3306,126 @@
         });
       });
       marker.addTo(mapMarkersLayer);
+      mapMarkers[v.id] = marker;
       bounds.push([v.lat, v.lng]);
     });
     mapVenueBounds = bounds;
     /* il fit sui palcoscenici serve solo se non stiamo centrando sulla posizione dell'utente */
     if(!mapUserCoords && !nearMeCoords && !mapLocating) fitMapToVenues();
   }
+  /* ---------------- la ricerca in mappa ----------------
+     In elenco la ricerca filtra: restano le righe che corrispondono. In
+     mappa non puo' fare lo stesso — togliere i segnalini intorno svuota
+     proprio quello che sei andato a guardare — quindi qui la ricerca
+     seleziona invece di filtrare: scrivi, ti si apre l'elenco dei nomi che
+     corrispondono, ne tocchi uno e la mappa ci va sopra con la finestrella
+     aperta. La mappa resta piena, e tu hai trovato il tuo posto. */
+  var elMapSearchResults = document.getElementById("mapSearchResults");
+  var MAP_SEARCH_MAX = 20;
+
+  function hideMapSearchResults(){
+    elMapSearchResults.hidden = true;
+    elMapSearchResults.innerHTML = "";
+  }
+  /* Il salto della mappa e l'apertura della finestrella sono due momenti:
+     aprirla prima di essere arrivati la fa litigare con l'animazione. Il
+     timeout e' la rete di sicurezza per quando il volo e' cosi' corto che
+     "moveend" non arriva mai. */
+  function focusVenueOnMap(v){
+    var marker = mapMarkers[v.id];
+    if(!marker) return;
+    var fatto = false;
+    function arrivati(){
+      if(fatto) return;
+      fatto = true;
+      marker.openPopup();
+      var el = marker.getElement();
+      if(el){
+        el.classList.remove("map-pin-found");
+        void el.offsetWidth;          /* rilancia l'animazione se e' lo stesso segnalino di prima */
+        el.classList.add("map-pin-found");
+      }
+    }
+    leafletMap.once("moveend", arrivati);
+    setTimeout(arrivati, 1000);
+    leafletMap.flyTo([v.lat, v.lng], Math.max(leafletMap.getZoom(), 15), {duration:.7});
+  }
+  /* Tre gruppi, in quest'ordine: quelli che sono sulla mappa e basta
+     toccarli, quelli che ci sarebbero ma li stanno nascondendo i filtri, e
+     quelli che sulla mappa non possono starci perche' non hanno una
+     posizione. Gli ultimi due dicono anche perche', invece di far finta di
+     non averli trovati. */
+  function mapSearchMatches(){
+    var trovati = venues.filter(matchesSearch);
+    var sulla = [], nascosti = [], senzaPosizione = [];
+    trovati.forEach(function(v){
+      if(v.lat == null || v.lng == null) senzaPosizione.push(v);
+      else if(matchesFilter(v)) sulla.push(v);
+      else nascosti.push(v);
+    });
+    function perNome(a, b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); }
+    return sulla.sort(perNome)
+      .concat(nascosti.sort(perNome).map(function(v){ return Object.assign({}, v, {__motivo:"filtri"}); }))
+      .concat(senzaPosizione.sort(perNome).map(function(v){ return Object.assign({}, v, {__motivo:"posizione"}); }));
+  }
+  function mapSearchRowHtml(v){
+    var st = statusInfo(v.status);
+    var tag = v.__motivo === "filtri" ? "nascosto dai filtri"
+            : v.__motivo === "posizione" ? "senza posizione" : "";
+    return '<div class="msr-row'+(tag ? ' msr-off' : '')+'" data-msr-id="'+v.id+'">'+
+      '<span class="msr-dot" style="background:'+st.color+'"></span>'+
+      '<div class="msr-main">'+
+        '<div class="msr-name">'+dato(v.name||"Senza nome")+'</div>'+
+        (v.city ? '<div class="msr-sub">'+dato(v.city)+'</div>' : '')+
+      '</div>'+
+      (tag ? '<span class="msr-tag">'+tag+'</span>' : '')+
+    '</div>';
+  }
+  function renderMapSearchResults(){
+    if(currentViewMode !== "map" || !searchText.trim()){ hideMapSearchResults(); return; }
+    var righe = mapSearchMatches();
+    if(!righe.length){
+      elMapSearchResults.innerHTML = '<div class="msr-note">Nessun palcoscenico con questo nome</div>';
+      elMapSearchResults.hidden = false;
+      return;
+    }
+    var mostrati = righe.slice(0, MAP_SEARCH_MAX);
+    elMapSearchResults.innerHTML = mostrati.map(mapSearchRowHtml).join("") +
+      (righe.length > mostrati.length
+        ? '<div class="msr-note">Altri '+(righe.length - mostrati.length)+', scrivi qualche lettera in piu\'</div>'
+        : '');
+    elMapSearchResults.hidden = false;
+    elMapSearchResults.scrollTop = 0;
+  }
+  /* Toccare un risultato non e' sempre "vai li'": se il posto non ha una
+     posizione l'unica cosa utile e' aprirne la scheda, che e' dove
+     l'indirizzo si scrive. */
+  elMapSearchResults.addEventListener("click", function(e){
+    var row = e.target.closest("[data-msr-id]");
+    if(!row) return;
+    var id = row.getAttribute("data-msr-id");
+    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
+    if(!v) return;
+    hideMapSearchResults();
+    elSearch.blur();
+    if(v.lat == null || v.lng == null){ openDetail(v.id); return; }
+    if(!matchesFilter(v)){
+      azzeraFiltri({tieniArchiviati:true});
+      renderMapMarkers(true);
+      toast("Filtri azzerati per mostrarti " + (v.name || "il palcoscenico"));
+    }
+    focusVenueOnMap(v);
+  });
+  elSearch.addEventListener("focus", renderMapSearchResults);
+  /* Invio porta al primo della lista: sulla tastiera del telefono e' il
+     tasto che viene sotto il pollice quando hai finito di scrivere. */
+  elSearch.addEventListener("keydown", function(e){
+    if(e.key !== "Enter" || currentViewMode !== "map") return;
+    e.preventDefault();
+    var prima = elMapSearchResults.querySelector("[data-msr-id]");
+    if(prima) prima.click();
+    else elSearch.blur();
+  });
   mapLocateBtn.addEventListener("click", function(){ locateOnMap({}); });
   document.getElementById("viewToggle").addEventListener("click", function(e){
     var btn = e.target.closest(".view-toggle-btn");
@@ -3279,6 +3447,7 @@
     } else {
       elMapView.hidden = true;
       elScrollList.hidden = false;
+      hideMapSearchResults();
     }
   });
 
