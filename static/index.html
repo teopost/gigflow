@@ -351,6 +351,13 @@
   /* Una riga che e' un comando, non un dato: il colore la distingue dalle
      caselle che ha sopra senza doverle mettere un bottone dentro. */
   .link-action{font-size:16px;color:var(--tint);}
+  .bulk-bar{height:6px;border-radius:999px;background:var(--fill);overflow:hidden;}
+  .bulk-bar i{display:block;height:100%;width:0;background:var(--tint);border-radius:999px;transition:width .25s;}
+  .bulk-now{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bulk-esito{display:flex;gap:10px;align-items:baseline;padding:9px 16px;background:var(--bg-elevated);font-size:14px;}
+  .bulk-esito + .bulk-esito{border-top:.5px solid var(--separator);}
+  .bulk-esito b{flex:none;font-variant-numeric:tabular-nums;}
+  .bulk-falliti{font-size:13px;color:var(--text-secondary);line-height:1.5;}
   .field-row.busy .link-action{color:var(--text-secondary);}
   .field-row.picker:active{background:var(--fill);}
   .picker-value{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;color:var(--text-secondary);font-size:16px;min-width:0;}
@@ -987,6 +994,12 @@
           <div class="row-trail"><span class="row-badge" id="settingsSeasonalityCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="row" id="rowSettingsFbCovers">
+          <div class="row-main"><div class="row-title">Copertine da Facebook</div>
+          <div class="row-sub" id="fbCoversSub">Senza copertina, con una pagina Facebook</div></div>
+          <div class="row-trail"><span class="row-badge" id="fbCoversCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="row" id="rowSettingsLivePeriod">
           <div class="row-main"><div class="row-title">Periodo</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsLivePeriodCount" style="background:var(--fill);color:var(--text-secondary);"></span>
@@ -1041,6 +1054,45 @@
       </div>
       <div class="section-footer" id="sectionAdminFooter" hidden></div>
 
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: COPERTINE DA FACEBOOK ============ -->
+  <section class="screen pushed" id="fbCoversScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnFbCoversBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">Copertine</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">DA FARE</div>
+      <div class="grouped-list">
+        <div class="field-row"><label style="flex:1;">Senza copertina, con pagina Facebook</label><span id="fbBulkTodo">0</span></div>
+        <div class="field-row"><label style="flex:1;">Copertine già a posto</label><span id="fbBulkDone">0</span></div>
+      </div>
+      <div class="section-footer">Prende l’immagine del profilo della pagina Facebook — quella quadrata, non la copertina larga — e la mette come copertina del palcoscenico. Tocca solo chi non ha nessuna foto: quelle che avete messo voi restano dove sono. Ci vuole qualche minuto, e si può fermare quando vuoi: quello che è passato resta fatto.</div>
+
+      <div class="grouped-list" id="fbBulkStartWrap">
+        <div class="field-row picker" id="rowFbBulkStart"><span class="link-action">Prendi le copertine</span></div>
+      </div>
+
+      <div id="fbBulkRunning" hidden>
+        <div class="grouped-list">
+          <div class="field-row stacked">
+            <label id="fbBulkProgressLabel">0 di 0</label>
+            <div class="bulk-bar"><i id="fbBulkBar"></i></div>
+            <div class="bulk-now" id="fbBulkNow"></div>
+          </div>
+          <div class="field-row picker" id="rowFbBulkStop"><span class="link-action" style="color:var(--destructive);">Ferma</span></div>
+        </div>
+      </div>
+
+      <div id="fbBulkReport" hidden></div>
     </div>
   </section>
 
@@ -2220,7 +2272,11 @@
     return fetch(path, opts).then(function(res){
       if(res.status === 204) return null;
       return res.json().then(function(data){
-        if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
+        if(!res.ok){
+          var errore = new Error(data.error || ("Errore " + res.status));
+          errore.code = data.code || null;   // per chi deve contare gli esiti, non solo mostrarli
+          throw errore;
+        }
         return data;
       });
     });
@@ -2741,6 +2797,7 @@
   }
   function renderAll(){
     updateFilterActiveDot();
+    renderFbCoversRow();
     renderHome();
     renderList();
     renderFavorites();
@@ -5695,6 +5752,138 @@
       updateSettingsTypesCount();
       toast("Tipologia aggiunta");
     }).catch(function(err){ toast(err.message); });
+  });
+
+  /* ---------------- copertine da Facebook, tutte insieme ----------------
+     La riga nelle Impostazioni porta gia' il numero: quante copertine
+     mancano fra i palcoscenici che hanno una pagina Facebook scritta nel
+     campo Sito. E' un numero che si legge di sfuggita e dice se c'e'
+     lavoro da fare, senza entrare.
+
+     Il giro lo guida l'app, una chiamata per volta su quella che c'e' gia'
+     per la singola scheda: cosi' l'avanzamento e il Ferma vengono gratis e
+     il server non deve ricordarsi niente fra una richiesta e l'altra. Se
+     chiudi a meta' non hai rotto nulla — quelle passate sono passate, e
+     rientrando il numero e' gia' diminuito. */
+  function fbCoverMancanti(){
+    return venues.filter(function(v){
+      return !v.deleted_at && !(v.photos && v.photos.length) && facebookPageId(v.website);
+    });
+  }
+  function renderFbCoversRow(){
+    document.getElementById("fbCoversCount").textContent = fbCoverMancanti().length;
+  }
+  var elFbCoversScreen = document.getElementById("fbCoversScreen");
+  var elFbBulkBar = document.getElementById("fbBulkBar");
+  var elFbBulkReport = document.getElementById("fbBulkReport");
+  var fbBulkRunning = false;
+  var fbBulkStop = false;
+
+  function renderFbCoversScreen(){
+    var mancanti = fbCoverMancanti().length;
+    var conFoto = venues.filter(function(v){ return !v.deleted_at && v.photos && v.photos.length; }).length;
+    document.getElementById("fbBulkTodo").textContent = mancanti;
+    document.getElementById("fbBulkDone").textContent = conFoto;
+    document.getElementById("rowFbBulkStart").classList.toggle("busy", mancanti === 0);
+    document.getElementById("fbBulkStartWrap").hidden = fbBulkRunning;
+  }
+  function openFbCoversScreen(){
+    elFbBulkReport.hidden = true;
+    elFbBulkReport.innerHTML = "";
+    renderFbCoversScreen();
+    elFbCoversScreen.hidden = false;
+    requestAnimationFrame(function(){ elFbCoversScreen.classList.add("in"); });
+  }
+  function closeFbCoversScreen(){
+    fbBulkStop = true;   /* uscendo si smette: continuare di nascosto non lo capirebbe nessuno */
+    elFbCoversScreen.classList.remove("in");
+    setTimeout(function(){ elFbCoversScreen.hidden = true; }, 320);
+  }
+  document.getElementById("rowSettingsFbCovers").addEventListener("click", openFbCoversScreen);
+  document.getElementById("btnFbCoversBack").addEventListener("click", closeFbCoversScreen);
+  document.getElementById("rowFbBulkStop").addEventListener("click", function(){ fbBulkStop = true; });
+
+  var FB_BULK_PAUSA = 400;     /* fra una pagina e l'altra: Facebook non va martellato */
+  var FB_BULK_STOP_RETE = 5;   /* errori di rete di fila dopo i quali insistere peggiora */
+
+  document.getElementById("rowFbBulkStart").addEventListener("click", function(){
+    if(fbBulkRunning) return;
+    var coda = fbCoverMancanti();
+    if(!coda.length){ toast("Non manca nessuna copertina"); return; }
+    fbBulkRunning = true;
+    fbBulkStop = false;
+    var esiti = {fatte:[], senza_foto:[], pagina_sparita:[], altro:[]};
+    var fatti = 0, reteDiFila = 0;
+    document.getElementById("fbBulkRunning").hidden = false;
+    elFbBulkReport.hidden = true;
+    elFbBulkReport.innerHTML = "";
+    renderFbCoversScreen();
+
+    function avanzamento(v){
+      document.getElementById("fbBulkProgressLabel").textContent = fatti + " di " + coda.length;
+      elFbBulkBar.style.width = Math.round(fatti * 100 / coda.length) + "%";
+      // Il nome resta quello dell'ultima fatta anche fra un passo e l'altro:
+      // farlo sparire per mezzo secondo ogni volta e' solo uno sfarfallio.
+      if(v) document.getElementById("fbBulkNow").textContent = v.name || "Senza nome";
+    }
+    function passo(i){
+      if(fbBulkStop || i >= coda.length) return fine();
+      var v = coda[i];
+      avanzamento(v);
+      api("POST", "/api/locations/" + v.id + "/photos/facebook", {url: v.website})
+        .then(function(updated){
+          reteDiFila = 0;
+          esiti.fatte.push(v);
+          var locale = venues.filter(function(x){ return String(x.id) === String(v.id); })[0];
+          if(locale) locale.photos = updated.photos || [];
+        })
+        .catch(function(err){
+          var code = err.code || "altro";
+          if(code === "rete"){
+            reteDiFila++;
+            esiti.altro.push({v:v, msg:err.message});
+          } else {
+            reteDiFila = 0;
+            (esiti[code] || esiti.altro).push(code === "senza_foto" || code === "pagina_sparita" ? v : {v:v, msg:err.message});
+          }
+          if(reteDiFila >= FB_BULK_STOP_RETE) fbBulkStop = true;
+        })
+        .then(function(){
+          fatti++;
+          avanzamento(null);
+          setTimeout(function(){ passo(i + 1); }, FB_BULK_PAUSA);
+        });
+    }
+    function fine(){
+      fbBulkRunning = false;
+      document.getElementById("fbBulkRunning").hidden = true;
+      renderList(); renderFavorites(); renderFbCoversRow(); renderFbCoversScreen();
+      mostraReport(esiti, fatti, coda.length);
+    }
+    function elenco(titolo, righe){
+      if(!righe.length) return "";
+      var nomi = righe.map(function(r){ return esc((r.v || r).name || "Senza nome"); }).join(" · ");
+      return '<div class="section-header">'+titolo+'</div>'+
+             '<div class="grouped-list"><div class="field-row stacked"><div class="bulk-falliti">'+nomi+'</div></div></div>';
+    }
+    function mostraReport(e, fatti, totale){
+      var interrotto = fatti < totale;
+      elFbBulkReport.innerHTML =
+        '<div class="section-header">'+(interrotto ? "FERMATO DOPO "+fatti+" DI "+totale : "FATTO")+'</div>'+
+        '<div class="grouped-list">'+
+          '<div class="bulk-esito"><b>'+e.fatte.length+'</b><span>copertine messe</span></div>'+
+          '<div class="bulk-esito"><b>'+e.senza_foto.length+'</b><span>pagine senza immagine del profilo</span></div>'+
+          '<div class="bulk-esito"><b>'+e.pagina_sparita.length+'</b><span>pagine che Facebook non trova più</span></div>'+
+          (e.altro.length ? '<div class="bulk-esito"><b>'+e.altro.length+'</b><span>non riuscite per altri motivi</span></div>' : '')+
+        '</div>'+
+        // I nomi, non solo i numeri: sono quelli su cui mettere mano a mano,
+        // e senza nome resterebbero un conteggio che non si puo' usare.
+        elenco("SENZA IMMAGINE DEL PROFILO", e.senza_foto)+
+        elenco("PAGINE NON TROVATE", e.pagina_sparita)+
+        elenco("ALTRI ERRORI", e.altro);
+      elFbBulkReport.hidden = false;
+    }
+    passo(0);
   });
 
   var elTypesScreen = document.getElementById("typesScreen");

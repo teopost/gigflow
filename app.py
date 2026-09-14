@@ -1950,10 +1950,23 @@ def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
 
 
 class ApiError(Exception):
-    def __init__(self, status, message):
+    """Il codice e' per l'app, il messaggio per chi legge. Serve quando
+    l'app deve contare gli esiti invece di limitarsi a mostrarli: riconoscere
+    "la pagina non ha foto" dal testo del messaggio vuol dire rompere un
+    conteggio ogni volta che si corregge una parola."""
+
+    def __init__(self, status, message, code=None):
         super().__init__(message)
         self.status = status
         self.message = message
+        self.code = code
+
+
+def _errore_json(e):
+    corpo = {"error": e.message}
+    if getattr(e, "code", None):
+        corpo["code"] = e.code
+    return corpo
 
 
 def to_number_or_none(value, kind=float):
@@ -2638,7 +2651,7 @@ def facebook_cover(conn, ws, loc_id, body=None):
 
     page_id = facebook_page_id((body or {}).get("url") or row["website"])
     if not page_id:
-        raise ApiError(400, "Nel campo Sito non c'e' una pagina Facebook")
+        raise ApiError(400, "Nel campo Sito non c'e' una pagina Facebook", "non_facebook")
 
     # Il nome vecchio stile va provato in due modi: com'e' scritto, e poi
     # col solo numero in fondo, che e' l'id sopravvissuto al cambio di nome.
@@ -2657,13 +2670,13 @@ def facebook_cover(conn, ws, loc_id, body=None):
             # chiusa o rinominata, e il link in archivio punta al vuoto.
             continue
         except Exception:
-            raise ApiError(502, "Facebook non risponde, riprova fra poco")
+            raise ApiError(502, "Facebook non risponde, riprova fra poco", "rete")
     if esito is None:
-        raise ApiError(404, "Facebook non trova questa pagina: forse ha cambiato nome")
+        raise ApiError(404, "Facebook non trova questa pagina: forse ha cambiato nome", "pagina_sparita")
 
     dati = (esito or {}).get("data") or {}
     if dati.get("is_silhouette"):
-        raise ApiError(404, "Questa pagina non ha un'immagine del profilo")
+        raise ApiError(404, "Questa pagina non ha un'immagine del profilo", "senza_foto")
     foto_url = dati.get("url")
     if not foto_url:
         raise ApiError(502, "Facebook non ha dato nessuna immagine")
@@ -2680,7 +2693,7 @@ def facebook_cover(conn, ws, loc_id, body=None):
             ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             raw = resp.read(MAX_PHOTO_BYTES + 1)
     except Exception:
-        raise ApiError(502, "Non sono riuscito a scaricare l'immagine")
+        raise ApiError(502, "Non sono riuscito a scaricare l'immagine", "rete")
 
     ext = CONTENT_TYPE_PHOTO_EXT.get(ctype)
     if not ext or not raw:
@@ -4407,7 +4420,7 @@ class Handler(BaseHTTPRequestHandler):
                 payload = create_location(conn, ws, self._read_json_body(), owner_email=owner_email)
                 self._send_json(201, payload)
             except ApiError as e:
-                self._send_json(e.status, {"error": e.message})
+                self._send_json(e.status, _errore_json(e))
         finally:
             conn.close()
         return True
@@ -4447,7 +4460,7 @@ class Handler(BaseHTTPRequestHandler):
                 require_admin(ctx)
                 dati = export_zip(conn)
             except ApiError as e:
-                self._send_json(e.status, {"error": e.message})
+                self._send_json(e.status, _errore_json(e))
                 return
             finally:
                 conn.close()
@@ -4536,7 +4549,7 @@ class Handler(BaseHTTPRequestHandler):
                     conn.close()
                 self._send_json(status, payload)
             except ApiError as e:
-                self._send_json(e.status, {"error": e.message})
+                self._send_json(e.status, _errore_json(e))
             except Exception as e:  # pragma: no cover - safety net
                 self._send_json(500, {"error": f"Errore interno: {e}"})
             return
