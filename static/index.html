@@ -189,12 +189,23 @@
   .view-toggle.tre .view-toggle-btn{font-size:13px;padding:9px 2px;}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
+  /* Il colore del segnalino e' quello dello stato, lo stesso della pastiglia
+     nell'elenco: da lontano la mappa dice a che punto sei con ogni posto
+     senza aprire niente. Il fill lo mette il singolo segnalino, qui non si
+     fissa nessun colore o vincerebbe su quello. */
   .map-pin-icon{background:none;border:none;}
-  .map-pin-icon path{fill:var(--tint);}
   .map-pin-popup{font-family:inherit;}
-  .map-pin-popup .mp-name{font-weight:700;font-size:14px;margin-bottom:2px;}
+  .map-pin-popup .mp-name{font-weight:700;font-size:15px;margin-bottom:4px;line-height:1.25;}
   .map-pin-popup .mp-sub{font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
-  .map-pin-popup button{border:none;background:var(--tint);color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .map-pin-popup .mp-badge{margin-bottom:8px;}
+  .map-pin-popup .mp-rows{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+  .map-pin-popup .mp-row{display:flex;gap:7px;font-size:13px;line-height:1.35;color:var(--text);}
+  .map-pin-popup .mp-row .mp-ico{flex:none;width:15px;text-align:center;}
+  .map-pin-popup .mp-row a{color:var(--tint);text-decoration:none;font-weight:600;}
+  .map-pin-popup .mp-actions{display:flex;gap:6px;}
+  .map-pin-popup .mp-actions > *{flex:1;text-align:center;border:none;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;white-space:nowrap;}
+  .map-pin-popup .mp-route{background:var(--tint);color:#fff;}
+  .map-pin-popup button{background:var(--fill);color:var(--text);}
   /* ---------- band attiva, inviti, membri ---------- */
   .ws-check{flex:none;width:20px;margin-right:2px;color:var(--tint);display:flex;align-items:center;}
   .ws-edit{flex:none;border:none;background:none;padding:6px;margin:-6px -4px -6px 0;color:var(--text-tertiary);cursor:pointer;display:flex;align-items:center;}
@@ -228,6 +239,11 @@
 
   /* ---------- searchbar & scope chips ---------- */
   .searchbar-wrap{padding:0 16px 8px;}
+  /* dentro la navbar la searchbar sta appiccicata al selettore che la segue */
+  .navbar .searchbar-wrap{padding:2px 16px 0;}
+  /* la searchbar non e' piu' in cima allo scroll a fare da spazio: l'aria
+     sopra la prima riga dell'elenco va rimessa qui. */
+  #scrollList > #list{padding-top:8px;}
   .searchbar{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;padding:8px 10px;}
   .searchbar svg{flex:none;color:var(--text-secondary);}
   .searchbar input{border:0;background:transparent;flex:1;min-width:0;font-size:17px;color:var(--text);font-family:inherit;}
@@ -610,6 +626,13 @@
         <h1 class="large-title">Palcoscenici</h1>
         <div class="subtitle-count" id="countSub">0 palcoscenici</div>
       </div>
+      <div class="searchbar-wrap">
+        <div class="searchbar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="text" placeholder="Cerca per nome, città o tipo…" autocomplete="off">
+          <button class="clear-btn" id="searchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
+        </div>
+      </div>
       <div class="view-toggle-wrap">
         <div class="view-toggle" id="viewToggle">
           <button class="view-toggle-btn active" data-view="list">
@@ -624,13 +647,6 @@
       </div>
     </header>
     <div class="screen-scroll" id="scrollList">
-      <div class="searchbar-wrap">
-        <div class="searchbar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="searchInput" type="text" placeholder="Cerca per nome, città o tipo…" autocomplete="off">
-          <button class="clear-btn" id="searchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
-        </div>
-      </div>
       <div id="list"></div>
     </div>
     <div class="map-view" id="mapView" hidden>
@@ -3085,7 +3101,7 @@
   var elMapView = document.getElementById("mapView");
   var leafletMap = null;
   var mapMarkersLayer = null;
-  var mapPinIcon = null;
+  var mapPinIcons = {};
   var mapUserIcon = null;
   var mapUserMarker = null;
   var mapUserCircle = null;
@@ -3095,16 +3111,35 @@
   var currentViewMode = "list";
   var MAP_RADIUS_M = 50000;   /* raggio di 50 km attorno alla posizione */
 
-  function getMapPinIcon(){
-    if(mapPinIcon) return mapPinIcon;
-    mapPinIcon = L.divIcon({
+  /* Un'icona per colore, tenuta da parte: i colori sono sette, i segnalini
+     centinaia, e ricostruire lo stesso divIcon a ogni ridisegno e' lavoro
+     buttato. */
+  function getMapPinIcon(color){
+    if(mapPinIcons[color]) return mapPinIcons[color];
+    mapPinIcons[color] = L.divIcon({
       className: "map-pin-icon",
-      html: '<svg width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z"/><circle cx="14" cy="14" r="5.5" fill="#fff"/></svg>',
+      html: '<svg width="28" height="40" viewBox="0 0 28 40"><path style="fill:'+color+'" d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z"/><circle cx="14" cy="14" r="5.5" fill="#fff"/></svg>',
       iconSize: [28, 40],
       iconAnchor: [14, 40],
       popupAnchor: [0, -36]
     });
-    return mapPinIcon;
+    return mapPinIcons[color];
+  }
+  /* "Portami qui" deve aprire l'itinerario gia' impostato, non la scheda del
+     posto: su iPhone quello vuol dire Mappe di Apple, che e' l'app che la
+     gente ha davvero sul telefono, altrove Google Maps. In entrambi i casi
+     si parte da dove sei, la destinazione sono le coordinate del
+     palcoscenico e il mezzo e' l'auto — al furgone con dentro gli ampli non
+     interessano le indicazioni a piedi. */
+  function isAppleDevice(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+  function directionsHref(v){
+    var dest = v.lat + "," + v.lng;
+    return isAppleDevice()
+      ? "https://maps.apple.com/?daddr=" + encodeURIComponent(dest) + "&dirflg=d"
+      : "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + encodeURIComponent(dest);
   }
   function getMapUserIcon(){
     if(mapUserIcon) return mapUserIcon;
@@ -3168,13 +3203,34 @@
   function fitMapToVenues(){
     if(leafletMap && mapVenueBounds.length) leafletMap.fitBounds(mapVenueBounds, {padding:[30,30], maxZoom:13});
   }
+  /* Quello che serve sapere stando in giro senza aprire la scheda: con chi
+     parli, dove entri, che numero fai. L'indirizzo tiene dentro anche la
+     citta' perche' da soli "Via Roma 4" e "Cesenatico" non sono due
+     informazioni, sono una. */
+  function mapPopupHtml(v, st){
+    var righe = [];
+    if(v.contact_name) righe.push('<div class="mp-row"><span class="mp-ico">👤</span><span>'+dato(v.contact_name)+'</span></div>');
+    var indirizzo = [v.address, v.city].filter(function(x){ return x; }).join(", ");
+    if(indirizzo) righe.push('<div class="mp-row"><span class="mp-ico">📍</span><span>'+dato(indirizzo)+'</span></div>');
+    if(v.phone) righe.push('<div class="mp-row"><span class="mp-ico">📱</span>'+
+      '<a href="tel:'+esc(v.phone.replace(/\s+/g,""))+'">'+dato(v.phone)+'</a></div>');
+    return '<div class="map-pin-popup">'+
+      '<div class="mp-name">'+dato(v.name||"Senza nome")+'</div>'+
+      '<div class="mp-badge">'+statusPillHtml(st.label, st)+'</div>'+
+      (righe.length ? '<div class="mp-rows">'+righe.join("")+'</div>' : '')+
+      '<div class="mp-actions">'+
+        '<a class="mp-route" target="_blank" rel="noopener" href="'+esc(directionsHref(v))+'">Portami qui</a>'+
+        '<button data-open-map-id="'+v.id+'">Apri scheda</button>'+
+      '</div>'+
+    '</div>';
+  }
   var mapSignature = null;
   function renderMapMarkers(force){
     if(!mapMarkersLayer) return;
     var visibili = venues.filter(function(v){ return matchesFilter(v) && v.lat != null && v.lng != null; });
     // Se l'insieme visibile e' lo stesso di prima non si tocca niente: il
     // fit qui sotto rizoomerebbe la mappa mentre l'utente la sta guardando.
-    var firma = visibili.map(function(v){ return v.id + ":" + v.lat + "," + v.lng; }).join("|");
+    var firma = visibili.map(function(v){ return v.id + ":" + v.lat + "," + v.lng + ":" + v.status; }).join("|");
     if(!force && firma === mapSignature) return;
     mapSignature = firma;
     mapMarkersLayer.clearLayers();
@@ -3185,11 +3241,9 @@
     var withCoords = visibili;
     var bounds = [];
     withCoords.forEach(function(v){
-      var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon()});
-      var popupHtml = '<div class="map-pin-popup"><div class="mp-name">'+dato(v.name||"Senza nome")+'</div>'+
-        (v.city ? '<div class="mp-sub">'+dato(v.city)+'</div>' : '')+
-        '<button data-open-map-id="'+v.id+'">Apri scheda</button></div>';
-      marker.bindPopup(popupHtml);
+      var st = statusInfo(v.status);
+      var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon(st.color)});
+      marker.bindPopup(mapPopupHtml(v, st));
       marker.on("popupopen", function(e){
         var btn = e.popup.getElement().querySelector("[data-open-map-id]");
         if(btn) btn.addEventListener("click", function(){
