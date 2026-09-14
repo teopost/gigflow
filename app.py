@@ -692,6 +692,7 @@ def migrate_schema(conn):
     migrate_to_recontact_period(conn)
     migrate_drop_rifiutato(conn)
     migrate_photos_cover(conn)
+    migrate_venue_type_icon(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
@@ -715,6 +716,63 @@ def migrate_schema(conn):
     # di dire "nessun promemoria" che le query devono distinguere. Qui restano
     # in uno solo, ed e' idempotente.
     conn.execute("UPDATE locations SET recontact_period = NULL WHERE recontact_period = ''")
+
+
+# Le emoji proposte alle tipologie che gia' esistono, cercate dentro il
+# nome. Prima le parole piu' precise: "stabilimento balneare" prende
+# l'ombrellone, e "bar" non deve rubarlo a "bar sulla spiaggia" solo perche'
+# viene prima in ordine alfabetico. Sono una proposta di partenza, non una
+# regola: da Impostazioni si cambia, e da quel momento nessuno le tocca piu'.
+ICONE_TIPOLOGIA = [
+    ("balnear", "\u26f1\ufe0f"), ("bagno", "\u26f1\ufe0f"), ("spiaggia", "\U0001f3d6\ufe0f"),
+    ("lido", "\u26f1\ufe0f"), ("chiosco", "\U0001f379"),
+    # "pubblic" prima di "pub", o "spazio pubblico" si becca il boccale di birra.
+    ("pubblic", "\U0001f3db\ufe0f"), ("comune", "\U0001f3db\ufe0f"), ("piazza", "\U0001f3db\ufe0f"),
+    ("pub", "\U0001f37a"), ("birr", "\U0001f37a"), ("club", "\U0001f37a"), ("locale", "\U0001f37a"),
+    ("discotec", "\U0001faa9"), ("disco", "\U0001faa9"),
+    ("ristor", "\U0001f374"), ("pizzer", "\U0001f355"), ("osteria", "\U0001f374"),
+    ("trattoria", "\U0001f374"), ("agrituris", "\U0001f33e"),
+    ("enotec", "\U0001f377"), ("vineria", "\U0001f377"), ("wine", "\U0001f377"),
+    ("caff", "\u2615"), ("bar", "\u2615"),
+    ("sagra", "\U0001f3a1"), ("fiera", "\U0001f3a1"), ("luna park", "\U0001f3a1"),
+    ("pro loco", "\U0001f3aa"), ("proloco", "\U0001f3aa"), ("associazion", "\U0001f3aa"),
+    ("circolo", "\U0001f3aa"), ("festa", "\U0001f386"), ("evento", "\U0001f386"),
+    ("teatro", "\U0001f3ad"), ("cinema", "\U0001f3ac"), ("auditorium", "\U0001f3ad"),
+    ("arena", "\U0001f3df\ufe0f"), ("stadio", "\U0001f3df\ufe0f"), ("palazzetto", "\U0001f3df\ufe0f"),
+    ("parco", "\U0001f333"), ("giardin", "\U0001f333"),
+    ("chiesa", "\u26ea"), ("parrocch", "\u26ea"), ("oratorio", "\u26ea"),
+    ("hotel", "\U0001f3e8"), ("albergo", "\U0001f3e8"), ("resort", "\U0001f3e8"),
+    ("villaggio", "\U0001f3d5\ufe0f"), ("camping", "\U0001f3d5\ufe0f"), ("campeggio", "\U0001f3d5\ufe0f"),
+    ("matrimon", "\U0001f492"), ("privat", "\U0001f3e0"),
+    ("nave", "\u2693"), ("porto", "\u2693"), ("barca", "\u2693"),
+    ("festival", "\U0001f3a4"), ("concert", "\U0001f3b8"), ("sala prove", "\U0001f3b8"),
+]
+
+
+def icona_per_tipologia(nome):
+    """L'emoji che sembra adatta a un nome di tipologia, o niente se non si
+    riconosce: meglio il cerchio vuoto che un simbolo che dice un'altra cosa."""
+    testo = (nome or "").lower()
+    for parola, emoji in ICONE_TIPOLOGIA:
+        if parola in testo:
+            return emoji
+    return None
+
+
+def migrate_venue_type_icon(conn):
+    """L'icona sulla tipologia: e' quella che finisce dentro il segnalino
+    sulla mappa. Alla prima accensione le tipologie che ci sono gia' si
+    prendono una proposta indovinata dal nome, cosi' la mappa parla subito
+    invece di aspettare che qualcuno riempia dieci caselle. Gira una volta
+    sola: da qui in poi l'icona la decide chi la guarda."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(venue_types)").fetchall()}
+    if "icon" in cols:
+        return
+    conn.execute("ALTER TABLE venue_types ADD COLUMN icon TEXT")
+    for row in conn.execute("SELECT id, name FROM venue_types").fetchall():
+        emoji = icona_per_tipologia(row["name"])
+        if emoji:
+            conn.execute("UPDATE venue_types SET icon = ? WHERE id = ?", (emoji, row["id"]))
 
 
 def migrate_photos_cover(conn):
@@ -3084,6 +3142,15 @@ def fetch_venue_types(conn, ws):
     return [dict(r) for r in rows]
 
 
+def pulisci_icona(valore):
+    """Un'emoji e' corta ma non cortissima: l'ombrellone e' due caratteri,
+    una famiglia anche sette. Si taglia a dieci e si tolgono gli a capo —
+    quello che resta finisce dentro un segnalino grande come un'unghia, e
+    non e' il posto per scriverci una frase."""
+    testo = (valore or "").strip().replace("\n", "").replace("\r", "")
+    return testo[:10] or None
+
+
 def create_venue_type(conn, ws, body):
     name = (body.get("name") or "").strip()
     if not name:
@@ -3093,9 +3160,13 @@ def create_venue_type(conn, ws, body):
     ).fetchone()
     if existing:
         raise ApiError(400, "Questa tipologia esiste già")
+    # Una tipologia nuova nasce gia' con la sua emoji se il nome la
+    # suggerisce: "Rifugio di montagna" non la trova e resta senza, ed e'
+    # giusto cosi' — un simbolo a caso direbbe una cosa sbagliata.
+    icona = pulisci_icona(body.get("icon")) or icona_per_tipologia(name)
     cur = conn.execute(
-        "INSERT INTO venue_types (name, workspace_id, created_at) VALUES (?, ?, ?)",
-        (name, ws, now_iso()),
+        "INSERT INTO venue_types (name, icon, workspace_id, created_at) VALUES (?, ?, ?, ?)",
+        (name, icona, ws, now_iso()),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM venue_types WHERE id = ?", (cur.lastrowid,)).fetchone()
@@ -3108,10 +3179,26 @@ def update_venue_type(conn, ws, type_id, body):
     ).fetchone()
     if not row:
         raise ApiError(404, "Tipologia non trovata")
+    old_name = row["name"]
+
+    # Cambiare l'emoji non e' rinominare: chi manda solo l'icona non deve
+    # rimandare anche il nome per non vederselo cancellare.
+    if "icon" in body:
+        conn.execute(
+            "UPDATE venue_types SET icon = ? WHERE id = ?",
+            (pulisci_icona(body.get("icon")), type_id),
+        )
+        if "name" not in body:
+            conn.commit()
+            aggiornata = dict(
+                conn.execute("SELECT * FROM venue_types WHERE id = ?", (type_id,)).fetchone()
+            )
+            aggiornata["affected_locations"] = 0
+            return aggiornata
+
     new_name = (body.get("name") or "").strip()
     if not new_name:
         raise ApiError(400, "Il nome della tipologia è obbligatorio")
-    old_name = row["name"]
 
     if new_name.lower() != old_name.lower():
         dup = conn.execute(

@@ -194,6 +194,17 @@
      senza aprire niente. Il fill lo mette il singolo segnalino, qui non si
      fissa nessun colore o vincerebbe su quello. */
   .map-pin-icon{background:none;border:none;}
+  .mpin{position:relative;width:32px;height:44px;}
+  .mpin svg{display:block;}
+  /* L'emoji sta sopra il cerchio bianco, non dentro l'SVG: come <text> ogni
+     telefono la allinea a modo suo, come riga di testo sta ferma. */
+  .mpin-emoji{position:absolute;left:0;top:7px;width:32px;height:17px;line-height:17px;text-align:center;font-size:13px;}
+  .type-tag .ico{margin-right:3px;}
+  /* Una colonna sola per tutte le righe: le icone incolonnate si leggono
+     come un elenco, sparse come disordine. Chi non ce l'ha tiene il posto
+     con un puntino. */
+  .type-icon-cell{flex:none;width:26px;text-align:center;font-size:19px;line-height:1;color:var(--text-tertiary);}
+  .type-icon-big{font-size:24px;line-height:1;}
   .map-pin-popup{font-family:inherit;}
   .map-pin-popup .mp-name{font-weight:700;font-size:15px;margin-bottom:4px;line-height:1.25;}
   .map-pin-popup .mp-sub{font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
@@ -1135,6 +1146,15 @@
     </header>
     <div class="screen-scroll">
       <div class="d-title-name"><input id="typeEditName" placeholder="Nome tipologia" /></div>
+      <div class="section-header">SEGNALINO SULLA MAPPA</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowTypeEditIcon">
+          <label style="flex:1;">Icona</label>
+          <div class="picker-value"><span class="type-icon-big" id="typeEditIcon"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">L’icona finisce dentro il segnalino sulla mappa, e davanti al nome della tipologia nell’elenco. Il colore del segnalino resta quello dello stato: così da un’occhiata sola vedi che posto è e a che punto sei. Si salva con Salva, come il nome.</div>
       <div class="section-footer" id="typeEditUsage"></div>
     </div>
   </section>
@@ -3106,7 +3126,10 @@
     var showFav = !opts || opts.showFav !== false;
     var st = statusInfo(v.status);
     var subParts = [];
-    if(v.type) subParts.push('<span class="type-tag">'+dato(v.type)+'</span>');
+    if(v.type){
+      var ico = typeIcon(v.type);
+      subParts.push('<span class="type-tag">'+(ico ? '<span class="ico">'+esc(ico)+'</span>' : '')+dato(v.type)+'</span>');
+    }
     // Solo le icone: i nomi finivano in una riga gia' occupata dal tipo, e
     // venivano tagliati a meta' quasi sempre. Un nome troncato non si legge
     // e non si riconosce — che ci sia un titolare, o un art director, quello
@@ -3312,16 +3335,38 @@
   /* Un'icona per colore, tenuta da parte: i colori sono sette, i segnalini
      centinaia, e ricostruire lo stesso divIcon a ogni ridisegno e' lavoro
      buttato. */
-  function getMapPinIcon(color){
-    if(mapPinIcons[color]) return mapPinIcons[color];
-    mapPinIcons[color] = L.divIcon({
+  /* Due informazioni in un segnalino solo: la goccia ha il colore dello
+     stato — a che punto sei con lui — e il cerchio bianco tiene l'icona
+     della tipologia — che genere di posto e'. Chi non ha tipologia resta col
+     pallino piccolo di prima, che e' il modo giusto di dire "da
+     classificare".
+
+     Un'icona per combinazione colore+emoji, tenuta da parte: le
+     combinazioni sono poche decine, i segnalini centinaia. */
+  function getMapPinIcon(color, emoji){
+    var chiave = color + "|" + (emoji || "");
+    if(mapPinIcons[chiave]) return mapPinIcons[chiave];
+    var r = emoji ? 7.5 : 5.5;
+    mapPinIcons[chiave] = L.divIcon({
       className: "map-pin-icon",
-      html: '<svg width="28" height="40" viewBox="0 0 28 40"><path style="fill:'+color+'" d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z"/><circle cx="14" cy="14" r="5.5" fill="#fff"/></svg>',
-      iconSize: [28, 40],
-      iconAnchor: [14, 40],
-      popupAnchor: [0, -36]
+      html: '<div class="mpin"><svg width="32" height="44" viewBox="0 0 28 40">'+
+              '<path style="fill:'+color+'" d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z"/>'+
+              '<circle cx="14" cy="14" r="'+r+'" fill="#fff"/></svg>'+
+              (emoji ? '<span class="mpin-emoji">'+esc(emoji)+'</span>' : '')+
+            '</div>',
+      iconSize: [32, 44],
+      iconAnchor: [16, 44],
+      popupAnchor: [0, -40]
     });
-    return mapPinIcons[color];
+    return mapPinIcons[chiave];
+  }
+  /* L'icona sta sulla tipologia, non sul palcoscenico: si sceglie una volta
+     in Impostazioni e vale per i centoventisei stabilimenti balneari
+     insieme, compresi quelli che aggiungerai domani. */
+  function typeIcon(nome){
+    if(!nome) return "";
+    var t = venueTypes.filter(function(x){ return x.name === nome; })[0];
+    return (t && t.icon) || "";
   }
   /* "Portami qui" deve aprire l'itinerario gia' impostato, non la scheda del
      posto: su iPhone quello vuol dire Mappe di Apple, che e' l'app che la
@@ -3462,7 +3507,7 @@
     var visibili = venues.filter(function(v){ return matchesFilter(v) && v.lat != null && v.lng != null; });
     // Se l'insieme visibile e' lo stesso di prima non si tocca niente: il
     // fit qui sotto rizoomerebbe la mappa mentre l'utente la sta guardando.
-    var firma = visibili.map(function(v){ return v.id + ":" + v.lat + "," + v.lng + ":" + v.status; }).join("|");
+    var firma = visibili.map(function(v){ return v.id + ":" + v.lat + "," + v.lng + ":" + v.status + ":" + typeIcon(v.type); }).join("|");
     if(!force && firma === mapSignature) return;
     mapSignature = firma;
     mapMarkersLayer.clearLayers();
@@ -3475,7 +3520,7 @@
     var bounds = [];
     withCoords.forEach(function(v){
       var st = statusInfo(v.status);
-      var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon(st.color)});
+      var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon(st.color, typeIcon(v.type))});
       marker.bindPopup(mapPopupHtml(v, st));
       marker.on("popupopen", function(e){
         var btn = e.popup.getElement().querySelector("[data-open-map-id]");
@@ -4686,7 +4731,7 @@
     }}];
     venueTypes.forEach(function(vt){
       var t = vt.name;
-      opts.push({label:t, dato:true, checkmark: v.type===t, onSelect:function(){
+      opts.push({label:(vt.icon ? vt.icon + "  " : "") + t, dato:true, checkmark: v.type===t, onSelect:function(){
         patchVenue("type", t).then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo: "+t); });
       }});
     });
@@ -5691,6 +5736,7 @@
     elTypesList.innerHTML = venueTypes.map(function(t){
       var count = typeUsageCount(t.name);
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-type="'+t.id+'">'+
+        '<span class="type-icon-cell">'+(t.icon ? esc(t.icon) : '\u00b7')+'</span>'+
         '<div class="row-main"><div class="row-title">'+dato(t.name)+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+count+'</span>'+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
@@ -5715,13 +5761,62 @@
     if(row) openTypeEditScreen(Number(row.getAttribute("data-open-type")));
   });
 
+  /* Le emoji proposte: quelle che servono a questo mestiere, non tutte
+     quelle che esistono. Il foglio e' gia' cercabile e accetta testo
+     libero, quindi chi ne vuole una fuori elenco la scrive dalla tastiera
+     del telefono e funziona lo stesso. */
+  var ICONE_TIPOLOGIA = [
+    ["\u26f1\ufe0f","Ombrellone"], ["🏖\ufe0f","Spiaggia"], ["🍹","Chiosco"], ["\u2693","Porto"],
+    ["🍺","Boccale di birra"], ["🍻","Brindisi"], ["🍷","Vino"], ["🍸","Cocktail"],
+    ["\u2615","Caff\u00e8"], ["🍴","Forchetta e coltello"], ["🍕","Pizza"], ["🍖","Griglia"],
+    ["🍦","Gelato"], ["🌾","Agriturismo"],
+    ["🪩","Discoteca"], ["🎸","Chitarra"], ["🎤","Microfono"], ["🎶","Musica"],
+    ["🥁","Batteria"], ["🎭","Teatro"], ["🎬","Cinema"],
+    ["🎪","Tendone"], ["🎡","Giostra"], ["🎆","Fuochi d\u2019artificio"], ["🎉","Festa"],
+    ["🏛\ufe0f","Spazio pubblico"], ["\u26ea","Chiesa"], ["🏟\ufe0f","Arena"], ["⚽","Campo sportivo"],
+    ["🌳","Parco"], ["🏕\ufe0f","Campeggio"], ["\u26f0\ufe0f","Montagna"],
+    ["🏨","Hotel"], ["🏠","Casa privata"], ["💒","Matrimonio"],
+    ["🏪","Negozio"], ["🚢","Nave"], ["\u2b50","Stella"], ["📍","Puntina"]
+  ];
   var currentTypeEditId = null;
+  var typeEditIcon = "";
   var elTypeEditScreen = document.getElementById("typeEditScreen");
+  function renderTypeEditIcon(){
+    // Il segnaposto dice cosa manca senza sembrare un'icona scelta male.
+    var el = document.getElementById("typeEditIcon");
+    el.textContent = typeEditIcon || "\u2014";
+    el.style.opacity = typeEditIcon ? "1" : ".4";
+  }
+  document.getElementById("rowTypeEditIcon").addEventListener("click", function(){
+    var opts = [{label:"\u2014  Nessuna icona", checkmark: !typeEditIcon, onSelect:function(){
+      typeEditIcon = ""; renderTypeEditIcon();
+    }}];
+    ICONE_TIPOLOGIA.forEach(function(coppia){
+      opts.push({label: coppia[0] + "  " + coppia[1], checkmark: typeEditIcon === coppia[0], onSelect:function(){
+        typeEditIcon = coppia[0]; renderTypeEditIcon();
+      }});
+    });
+    openSheet({
+      title:"Icona della tipologia",
+      searchable:true,
+      searchPlaceholder:"Cerca, o incolla un\u2019emoji qualsiasi\u2026",
+      freeText:true,
+      onFreeText:function(valore){
+        // Quello che si scrive qui e' un'emoji, non una frase: si tiene il
+        // primo pezzo e si butta il resto.
+        typeEditIcon = (valore || "").trim().slice(0, 10);
+        renderTypeEditIcon();
+      },
+      options: opts
+    });
+  });
   function openTypeEditScreen(id){
     var t = venueTypes.find(function(x){ return x.id === id; });
     if(!t) return;
     currentTypeEditId = id;
     document.getElementById("typeEditName").value = t.name;
+    typeEditIcon = t.icon || "";
+    renderTypeEditIcon();
     var count = typeUsageCount(t.name);
     document.getElementById("typeEditUsage").textContent = count
       ? ("Usata da " + count + (count===1 ? " palcoscenico. Rinominandola si aggiorna anche lui." : " palcoscenici. Rinominandola si aggiornano anche loro."))
@@ -5742,7 +5837,7 @@
     if(!name){ toast("Il nome è obbligatorio"); return; }
     var btn = this;
     withButtonBusy(btn, function(){
-      return api("PUT", "/api/venue_types/" + currentTypeEditId, {name:name}).then(function(updated){
+      return api("PUT", "/api/venue_types/" + currentTypeEditId, {name:name, icon:typeEditIcon}).then(function(updated){
         var i = venueTypes.findIndex(function(t){ return t.id === updated.id; });
         if(i > -1) venueTypes[i] = updated;
         return updated.affected_locations ? loadVenues().then(function(){ return updated; }) : updated;
@@ -5750,6 +5845,8 @@
     }).then(function(updated){
       renderTypesList();
       renderFilterTypeRow();
+      renderList();
+      renderMapMarkers(true);
       toast(updated.affected_locations
         ? ("Tipologia rinominata (" + updated.affected_locations + " palcoscenici aggiornati)")
         : "Tipologia rinominata");
