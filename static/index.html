@@ -546,6 +546,11 @@
   .month-labels span{flex:1;text-align:center;font-size:10.5px;color:var(--text-tertiary);}
   .agenda-group{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
   .group-count{font-weight:600;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
+  /* Gli scaduti: intestazione rossa e un taglio rosso sul fianco. Non le
+     righe colorate dentro — il rosso li' dentro ce l'ha gia' il conto dei
+     giorni, e due rossi sovrapposti non gridano il doppio. */
+  .agenda-group.late,.agenda-group.late .group-count{color:var(--red);}
+  .grouped-list.late{border-left:3px solid var(--red);}
   .year-head{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center;}
   .year-head .row-chevron{color:var(--text-tertiary);transition:transform .2s;}
   .year-head.open .row-chevron{transform:rotate(90deg);}
@@ -2260,28 +2265,59 @@
     var ultimo = new Date(anno, q.mese, 0).getDate();
     return anno + "-" + pad2(q.mese) + "-" + pad2(Math.min(q.giorno || 1, ultimo));
   }
-  /* Quando tocca, e se e' gia' passato senza che tu abbia fatto niente.
+  /* Lo stesso giorno-mese di N mesi fa: serve alla finestra degli scaduti.
+     Come periodOccurrence, se il giorno in quel mese non esiste scala
+     all'ultimo che c'e'. */
+  function monthsAgo(dateStr, n){
+    var y = Number(dateStr.slice(0, 4)), m = Number(dateStr.slice(5, 7)) - n,
+        d = Number(dateStr.slice(8, 10));
+    while(m <= 0){ m += 12; y -= 1; }
+    return y + "-" + pad2(m) + "-" + pad2(Math.min(d, new Date(y, m, 0).getDate()));
+  }
+  /* Per quanto tempo un'occorrenza mancata resta "scaduta". Passata la
+     finestra il palcoscenico torna in fila con la sua occorrenza dell'anno
+     dopo: un rosso che dura dodici mesi non e' un avviso, e' l'arredamento. */
+  var MESI_SCADUTO = 4;
+  /* Quando tocca, e se e' gia' passato senza che tu abbia chiamato.
 
-     "Fatto per quest'anno" non e' una casella da spuntare: e' aver aperto
-     una serata dopo l'ultima occorrenza. Riprendere il giro *e'* aprire il
-     tentativo, e un pulsante "fatto" che non apre niente lascerebbe quel
-     tentativo fuori dal conto di fine stagione.
+     L'occorrenza in ballo e' l'ultima passata: quella di quest'anno se e'
+     gia' arrivata, altrimenti quella dell'anno scorso. Serve tenersi anche
+     quella vecchia, altrimenti un novembre mancato smetterebbe di essere in
+     ritardo il primo di gennaio — due mesi invece di quattro, e proprio nel
+     mese in cui si programma la stagione.
 
-     Il confronto con la data di nascita del palcoscenico serve a non dare
-     dell'inadempiente a chi a gennaio scrive "a ottobre": l'ottobre scorso
-     non era suo, e senza questo si accenderebbe rosso il giorno stesso. */
+     "Non l'ho chiamato" e' lo stato del palcoscenico, non l'esistenza di una
+     serata. Prima qui si guardava se c'era un tentativo aperto dopo
+     l'occorrenza, e bastava quello a dire "fatto": ma un giro di "Riproponi"
+     apre le serate a pacchi e le lascia tutte su "Da contattare" — il
+     tentativo c'e', la telefonata no, ed era esattamente il caso che questo
+     elenco deve far vedere. Chi si e' mosso davvero e' passato a Contattato,
+     In trattativa o Confermato, e quelli non sono in ritardo: hanno una
+     trattativa per le mani, non una chiamata da fare.
+
+     La data di nascita del palcoscenico continua a contare, ma solo per
+     l'occorrenza di un anno passato. Serviva a non dare dell'inadempiente a
+     chi a gennaio scrive "a ottobre": l'ottobre scorso non era suo, e quel
+     caso resta coperto. Sull'occorrenza dell'anno in corso invece non si
+     guarda piu', perche' in una rubrica importata da Excel sono nati tutti
+     lo stesso giorno — 7 settembre 2026 — e con quel metro nessun periodo
+     da gennaio ad agosto poteva essere in ritardo il primo anno: Bar sport,
+     "27 agosto", risultava scaduto undici giorni prima di esistere e finiva
+     in fondo all'elenco con la data del 2027. Il resto lo fa la finestra:
+     non chiede se il palcoscenico c'era, chiede se la data mancata e'
+     abbastanza fresca da valere ancora una telefonata. */
   function recontactDue(v){
     var p = v && v.recontact_period;
     if(!p) return null;
     var oggi = todayStr(), anno = Number(oggi.slice(0, 4));
     var quest = periodOccurrence(p, anno);
-    var scorsa = quest <= oggi ? quest : periodOccurrence(p, anno - 1);
-    var nato = (v.created_at || "").slice(0, 10);
-    var ripreso = venueGigs(v).some(function(g){
-      return (g.created_at || "").slice(0, 10) >= scorsa;
-    });
-    if(scorsa >= nato && !ripreso) return {date: scorsa, late: true};
-    return {date: quest > oggi ? quest : periodOccurrence(p, anno + 1), late: false};
+    var passata = quest <= oggi ? quest : periodOccurrence(p, anno - 1);
+    var prossima = quest > oggi ? quest : periodOccurrence(p, anno + 1);
+    var suo = passata.slice(0, 4) === oggi.slice(0, 4) ||
+              (v.created_at || "").slice(0, 10) <= passata;
+    if(v.status === "da_contattare" && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
+      return {date: passata, late: true};
+    return {date: prossima, late: false};
   }
   /* Il foglio dei mesi, uguale ovunque si scelga un periodo: nella scheda e
      nel pannello "Ho suonato". Cambiare mese non butta via il giorno che
@@ -3983,9 +4019,15 @@
      cose da fare, e una serata andata a buon fine non lo e'. Si riparte
      dalla sua riga in Serate, dove lo scorrimento offre "Riproponi" — e da
      li' il palcoscenico torna "da contattare", quindi ricompare qui. */
+  /* Fuori anche i lead, come in "Da pianificare": un lead e' un indirizzo
+     su cui non hai ancora aperto niente, e l'Agenda e' l'elenco di quello
+     che hai per le mani. Il periodo su un lead resta scritto nella scheda e
+     torna buono da solo appena apri la prima serata — il palcoscenico passa
+     a "Da contattare" e da quel momento compare qui. */
   function venuesToRecontact(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.recontact_period && v.status !== "suonato";
+      return !v.deleted_at && v.recontact_period &&
+             v.status !== "suonato" && v.status !== "lead";
     })
       .map(function(v){ return {v: v, due: recontactDue(v)}; })
       .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
@@ -4186,9 +4228,21 @@
       '</div>'+
     '</div>';
   }
-  /* Raggruppati a rottura di mese. L'elenco arriva gia' ordinato per data,
-     quindi basta confrontare l'anno-mese con quello della riga precedente:
-     "questo mese ne ho tre" e' la domanda vera quando pianifichi. */
+  /* Gli scaduti in un riquadro loro, in cima, e il resto raggruppato a
+     rottura di mese. L'elenco arriva gia' ordinato per data, quindi basta
+     confrontare l'anno-mese con quello della riga precedente: "questo mese
+     ne ho tre" e' la domanda vera quando pianifichi.
+
+     Perche' due blocchi. Ordinati per data gli scaduti erano gia' primi —
+     la data che si portano dietro e' quella dell'occorrenza mancata, che e'
+     nel passato — ma stavano sotto un'intestazione tipo "settembre 2026",
+     che a ottobre si legge come un mese qualunque gia' passato: sembrano
+     roba archiviata invece che roba da fare, e chi guarda scende a cercare
+     il mese corrente. Adesso la loro intestazione dice "Scaduti".
+
+     Quanto ci restano: quattro mesi (MESI_SCADUTO), o finche' non ti muovi.
+     Si svuota da sola perche' chiamare cambia lo stato del palcoscenico, non
+     perche' scatta una mezzanotte. */
   function renderRecontactList(){
     var righe = venuesToRecontact();
     if(!righe.length){
@@ -4196,20 +4250,28 @@
         '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p></div>';
       return;
     }
+    var scaduti = righe.filter(function(x){ return x.due.late; });
+    var prossimi = righe.filter(function(x){ return !x.due.late; });
     var html = "";
+    if(scaduti.length){
+      html += '<div class="agenda-group late">Scaduti<span class="group-count">'+scaduti.length+
+        '</span></div><div class="grouped-list late">'+
+        scaduti.map(recontactRowHtml).join("")+'</div>';
+    }
     var currentMonth = null;
-    righe.forEach(function(x){
+    prossimi.forEach(function(x){
       var month = x.due.date.slice(0, 7);
       if(month !== currentMonth){
         if(currentMonth !== null) html += '</div>';
-        var quanti = righe.filter(function(y){ return y.due.date.slice(0, 7) === month; }).length;
+        var quanti = prossimi.filter(function(y){ return y.due.date.slice(0, 7) === month; }).length;
         html += '<div class="agenda-group">'+esc(monthLabel(x.due.date))+
           '<span class="group-count">'+quanti+'</span></div><div class="grouped-list">';
         currentMonth = month;
       }
       html += recontactRowHtml(x);
     });
-    elRecontactList.innerHTML = html + '</div>';
+    if(currentMonth !== null) html += '</div>';
+    elRecontactList.innerHTML = html;
   }
   elRecontactList.addEventListener("click", function(e){
     var purge = e.target.closest("[data-purge-id]");
