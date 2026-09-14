@@ -179,7 +179,7 @@ STATE_INVITE_SEP = "."
 WORKSPACE_SCOPED_TABLES = [
     "locations", "art_directors", "bands",
     "wa_templates", "mail_templates", "venue_types", "venue_categories",
-    "venue_list_values",
+    "venue_list_values", "cash_entries",
 ]
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -267,6 +267,24 @@ VENUE_LISTS = {
         "in_use": "questo periodo",
     },
 }
+# ---------------------------------------------------------------- cassa --
+# I due versi di un movimento. Gli importi si scrivono sempre positivi: il
+# segno lo mette il verso, cosi' non esiste il costo da -50 euro che nei
+# totali si somma al contrario.
+CASH_KINDS = {"costo", "ricavo"}
+
+# Le categorie di spesa stanno nella tabella generica delle liste di valori,
+# con una chiave loro. Non sono entrate in VENUE_LISTS apposta: quelle sono
+# campi del palcoscenico — hanno una colonna su locations, un filtro
+# nell'elenco e un selettore nella scheda — e la categoria di un costo non
+# e' niente di tutto questo.
+CASH_CATEGORY_LIST = "cost_category"
+DEFAULT_COST_CATEGORIES = [
+    "Trasferta", "Service", "Prove", "Strumenti", "Promozione", "SIAE", "Varie",
+]
+
+CASH_FIELDS = ["kind", "entry_date", "description", "amount", "category", "gig_id", "paid"]
+
 ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
 
@@ -375,6 +393,13 @@ def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     os.makedirs(PHOTOS_DIR, exist_ok=True)
     conn = get_conn()
+    # Si guarda prima di creare: e' l'unico momento in cui si puo' sapere
+    # che questa installazione la cassa non l'ha mai vista, e quindi che le
+    # categorie di spesa vanno ancora messe alle band che esistono gia'.
+    # Dopo, chi le svuota tutte non se le ritrova al riavvio dopo.
+    cash_is_new = not conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cash_entries'"
+    ).fetchone()
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS art_directors (
@@ -579,8 +604,38 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
+        -- La cassa della band. Dentro ci sono solo i movimenti scritti a
+        -- mano: i compensi delle serate NON stanno qui. Quelli vivono su
+        -- gigs.fee e la cassa li mostra leggendoli da li' (li compone
+        -- cashRows(), nella pagina). Copiarli avrebbe voluto dire tenere allineate
+        -- due cifre a ogni scrittura sulla serata, al rename del locale e
+        -- alla cancellazione — la stessa cosa che locations.status ha gia'
+        -- insegnato a non fare.
+        --
+        -- gig_id su un COSTO dice a quale serata appartiene quella spesa
+        -- (benzina, vitto, service di quella sera): serve al netto per
+        -- serata. Senza REFERENCES apposta, come per notes: la spesa e'
+        -- stata fatta davvero e resta anche se la serata sparisce, perde
+        -- solo il legame.
+        CREATE TABLE IF NOT EXISTS cash_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workspace_id INTEGER,
+            kind TEXT NOT NULL DEFAULT 'costo',
+            entry_date TEXT NOT NULL,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            category TEXT,
+            gig_id INTEGER,
+            paid INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_gigs_location ON gigs(location_id);
         CREATE INDEX IF NOT EXISTS idx_gigs_date ON gigs(gig_date);
+        CREATE INDEX IF NOT EXISTS idx_cash_workspace ON cash_entries(workspace_id, entry_date);
+        CREATE INDEX IF NOT EXISTS idx_cash_gig ON cash_entries(gig_id);
         CREATE INDEX IF NOT EXISTS idx_templates_kind ON app_templates(kind, position);
         CREATE INDEX IF NOT EXISTS idx_members_email ON workspace_members(email);
         CREATE INDEX IF NOT EXISTS idx_invites_workspace ON invites(workspace_id);
@@ -594,6 +649,9 @@ def init_db():
     )
     migrate_schema(conn)
     seed_app_templates(conn)
+    if cash_is_new:
+        for row in conn.execute("SELECT id FROM workspaces").fetchall():
+            seed_cost_categories(conn, row["id"])
     # Le tipologie di default non sono piu' globali: nascono con il workspace,
     # dentro create_workspace.
     conn.commit()
@@ -1939,6 +1997,27 @@ def delete_template(conn, template_id):
         raise ApiError(404, "Template non trovato")
 
 
+def seed_cost_categories(conn, ws):
+    """Le voci di spesa di partenza di una band nuova.
+
+    Non passano da app_templates come le altre liste: quella tabella si
+    semina una volta sola, alla primissima installazione, e un genere nuovo
+    aggiunto dopo non ci entrerebbe mai. Qui la lista sta nel codice e la
+    band se la cambia da Impostazioni.
+    """
+    if conn.execute(
+        "SELECT 1 FROM venue_list_values WHERE workspace_id = ? AND list_key = ? LIMIT 1",
+        (ws, CASH_CATEGORY_LIST),
+    ).fetchone():
+        return
+    ts = now_iso()
+    conn.executemany(
+        "INSERT INTO venue_list_values (list_key, name, workspace_id, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        [(CASH_CATEGORY_LIST, name, ws, ts) for name in DEFAULT_COST_CATEGORIES],
+    )
+
+
 def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
     """Precarica tipologie, categorie e modelli WhatsApp di una band nuova.
 
@@ -1976,6 +2055,8 @@ def seed_workspace_defaults(conn, ws, band_name=None, genre=None, person=None):
                 "VALUES (?, ?, ?, ?)",
                 [(key, name, ws, ts) for name in values],
             )
+
+    seed_cost_categories(conn, ws)
 
     messages = fetch_templates(conn, "wa_template")
     if messages and not conn.execute(
@@ -2030,10 +2111,35 @@ def _errore_json(e):
 def to_number_or_none(value, kind=float):
     if value is None or value == "":
         return None
+    if kind is float and isinstance(value, str):
+        value = normalizza_decimale(value)
     try:
         return kind(value)
     except (TypeError, ValueError):
         raise ApiError(400, "Valore numerico non valido")
+
+
+def normalizza_decimale(testo):
+    """"62,50" e' un numero, e chi lo scrive cosi' ha ragione.
+
+    La tastiera di un telefono mette il separatore della lingua del
+    sistema: con l'italiano esce la virgola, con l'inglese il punto, e chi
+    ha l'iPhone in inglese la virgola sul tastierino numerico non ce l'ha
+    proprio. Un campo che accetta solo il punto costringe a indovinare la
+    lingua dell'app invece di scrivere la cifra.
+
+    Se ci sono tutti e due i segni, quello di sinistra separa le migliaia:
+    "1.234,56" e "1,234.56" vogliono dire la stessa cosa, e si capisce da
+    quale arriva per ultimo. Via anche gli spazi e il simbolo dell'euro, che
+    capita di incollarli insieme alla cifra.
+    """
+    t = testo.strip().replace("€", "").replace(" ", "").replace("\u00a0", "")
+    if "," in t and "." in t:
+        decimale = "," if t.rfind(",") > t.rfind(".") else "."
+        migliaia = "." if decimale == "," else ","
+        t = t.replace(migliaia, "")
+        return t.replace(decimale, ".")
+    return t.replace(",", ".")
 
 
 # Una serata = un tentativo di suonare in quel posto. L'ordine e' sempre lo
@@ -2272,12 +2378,269 @@ def update_gig(conn, ws, gig_id, body):
 def delete_gig(conn, ws, gig_id):
     loc_id = gig_location_id(conn, ws, gig_id)
     # Le attivita' restano: erano cose fatte davvero, perdono solo il legame
-    # con il ciclo che non c'e' piu'.
+    # con il ciclo che non c'e' piu'. Stessa cosa per le spese di quella
+    # sera: la benzina l'hai messa lo stesso, e continua a pesare sul netto
+    # dell'anno. Il compenso invece sparisce da solo — non era una riga, era
+    # la serata stessa.
     conn.execute("UPDATE notes SET gig_id = NULL WHERE gig_id = ?", (gig_id,))
+    conn.execute(
+        "UPDATE cash_entries SET gig_id = NULL, updated_at = ? WHERE gig_id = ?",
+        (now_iso(), gig_id),
+    )
     conn.execute("DELETE FROM gigs WHERE id = ?", (gig_id,))
     refresh_location_status(conn, loc_id)
     conn.commit()
     return fetch_location(conn, ws, loc_id)
+
+
+# ------------------------------------------------------------------ cassa --
+# La cassa e' un elenco solo, e dentro ci sono due razze di righe.
+#
+# Le righe SCRITTE A MANO stanno in cash_entries: i costi, e i ricavi che non
+# vengono da una serata (merchandising, rimborsi).
+#
+# Le righe dei COMPENSI non stanno da nessuna parte: si ricavano dalle serate
+# suonate ogni volta che la cassa si apre. Il compenso di una serata e' gia'
+# scritto su gigs.fee, ed e' li' che si guarda; una copia in cassa avrebbe
+# voluto dire riallinearla a ogni modifica della serata, a ogni cambio di
+# stato, quando il palcoscenico viene rinominato (la descrizione contiene il
+# suo nome) e quando la serata viene cancellata. locations.status e' gia' una
+# copia e ha gia' fatto il suo danno: non se ne aggiunge una seconda, e sui
+# soldi meno che mai.
+#
+# Cosa si perde a non copiarle, detto chiaro: il compenso ha sempre la data
+# della serata (non si puo' segnare "incassato il mese dopo") e non si puo'
+# cancellare un compenso lasciando in piedi la serata. Se un giorno servisse,
+# la strada e' una riga manuale con gig_id che prende il posto della
+# proiezione, non una copia di tutte.
+
+
+def cash_entry_to_dict(row):
+    d = dict(row)
+    d["source"] = "manuale"
+    d["paid"] = bool(d.get("paid"))
+    return d
+
+
+def fetch_cash(conn, ws):
+    """I movimenti scritti a mano, i piu' recenti in cima.
+
+    I compensi delle serate qui non ci sono, e non perche' ce li siamo
+    dimenticati: li compone la pagina leggendo le serate che ha gia' in
+    mano. Erano nati qui, e da qui sono usciti per un motivo preciso — il
+    telefono teneva due elenchi, le serate e la cassa, e correggendo un
+    compenso dalla scheda del palcoscenico si aggiornava solo il primo: la
+    Cassa continuava a mostrare la cifra vecchia finche' non si ricaricava.
+    Erano due copie, e come tutte le copie sono divergute.
+
+    Adesso la regola che dice cos'e' un compenso sta scritta in un posto
+    solo (cashRows(), in index.html) e legge l'unico elenco che c'e'.
+    Niente totali e niente raggruppamenti neanche qui: li fa la pagina,
+    come gia' per l'Agenda e per la Home.
+    """
+    return [cash_entry_to_dict(r) for r in conn.execute(
+        "SELECT c.*, l.name AS location_name, g.gig_date "
+        "FROM cash_entries c "
+        "LEFT JOIN gigs g ON g.id = c.gig_id "
+        "LEFT JOIN locations l ON l.id = g.location_id "
+        "WHERE c.workspace_id = ? ORDER BY c.entry_date DESC, c.id DESC",
+        (ws,),
+    ).fetchall()]
+
+
+def clean_cash_payload(conn, ws, body, partial, kind=None):
+    data = {}
+    for field in CASH_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if field == "kind":
+            if value not in CASH_KINDS:
+                raise ApiError(400, "Tipo di movimento non valido")
+        elif field == "entry_date":
+            value = (value or "").strip()
+            # La data non e' facoltativa: senza, il movimento non sta in
+            # nessun anno e nei conti non compare da nessuna parte.
+            if not GIG_DATE_RE.match(value):
+                raise ApiError(400, "La data del movimento è obbligatoria")
+        elif field == "description":
+            value = (value or "").strip()
+            if not value:
+                raise ApiError(400, "La descrizione è obbligatoria")
+        elif field == "amount":
+            value = to_number_or_none(value, float)
+            # Il verso lo dice kind: un importo negativo qui vorrebbe dire un
+            # costo che nei totali si comporta da ricavo.
+            if value is None or value <= 0:
+                raise ApiError(400, "L'importo deve essere maggiore di zero")
+        elif field == "gig_id":
+            value = to_number_or_none(value, int)
+            if value is not None:
+                gig_location_id(conn, ws, value)  # 404 se non e' di questa band
+        elif field == "paid":
+            value = 1 if value else 0
+        elif isinstance(value, str):
+            value = value.strip() or None
+        data[field] = value
+
+    verso = data.get("kind", kind)
+    # Il legame con la serata vale solo su un costo: il compenso di una
+    # serata non e' una riga di questa tabella, lo proietta gig_revenue_rows.
+    #
+    # La spunta invece vale su tutti e due i versi, perche' la cassa conta i
+    # soldi che si sono mossi davvero: su un costo vuol dire pagato, su un
+    # ricavo incassato. Un movimento senza spunta e' un impegno, non un
+    # euro in cassa. (I compensi delle serate sono sempre incassati: non
+    # c'e' dove scrivere il contrario, e quel posto sarebbe la serata.)
+    if verso == "ricavo" and data.get("gig_id") is not None:
+        raise ApiError(400, "Il compenso di una serata si scrive sulla serata, non in cassa")
+    return data
+
+
+def create_cash_entry(conn, ws, ctx, body):
+    nuovo = dict(body or {})
+    nuovo["kind"] = nuovo.get("kind") or "costo"
+    # Su un movimento nuovo i tre campi ci devono essere: clean_cash_payload
+    # controlla solo quelli che arrivano, e qui non arrivarci non vuol dire
+    # "lascia com'era" — non c'e' niente com'era. Passarli a vuoto fa dire a
+    # lui la frase giusta per ognuno.
+    for campo in ("entry_date", "description", "amount"):
+        nuovo.setdefault(campo, None)
+    data = clean_cash_payload(conn, ws, nuovo, partial=False)
+    data.setdefault("paid", 1)
+    ts = now_iso()
+    fields = list(data.keys()) + ["workspace_id", "created_by", "created_at", "updated_at"]
+    values = list(data.values()) + [ws, ctx.email, ts, ts]
+    conn.execute(
+        "INSERT INTO cash_entries (%s) VALUES (%s)"
+        % (",".join(fields), ",".join("?" for _ in fields)),
+        values,
+    )
+    conn.commit()
+    return fetch_cash(conn, ws)
+
+
+def require_cash_entry(conn, ws, entry_id):
+    row = conn.execute(
+        "SELECT * FROM cash_entries WHERE id = ? AND workspace_id = ?", (entry_id, ws)
+    ).fetchone()
+    if not row:
+        # Chi prova a modificare la riga di un compenso arriva qui: quella
+        # riga in tabella non c'e', il suo importo sta sulla serata.
+        raise ApiError(404, "Movimento non trovato")
+    return row
+
+
+def update_cash_entry(conn, ws, entry_id, body):
+    before = require_cash_entry(conn, ws, entry_id)
+    data = clean_cash_payload(conn, ws, body or {}, partial=True, kind=before["kind"])
+    if data:
+        data["updated_at"] = now_iso()
+        conn.execute(
+            "UPDATE cash_entries SET %s WHERE id = ?"
+            % ",".join("%s = ?" % k for k in data.keys()),
+            list(data.values()) + [entry_id],
+        )
+        conn.commit()
+    return fetch_cash(conn, ws)
+
+
+def delete_cash_entry(conn, ws, entry_id):
+    require_cash_entry(conn, ws, entry_id)
+    conn.execute("DELETE FROM cash_entries WHERE id = ?", (entry_id,))
+    conn.commit()
+    return fetch_cash(conn, ws)
+
+
+# Le categorie di spesa. Stessa tabella delle altre liste configurabili, ma
+# CRUD suo: rinominare propaga sui movimenti invece che sui palcoscenici, e
+# una categoria in uso non si elimina.
+
+
+def fetch_cost_categories(conn, ws):
+    return [dict(r) for r in conn.execute(
+        "SELECT * FROM venue_list_values WHERE workspace_id = ? AND list_key = ? "
+        "ORDER BY name COLLATE NOCASE ASC",
+        (ws, CASH_CATEGORY_LIST),
+    ).fetchall()]
+
+
+def create_cost_category(conn, ws, body):
+    name = ((body or {}).get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "Il nome della categoria è obbligatorio")
+    if conn.execute(
+        "SELECT 1 FROM venue_list_values WHERE LOWER(name) = LOWER(?) "
+        "AND workspace_id = ? AND list_key = ?",
+        (name, ws, CASH_CATEGORY_LIST),
+    ).fetchone():
+        raise ApiError(400, "Questa categoria esiste già")
+    cur = conn.execute(
+        "INSERT INTO venue_list_values (list_key, name, workspace_id, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (CASH_CATEGORY_LIST, name, ws, now_iso()),
+    )
+    conn.commit()
+    return dict(conn.execute(
+        "SELECT * FROM venue_list_values WHERE id = ?", (cur.lastrowid,)
+    ).fetchone())
+
+
+def require_cost_category(conn, ws, value_id):
+    row = conn.execute(
+        "SELECT * FROM venue_list_values WHERE id = ? AND workspace_id = ? AND list_key = ?",
+        (value_id, ws, CASH_CATEGORY_LIST),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Categoria non trovata")
+    return row
+
+
+def update_cost_category(conn, ws, value_id, body):
+    row = require_cost_category(conn, ws, value_id)
+    new_name = ((body or {}).get("name") or "").strip()
+    if not new_name:
+        raise ApiError(400, "Il nome della categoria è obbligatorio")
+    old_name = row["name"]
+    if new_name.lower() != old_name.lower() and conn.execute(
+        "SELECT 1 FROM venue_list_values WHERE LOWER(name) = LOWER(?) AND id != ? "
+        "AND workspace_id = ? AND list_key = ?",
+        (new_name, value_id, ws, CASH_CATEGORY_LIST),
+    ).fetchone():
+        raise ApiError(400, "Questa categoria esiste già")
+    conn.execute("UPDATE venue_list_values SET name = ? WHERE id = ?", (new_name, value_id))
+    affected = 0
+    if new_name != old_name:
+        # Rinominare una categoria non deve lasciare indietro i movimenti
+        # che la usano: li' dentro c'e' scritto il nome, non l'id.
+        cur = conn.execute(
+            "UPDATE cash_entries SET category = ?, updated_at = ? "
+            "WHERE category = ? AND workspace_id = ?",
+            (new_name, now_iso(), old_name, ws),
+        )
+        affected = cur.rowcount
+    conn.commit()
+    updated = dict(conn.execute(
+        "SELECT * FROM venue_list_values WHERE id = ?", (value_id,)
+    ).fetchone())
+    updated["affected_entries"] = affected
+    return updated
+
+
+def delete_cost_category(conn, ws, value_id):
+    row = require_cost_category(conn, ws, value_id)
+    n = conn.execute(
+        "SELECT COUNT(*) AS n FROM cash_entries WHERE category = ? AND workspace_id = ?",
+        (row["name"], ws),
+    ).fetchone()["n"]
+    if n:
+        raise ApiError(
+            400,
+            "%d %s usa%s questa categoria: cambiala prima di eliminarla."
+            % (n, "movimento" if n == 1 else "movimenti", "" if n == 1 else "no"),
+        )
+    conn.execute("DELETE FROM venue_list_values WHERE id = ?", (value_id,))
+    conn.commit()
 
 
 def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None,
@@ -2500,6 +2863,14 @@ def purge_location(conn, ws, loc_id):
     ]
     conn.execute("DELETE FROM photos WHERE location_id = ?", (loc_id,))
     conn.execute("DELETE FROM notes WHERE location_id = ?", (loc_id,))
+    # Le spese segnate su quelle serate restano in cassa senza piu' la
+    # serata: i soldi sono usciti davvero, e il bilancio dell'anno non si
+    # aggiusta cancellando un palcoscenico.
+    conn.execute(
+        "UPDATE cash_entries SET gig_id = NULL, updated_at = ? WHERE gig_id IN "
+        "(SELECT id FROM gigs WHERE location_id = ?)",
+        (now_iso(), loc_id),
+    )
     conn.execute("DELETE FROM gigs WHERE location_id = ?", (loc_id,))
     conn.execute("DELETE FROM locations WHERE id = ?", (loc_id,))
     conn.commit()
@@ -3583,6 +3954,23 @@ def export_zip(conn):
             "LEFT JOIN workspaces w ON w.id = l.workspace_id "
             "ORDER BY g.gig_date DESC, g.id DESC")])))
 
+    # In cassa.csv ci sono i movimenti scritti a mano, e basta: i compensi
+    # delle serate non sono righe di questa tabella, stanno nella colonna
+    # "compenso" di serate.csv. Ripeterli qui vorrebbe dire consegnare lo
+    # stesso euro due volte in due fogli, e chi somma la colonna sbaglia.
+    fogli.append(("cassa.csv", _csv_bytes(
+        ["id", "band", "verso", "data", "descrizione", "importo", "categoria",
+         "pagato", "serata_id", "palcoscenico", "inserito_da", "creato_il"],
+        [(c["id"], c["band"], c["kind"], c["entry_date"], c["description"], c["amount"],
+          c["category"], "sì" if c["paid"] else "no", c["gig_id"], c["palco"],
+          c["created_by"], c["created_at"])
+         for c in _query(conn,
+            "SELECT c.*, w.name AS band, l.name AS palco FROM cash_entries c "
+            "LEFT JOIN workspaces w ON w.id = c.workspace_id "
+            "LEFT JOIN gigs g ON g.id = c.gig_id "
+            "LEFT JOIN locations l ON l.id = g.location_id "
+            "ORDER BY w.name, c.entry_date DESC, c.id DESC")])))
+
     fogli.append(("note.csv", _csv_bytes(
         ["id", "band", "palcoscenico_id", "palcoscenico", "tipo", "testo", "serata_id", "creata_il"],
         [(n["id"], n["band"], n["location_id"], n["palco"], n["kind"], n["text"],
@@ -3964,6 +4352,42 @@ def _h_update_report(conn, match, query, body, ctx):
     return 200, update_report(conn, ctx, int(match.group(1)), body)
 
 
+# La cassa risponde sempre con l'elenco intero, anche a un'eliminazione:
+# i movimenti sono pochi e le statistiche si rifanno tutte da quello, quindi
+# tornare la lista costa una riga e risparmia un giro di rete a ogni tocco.
+def _h_list_cash(conn, match, query, body, ctx):
+    return 200, fetch_cash(conn, require_ws(ctx))
+
+
+def _h_create_cash(conn, match, query, body, ctx):
+    return 201, create_cash_entry(conn, require_ws(ctx), ctx, body)
+
+
+def _h_update_cash(conn, match, query, body, ctx):
+    return 200, update_cash_entry(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_delete_cash(conn, match, query, body, ctx):
+    return 200, delete_cash_entry(conn, require_ws(ctx), int(match.group(1)))
+
+
+def _h_list_cost_categories(conn, match, query, body, ctx):
+    return 200, fetch_cost_categories(conn, require_ws(ctx))
+
+
+def _h_create_cost_category(conn, match, query, body, ctx):
+    return 201, create_cost_category(conn, require_ws(ctx), body)
+
+
+def _h_update_cost_category(conn, match, query, body, ctx):
+    return 200, update_cost_category(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_delete_cost_category(conn, match, query, body, ctx):
+    delete_cost_category(conn, require_ws(ctx), int(match.group(1)))
+    return 204, {}
+
+
 def _h_list_venue_list(conn, match, query, body, ctx):
     return 200, fetch_venue_list(conn, require_ws(ctx), match.group(1))
 
@@ -4008,6 +4432,14 @@ ROUTES = [
     ("POST", re.compile(r"^/api/locations/(\d+)/gigs$"), _h_create_gig),
     ("PUT", re.compile(r"^/api/gigs/(\d+)$"), _h_update_gig),
     ("DELETE", re.compile(r"^/api/gigs/(\d+)$"), _h_delete_gig),
+    ("GET", re.compile(r"^/api/cash$"), _h_list_cash),
+    ("POST", re.compile(r"^/api/cash$"), _h_create_cash),
+    ("GET", re.compile(r"^/api/cash/categories$"), _h_list_cost_categories),
+    ("POST", re.compile(r"^/api/cash/categories$"), _h_create_cost_category),
+    ("PUT", re.compile(r"^/api/cash/categories/(\d+)$"), _h_update_cost_category),
+    ("DELETE", re.compile(r"^/api/cash/categories/(\d+)$"), _h_delete_cost_category),
+    ("PUT", re.compile(r"^/api/cash/(\d+)$"), _h_update_cash),
+    ("DELETE", re.compile(r"^/api/cash/(\d+)$"), _h_delete_cash),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos/facebook$"), _h_facebook_cover),
     ("PUT", re.compile(r"^/api/photos/(\d+)/cover$"), _h_set_photo_cover),
