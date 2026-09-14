@@ -3346,11 +3346,27 @@
     var q = [v.name, v.city].filter(function(x){ return x; }).join(" ");
     return "https://www.google.com/search?q=" + encodeURIComponent(q);
   }
+  /* Le coordinate da sole arrivano dall'altra parte come coordinate: Google
+     Maps riconosce il punto e ti scrive "Bar Capriccio", Mappe di Apple no,
+     e chi guida si ritrova una destinazione fatta di numeri senza sapere
+     dove sta andando. Quando abbiamo indirizzo e citta' si manda il posto
+     scritto come lo scriveresti tu — nome, via, citta' — che tutte e due le
+     app sanno leggere e soprattutto sanno mostrare.
+
+     Senza indirizzo si resta alle coordinate: il solo nome, mandato a un
+     motore che cerca ovunque, e' il modo di finire a un altro "Bar Sport" a
+     sessanta chilometri da qui. Le coordinate saranno mute, ma sono giuste. */
+  function directionsDest(v){
+    if(v.address && v.city){
+      return [v.name, v.address, v.city].filter(function(x){ return x; }).join(", ");
+    }
+    return v.lat + "," + v.lng;
+  }
   function directionsHref(v){
-    var dest = v.lat + "," + v.lng;
+    var dest = encodeURIComponent(directionsDest(v));
     return isAppleDevice()
-      ? "https://maps.apple.com/?daddr=" + encodeURIComponent(dest) + "&dirflg=d"
-      : "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + encodeURIComponent(dest);
+      ? "https://maps.apple.com/?daddr=" + dest + "&dirflg=d"
+      : "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + dest;
   }
   function getMapUserIcon(){
     if(mapUserIcon) return mapUserIcon;
