@@ -267,6 +267,7 @@
   /* la searchbar non e' piu' in cima allo scroll a fare da spazio: l'aria
      sopra la prima riga dell'elenco va rimessa qui. */
   #scrollList > #list{padding-top:8px;}
+  #scrollFavorites > #favoritesList{padding-top:8px;}
   .searchbar{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;padding:8px 10px;}
   .searchbar svg{flex:none;color:var(--text-secondary);}
   .searchbar input{border:0;background:transparent;flex:1;min-width:0;font-size:17px;color:var(--text);font-family:inherit;}
@@ -684,13 +685,24 @@
   <!-- ============ TAB: PREFERITI ============ -->
   <section class="screen tab-screen" id="tabFavorites" data-tab="favorites" hidden>
     <header class="navbar" id="navFavorites">
-      <div class="navbar-row"><span class="inline-title">Preferiti</span></div>
+      <div class="navbar-row">
+        <span class="nav-btn nav-btn-spacer"></span>
+        <span class="inline-title">Preferiti</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn" id="btnSortFav" aria-label="Ordina" title="Ordina">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="15" y2="7"/><line x1="4" y1="12" x2="12" y2="12"/><line x1="4" y1="17" x2="9" y2="17"/><polyline points="17 14 20 17 23 14"/><line x1="20" y1="6" x2="20" y2="17"/></svg>
+            <span class="filter-dot" id="favSortActiveDot" hidden></span>
+          </button>
+          <button class="nav-btn" id="btnFiltersFav" aria-label="Filtri" title="Filtri">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 4 21 4 14 12.5 14 19.5 10 21.5 10 12.5"/></svg>
+            <span class="filter-dot" id="favFilterActiveDot" hidden></span>
+          </button>
+        </div>
+      </div>
       <div class="large-title-wrap">
         <h1 class="large-title">Preferiti</h1>
         <div class="subtitle-count" id="favoritesSub">0 preferiti</div>
       </div>
-    </header>
-    <div class="screen-scroll" id="scrollFavorites">
       <div class="searchbar-wrap">
         <div class="searchbar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -698,6 +710,20 @@
           <button class="clear-btn" id="favSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
         </div>
       </div>
+      <div class="view-toggle-wrap" id="favScopeWrap">
+        <div class="view-toggle" id="favScopeToggle">
+          <button class="view-toggle-btn active" data-favscope="all">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.6a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.2"/><path d="M22 20v-1.6a4 4 0 0 0-3-3.87"/><path d="M16.5 4.2a4 4 0 0 1 0 6.6"/></svg>
+            Mostra tutti
+          </button>
+          <button class="view-toggle-btn" data-favscope="mine">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20v-1.8a5 5 0 0 0-5-5h-4a5 5 0 0 0-5 5V20"/><circle cx="12" cy="7" r="3.6"/></svg>
+            I miei
+          </button>
+        </div>
+      </div>
+    </header>
+    <div class="screen-scroll" id="scrollFavorites">
       <div id="favoritesList"></div>
     </div>
   </section>
@@ -1667,17 +1693,21 @@
       </div>
       <div class="section-footer" id="nearMeFooter">Usa la posizione del telefono per mostrare solo i palcoscenici entro il raggio scelto. Funzionano solo i palcoscenici con coordinate geografiche già impostate.</div>
 
-      <div class="section-header">ARCHIVIO</div>
-      <div class="grouped-list">
-        <div class="field-row">
-          <label for="showDeletedToggle" style="flex:1;">Mostra archiviati</label>
-          <label class="ios-switch">
-            <input type="checkbox" id="showDeletedToggle">
-            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
-          </label>
+      <!-- Fuori dai Preferiti: li' gli archiviati non compaiono mai, e un
+           interruttore che non fa niente e' peggio che non averlo. -->
+      <div id="filtersArchiveSection">
+        <div class="section-header">ARCHIVIO</div>
+        <div class="grouped-list">
+          <div class="field-row">
+            <label for="showDeletedToggle" style="flex:1;">Mostra archiviati</label>
+            <label class="ios-switch">
+              <input type="checkbox" id="showDeletedToggle">
+              <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+            </label>
+          </div>
         </div>
+        <div class="section-footer">I palcoscenici archiviati non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli, oppure eliminarli definitivamente.</div>
       </div>
-      <div class="section-footer">I palcoscenici archiviati non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli, oppure eliminarli definitivamente.</div>
     </div>
   </section>
 
@@ -2206,6 +2236,21 @@
   var nearMeRadiusKm = 30;
   var nearMeCoords = null;
   var showDeletedEnabled = false;
+  /* Palcoscenici e Preferiti hanno le stesse due schermate — Ordina e
+     Filtri — ma non la stessa risposta: nei Preferiti cerchi fra venti
+     posti, nell'elenco fra duecento. Tenere un solo set di filtri voleva
+     dire che restringere i Preferiti ti svuotava l'elenco senza che tu te
+     ne accorgessi, e quel filtro te lo saresti ritrovato addosso il giorno
+     dopo.
+
+     Cosi' invece ogni schermata si tiene i suoi: le variabili qui sopra
+     sono sempre quelle della schermata che stai guardando (le leggono
+     matchesFilter, l'ordinamento e tutte le righe della schermata Filtri,
+     che restano una sola), e passando da una tab all'altra si mettono da
+     parte e si rimettono. "Mostra archiviati" no: quello ricarica i dati
+     dal server, non e' un filtro di una schermata, e resta di tutti. */
+  var filterScopes = {};
+  var filterScope = "list";
   var currentId = null;
   var currentAdId = null;
   var returnToPalcoscenicoAfterAd = null;
@@ -2255,6 +2300,7 @@
       tabs[k].hidden = k !== name;
     });
     document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.getAttribute("data-tab")===name); });
+    if(name === "list" || name === "favorites") usaFiltriDi(name);
     if(name === "home") renderHome();
     if(name === "recontact") renderRecontact();
     if(name === "favorites") renderFavorites();
@@ -2722,6 +2768,51 @@
     });
   }
 
+  function filtriVuoti(){
+    return {status:"all", type:"all", category:"all", owner:"all", regione:"all", provincia:"all",
+            nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
+  }
+  function snapshotFiltri(){
+    var liste = {};
+    VENUE_LISTS.forEach(function(L){ liste[L.key] = L.filter; });
+    return {status:filterStatus, type:filterType, category:filterCategory, owner:filterOwner,
+            regione:filterRegione, provincia:filterProvincia,
+            nearMe:nearMeEnabled, nearMeKm:nearMeRadiusKm, nearMeCoords:nearMeCoords,
+            liste:liste, sortBy:sortBy};
+  }
+  function applicaFiltri(snap){
+    filterStatus = snap.status; filterType = snap.type; filterCategory = snap.category; filterOwner = snap.owner;
+    filterRegione = snap.regione; filterProvincia = snap.provincia;
+    nearMeEnabled = snap.nearMe; nearMeRadiusKm = snap.nearMeKm; nearMeCoords = snap.nearMeCoords;
+    VENUE_LISTS.forEach(function(L){ L.filter = snap.liste[L.key] || "all"; });
+    sortBy = snap.sortBy;
+  }
+  function filtriDi(scope){
+    if(!filterScopes[scope]) filterScopes[scope] = filtriVuoti();
+    return filterScopes[scope];
+  }
+  function filtriAccesi(snap){
+    if(!snap) return false;
+    var liste = snap.liste || {};
+    return snap.status !== "all" || snap.type !== "all" || snap.category !== "all" || snap.owner !== "all"
+        || snap.regione !== "all" || snap.provincia !== "all" || snap.nearMe
+        || Object.keys(liste).some(function(k){ return liste[k] !== "all"; });
+  }
+  /* Il passaggio di consegne fra le due schermate: quella che lasci si
+     porta via i suoi filtri, quella che apri si rimette i propri. Le liste
+     si ridisegnano tutte e due perche' l'altra, nascosta, e' rimasta
+     disegnata con i filtri di questa. */
+  function usaFiltriDi(scope){
+    if(scope === filterScope) return;
+    filterScopes[filterScope] = snapshotFiltri();
+    filterScope = scope;
+    applicaFiltri(filtriDi(scope));
+    renderList();
+    renderFavorites();
+    updateFilterActiveDot();
+    renderSortRow();
+  }
+
   /* ---------------- PALCOSCENICI tab ---------------- */
   var elCountSub = document.getElementById("countSub");
   var elSearch = document.getElementById("searchInput");
@@ -2737,7 +2828,9 @@
   /* ---------------- schermata Filtri ---------------- */
   var elFiltersScreen = document.getElementById("filtersScreen");
   function updateFilterActiveDot(){
-    document.getElementById("filterActiveDot").hidden = (filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !nearMeEnabled && !showDeletedEnabled);
+    filterScopes[filterScope] = snapshotFiltri();
+    document.getElementById("filterActiveDot").hidden = !(filtriAccesi(filtriDi("list")) || showDeletedEnabled);
+    document.getElementById("favFilterActiveDot").hidden = !filtriAccesi(filtriDi("favorites"));
   }
   function ownerLabel(email){
     var o = owners.filter(function(x){ return x.email === email; })[0];
@@ -2880,6 +2973,7 @@
     renderFilterOwnerRow();
     renderNearMeRow();
     renderShowDeletedRow();
+    document.getElementById("filtersArchiveSection").hidden = (filterScope === "favorites");
     elFiltersScreen.hidden = false;
     requestAnimationFrame(function(){ elFiltersScreen.classList.add("in"); });
   }
@@ -2888,6 +2982,7 @@
     setTimeout(function(){ elFiltersScreen.hidden = true; }, 320);
   }
   document.getElementById("btnFilters").addEventListener("click", openFiltersScreen);
+  document.getElementById("btnFiltersFav").addEventListener("click", openFiltersScreen);
   document.getElementById("btnFiltersBack").addEventListener("click", closeFiltersScreen);
   /* Azzerare i filtri lo chiede anche la ricerca in mappa, quando il posto
      che hai trovato per nome e' proprio quello che i filtri stanno
@@ -3043,19 +3138,25 @@
     };
   }
   function renderSortRow(){
-    document.getElementById("sortActiveDot").hidden = (sortBy === "name");
+    filterScopes[filterScope] = snapshotFiltri();
+    document.getElementById("sortActiveDot").hidden = (filtriDi("list").sortBy === "name");
+    document.getElementById("favSortActiveDot").hidden = (filtriDi("favorites").sortBy === "name");
   }
-  document.getElementById("btnSort").addEventListener("click", function(){
+  /* Un solo foglio per tutte e due le schermate: l'ordinamento che cambia e'
+     quello di dove l'hai aperto, perche' sortBy e' gia' il suo. */
+  function openSortSheet(){
     openSheet({
       title:"Ordina per",
       options: SORT_OPTIONS.map(function(o){
         return {label:o.label, checkmark: sortBy === o.key, onSelect:function(){
-          sortBy = o.key; renderSortRow(); renderList();
+          sortBy = o.key; renderSortRow(); renderList(); renderFavorites();
           toast(o.key === "name" ? "Ordinato per nome" : "Ordinato per " + o.label.toLowerCase());
         }};
       })
     });
-  });
+  }
+  document.getElementById("btnSort").addEventListener("click", openSortSheet);
+  document.getElementById("btnSortFav").addEventListener("click", openSortSheet);
 
   function renderList(){
     var filtered = venues.filter(function(v){ return matchesFilter(v) && matchesSearch(v); });
@@ -3462,8 +3563,38 @@
   });
   wireClearBtn(elFavSearch, document.getElementById("favSearchClearBtn"));
 
+  /* Le due schede sopra l'elenco. La stella e' della band — la mette uno e
+     la vedono tutti — quindi "Mostra tutti" e' quello che i Preferiti sono
+     sempre stati, e "I miei" restringe a quelli che porti avanti tu: il
+     proprietario del palcoscenico, non chi ha messo la stella, che non e'
+     scritto da nessuna parte. Senza login la domanda non esiste e le schede
+     nemmeno. */
+  var favScope = "all";
+  var elFavScopeWrap = document.getElementById("favScopeWrap");
+  function favScopeUsabile(){ return !!(me && me.email); }
+  function renderFavScopeToggle(){
+    elFavScopeWrap.hidden = !favScopeUsabile();
+    document.querySelectorAll("#favScopeToggle .view-toggle-btn").forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-favscope") === favScope);
+    });
+  }
+  document.getElementById("favScopeToggle").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-favscope]");
+    if(!btn) return;
+    var scope = btn.getAttribute("data-favscope");
+    if(scope === favScope) return;
+    favScope = scope;
+    renderFavScopeToggle();
+    renderFavorites();
+  });
+
   function renderFavorites(){
-    var favs = venues.filter(function(v){ return v.favorite && !v.deleted_at; });
+    renderFavScopeToggle();
+    var stellati = venues.filter(function(v){ return v.favorite && !v.deleted_at; });
+    var favs = stellati.filter(matchesFilter);
+    if(favScope === "mine" && favScopeUsabile()){
+      favs = favs.filter(function(v){ return v.owner_email === me.email; });
+    }
     if(favSearchText){
       favs = favs.filter(function(v){
         var hay = ((v.name||"") + " " + (v.city||"") + " " + (v.type||"")).toLowerCase();
@@ -3471,13 +3602,22 @@
       });
     }
     elFavoritesSub.textContent = favs.length + (favs.length===1 ? " preferito" : " preferiti");
-    var sorted = favs.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
+    var sorted = favs.slice().sort(venueSorter());
     if(sorted.length === 0){
-      elFavoritesList.innerHTML = '<div class="empty-state">'+
-        (favSearchText
-          ? '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>'
-          : '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui.</p>')+
-        '</div>';
+      // Tre vuoti diversi: non hai preferiti, li hai ma li stai escludendo,
+      // oppure ce li ha qualcun altro. Dire "Nessun preferito" in tutti e
+      // tre manda a cercare una stella che hai gia' messo.
+      var vuoto;
+      if(!stellati.length){
+        vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui.</p>';
+      } else if(favSearchText){
+        vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>';
+      } else if(favScope === "mine"){
+        vuoto = '<div class="glyph">⭐</div><h2>Nessuno tuo</h2><p>Fra i preferiti della band non ce n\'è nessuno di cui sei proprietario. Tocca “Mostra tutti” per vederli.</p>';
+      } else {
+        vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>I preferiti ci sono, ma i filtri li stanno escludendo tutti.</p>';
+      }
+      elFavoritesList.innerHTML = '<div class="empty-state">'+vuoto+'</div>';
       return;
     }
     elFavoritesList.innerHTML = '<div class="grouped-list">' + sorted.map(function(v){ return venueRowHtml(v); }).join("") + '</div>';
