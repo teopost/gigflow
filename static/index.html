@@ -348,6 +348,10 @@
   .field-row.stacked textarea{border:none;background:transparent;font-size:16px;color:var(--text);font-family:inherit;resize:vertical;min-height:44px;padding:0;}
   .field-row.stacked textarea:focus{outline:none;}
   .field-row.picker{cursor:pointer;}
+  /* Una riga che e' un comando, non un dato: il colore la distingue dalle
+     caselle che ha sopra senza doverle mettere un bottone dentro. */
+  .link-action{font-size:16px;color:var(--tint);}
+  .field-row.busy .link-action{color:var(--text-secondary);}
   .field-row.picker:active{background:var(--fill);}
   .picker-value{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;color:var(--text-secondary);font-size:16px;min-width:0;}
   .picker-value .dot{width:9px;height:9px;border-radius:50%;flex:none;}
@@ -1807,6 +1811,7 @@
         <div class="field-row"><label for="fPhone">Cellulare</label><input id="fPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palcoscenico.it"></div>
         <div class="field-row"><label for="fWebsite">Sito / social</label><input id="fWebsite" type="text" placeholder="instagram.com/…"></div>
+        <div class="field-row picker" id="rowFbCover" hidden><span class="link-action" id="fbCoverLabel">Copertina dal profilo Facebook</span></div>
       </div>
       <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palcoscenici. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
 
@@ -4374,6 +4379,72 @@
   document.getElementById("photoFileInputCamera").addEventListener("change", handlePhotoFileSelected);
   document.getElementById("photoFileInputLibrary").addEventListener("change", handlePhotoFileSelected);
 
+  /* ---------------- copertina dalla pagina Facebook ----------------
+     Due terzi dei palcoscenici in archivio hanno una pagina Facebook al
+     posto del sito, e la sua immagine del profilo e' quasi sempre
+     l'insegna del locale: la riga sotto il campo Sito la prende e la mette
+     in copertina. Compare solo se li' dentro c'e' davvero una pagina
+     Facebook — le stesse regole che applica il server, scritte qui per
+     sapere se mostrare la riga. */
+  function facebookPageId(url){
+    if(!url) return null;
+    var testo = String(url).trim();
+    if(!testo) return null;
+    if(!/^https?:\/\//i.test(testo)) testo = "https://" + testo;
+    var a;
+    try { a = new URL(testo); } catch(e){ return null; }
+    var host = a.hostname.toLowerCase().replace(/^www\./, "");
+    if(!(host === "facebook.com" || /\.facebook\.com$/.test(host) || host === "fb.com" || host === "fb.me")) return null;
+    var seg = a.pathname.split("/").filter(function(x){ return x; });
+    if(!seg.length) return null;
+    if(seg[0] === "profile.php"){
+      var id = a.searchParams.get("id") || "";
+      return /^\d+$/.test(id) ? id : null;
+    }
+    if(seg[0] === "pages" || seg[0] === "p" || seg[0] === "people"){
+      var numeri = seg.filter(function(x){ return /^\d+$/.test(x); });
+      return numeri.length ? numeri[numeri.length-1] : null;
+    }
+    var nome;
+    try { nome = decodeURIComponent(seg[0]); } catch(e){ nome = seg[0]; }
+    return /^[A-Za-z0-9._-]{1,100}$/.test(nome) ? nome : null;
+  }
+  var elRowFbCover = document.getElementById("rowFbCover");
+  var elFbCoverLabel = document.getElementById("fbCoverLabel");
+  var FB_COVER_LABEL = "Copertina dal profilo Facebook";
+  var fbCoverBusy = false;
+  function renderFbCoverRow(){
+    elRowFbCover.hidden = !facebookPageId(fWebsite.value);
+  }
+  elRowFbCover.addEventListener("click", function(){
+    if(fbCoverBusy || !currentId) return;
+    if(!facebookPageId(fWebsite.value)) return;
+    var idQuando = currentId;
+    fbCoverBusy = true;
+    elRowFbCover.classList.add("busy");
+    elFbCoverLabel.textContent = "Scarico da Facebook\u2026";
+    api("POST", "/api/locations/" + idQuando + "/photos/facebook", {url: fWebsite.value})
+      .then(function(updated){
+        // Solo le foto, non tutta la scheda: quello che stai scrivendo qui
+        // dentro e' una bozza e non va sovrascritto da questa risposta.
+        var v = venues.filter(function(x){ return String(x.id) === String(idQuando); })[0];
+        if(v){
+          v.photos = updated.photos || [];
+          if(String(currentId) === String(idQuando)) renderPhotosStrip(v);
+          renderList();
+          renderFavorites();
+        }
+        toast("Copertina presa da Facebook");
+      })
+      .catch(function(err){ toast(err.message || "Non sono riuscito a prendere l'immagine"); })
+      .then(function(){
+        fbCoverBusy = false;
+        elRowFbCover.classList.remove("busy");
+        elFbCoverLabel.textContent = FB_COVER_LABEL;
+      });
+  });
+  fWebsite.addEventListener("input", renderFbCoverRow);
+
   function renderQuickActions(v){
     var actions = [];
     // Chiama ripiega sul fisso quando il cellulare manca: un posto che ha
@@ -5031,6 +5102,7 @@
     venueDirty = false;
     renderPhotosStrip(v);
     renderQuickActions(v);
+    renderFbCoverRow();
     renderStatusRow(v);
     renderGigs(v);
     renderArtDirectorRow(v);

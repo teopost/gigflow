@@ -2527,6 +2527,12 @@ def add_photo(conn, ws, loc_id, body):
     if len(raw) > MAX_PHOTO_BYTES:
         raise ApiError(400, "Immagine troppo grande (massimo 8 MB)")
 
+    return salva_foto(conn, loc_id, raw, ext)
+
+
+def salva_foto(conn, loc_id, raw, ext, copertina=False):
+    """Scrive il file e la riga: lo fanno sia la foto scattata dal telefono
+    sia quella presa da Facebook, e il posto dove si scrive e' uno solo."""
     os.makedirs(PHOTOS_DIR, exist_ok=True)
     filename = f"{loc_id}_{uuid.uuid4().hex}.{ext}"
     with open(os.path.join(PHOTOS_DIR, filename), "wb") as f:
@@ -2537,10 +2543,153 @@ def add_photo(conn, ws, loc_id, body):
         "INSERT INTO photos (location_id, filename, created_at) VALUES (?, ?, ?)",
         (loc_id, filename, ts),
     )
+    if copertina:
+        conn.execute("UPDATE photos SET is_cover = 0 WHERE location_id = ?", (loc_id,))
+        conn.execute("UPDATE photos SET is_cover = 1 WHERE id = ?", (cur.lastrowid,))
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
     conn.commit()
     row = conn.execute("SELECT * FROM photos WHERE id = ?", (cur.lastrowid,)).fetchone()
     return dict(row)
+
+
+# --- copertina dalla pagina Facebook -----------------------------------
+# Di tutto Facebook, /picture e' rimasto l'unico pezzo che risponde senza
+# chiave: dato il nome di una pagina pubblica restituisce la sua immagine
+# del profilo — quella quadrata, non la copertina larga in cima. Niente app
+# Facebook da registrare, niente token da rinnovare, niente revisione da
+# passare: una richiesta e via. Vale la pena perche' due terzi dei
+# palcoscenici in archivio hanno una pagina Facebook al posto del sito, e
+# quella foto e' quasi sempre l'insegna del locale.
+#
+# Con "redirect=false" invece dell'immagine arriva un JSON che dice anche
+# is_silhouette: e' l'avatar grigio di chi non ha mai messo una foto, e
+# metterlo come copertina sarebbe peggio che non avere niente.
+FB_PICTURE_URL = "https://graph.facebook.com/%s/picture?redirect=false&width=720&height=720"
+FB_HOSTS = ("facebook.com", "fb.com", "fb.me")
+FB_ID_OK = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
+# Il nome vecchio stile delle pagine: "Bar-Belverde-170145990444191". Come
+# nome non esiste piu', ma il numero in fondo e' ancora l'id buono.
+FB_SLUG_ID = re.compile(r"-(\d{6,})$")
+CONTENT_TYPE_PHOTO_EXT = {
+    "image/jpeg": "jpg", "image/jpg": "jpg",
+    "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+}
+
+
+def facebook_page_id(url):
+    """Il pezzo di link che Facebook accetta come identificativo, da
+    qualunque forma in cui e' stato incollato: /nomepagina, con o senza
+    https e www, con il ?locale=it_IT che si porta dietro il copia-incolla
+    dal telefono, /profile.php?id=1000..., /pages/Nome/1234, e i nomi
+    vecchio stile con il numero in coda. Fuori da facebook.com: None."""
+    if not url:
+        return None
+    testo = url.strip()
+    if not re.match(r"^https?://", testo, re.I):
+        testo = "https://" + testo
+    try:
+        parti = urlparse(testo)
+    except ValueError:
+        return None
+    host = (parti.netloc or "").lower().split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    if not (host in FB_HOSTS or any(host.endswith("." + h) for h in FB_HOSTS)):
+        return None
+    segmenti = [s for s in (parti.path or "").split("/") if s]
+    if not segmenti:
+        return None
+    if segmenti[0] == "profile.php":
+        valori = parse_qs(parti.query or "").get("id") or []
+        return valori[0] if valori and valori[0].isdigit() else None
+    if segmenti[0] in ("pages", "p", "people"):
+        numeri = [s for s in segmenti if s.isdigit()]
+        return numeri[-1] if numeri else None
+    nome = unquote(segmenti[0])
+    if not FB_ID_OK.match(nome):
+        return None
+    return nome
+
+
+def _facebook_json(page_id):
+    req = urllib.request.Request(
+        FB_PICTURE_URL % quote(page_id, safe=""),
+        headers={"User-Agent": "GigFlow"},
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.load(resp)
+
+
+def facebook_cover(conn, ws, loc_id, body=None):
+    """Prende l'immagine del profilo della pagina Facebook e la mette come
+    copertina del palcoscenico. Resta una foto come le altre: si cancella
+    dalla striscia, e la copertina si puo' rimettere su un'altra con la
+    stella.
+
+    Il link arriva dalla scheda aperta, non dal database: la scheda e' una
+    bozza finche' non si salva, e chiedere questa immagine per un indirizzo
+    diverso da quello che hai davanti sarebbe difficile da spiegare. Se non
+    arriva niente si ripiega su quello salvato."""
+    row = conn.execute(
+        "SELECT website FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+
+    page_id = facebook_page_id((body or {}).get("url") or row["website"])
+    if not page_id:
+        raise ApiError(400, "Nel campo Sito non c'e' una pagina Facebook")
+
+    # Il nome vecchio stile va provato in due modi: com'e' scritto, e poi
+    # col solo numero in fondo, che e' l'id sopravvissuto al cambio di nome.
+    tentativi = [page_id]
+    slug = FB_SLUG_ID.search(page_id)
+    if slug:
+        tentativi.append(slug.group(1))
+
+    esito = None
+    for tentativo in tentativi:
+        try:
+            esito = _facebook_json(tentativo)
+            break
+        except urllib.error.HTTPError:
+            # 400 con "Object with ID ... does not exist": la pagina e' stata
+            # chiusa o rinominata, e il link in archivio punta al vuoto.
+            continue
+        except Exception:
+            raise ApiError(502, "Facebook non risponde, riprova fra poco")
+    if esito is None:
+        raise ApiError(404, "Facebook non trova questa pagina: forse ha cambiato nome")
+
+    dati = (esito or {}).get("data") or {}
+    if dati.get("is_silhouette"):
+        raise ApiError(404, "Questa pagina non ha un'immagine del profilo")
+    foto_url = dati.get("url")
+    if not foto_url:
+        raise ApiError(502, "Facebook non ha dato nessuna immagine")
+
+    # L'indirizzo arriva da Facebook, ma finisce in una richiesta che parte
+    # da questo server: si scarica solo da dove ci si aspetta.
+    host = (urlparse(foto_url).netloc or "").lower().split(":")[0]
+    if not (host.endswith(".fbcdn.net") or host.endswith(".facebook.com")):
+        raise ApiError(502, "Facebook ha risposto con un indirizzo inatteso")
+
+    try:
+        req = urllib.request.Request(foto_url, headers={"User-Agent": "GigFlow"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            raw = resp.read(MAX_PHOTO_BYTES + 1)
+    except Exception:
+        raise ApiError(502, "Non sono riuscito a scaricare l'immagine")
+
+    ext = CONTENT_TYPE_PHOTO_EXT.get(ctype)
+    if not ext or not raw:
+        raise ApiError(502, "Facebook ha risposto con qualcosa che non e' un'immagine")
+    if len(raw) > MAX_PHOTO_BYTES:
+        raise ApiError(400, "Immagine troppo grande (massimo 8 MB)")
+
+    salva_foto(conn, loc_id, raw, ext, copertina=True)
+    return fetch_location(conn, ws, loc_id)
 
 
 def delete_photo(conn, ws, photo_id):
@@ -3498,6 +3647,10 @@ def _h_add_photo(conn, match, query, body, ctx):
     return 201, add_photo(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_facebook_cover(conn, match, query, body, ctx):
+    return 200, facebook_cover(conn, require_ws(ctx), int(match.group(1)), body)
+
+
 def _h_set_photo_cover(conn, match, query, body, ctx):
     return 200, set_photo_cover(conn, require_ws(ctx), int(match.group(1)))
 
@@ -3756,6 +3909,7 @@ ROUTES = [
     ("PUT", re.compile(r"^/api/gigs/(\d+)$"), _h_update_gig),
     ("DELETE", re.compile(r"^/api/gigs/(\d+)$"), _h_delete_gig),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
+    ("POST", re.compile(r"^/api/locations/(\d+)/photos/facebook$"), _h_facebook_cover),
     ("PUT", re.compile(r"^/api/photos/(\d+)/cover$"), _h_set_photo_cover),
     ("DELETE", re.compile(r"^/api/photos/(\d+)$"), _h_delete_photo),
     ("GET", re.compile(r"^/api/art_directors$"), _h_list_art_directors),
