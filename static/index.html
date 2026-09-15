@@ -544,14 +544,8 @@
   .act-strip + .act-strip{border-top:.5px solid var(--separator);}
   .note-dir{font-weight:600;}
   .act-chip:active{opacity:.55;}
-  /* I tag sono etichette di chi le mette, e hanno la stessa forma dovunque
-     compaiano: la striscia che filtra i preferiti, la riga della scheda,
-     il sottotitolo di una cella. Cambia la taglia, non il modo di leggerli. */
-  .mytag-chip{flex:none;display:inline-flex;align-items:center;gap:5px;border:none;border-radius:999px;background:var(--fill);color:var(--text);font-size:13px;font-weight:600;font-family:inherit;padding:7px 12px;cursor:pointer;white-space:nowrap;}
-  .mytag-chip.on{background:var(--tint);color:#fff;}
-  .mytag-chip:active{opacity:.55;}
-  .mytag-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 16px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  .mytag-strip::-webkit-scrollbar{display:none;}
+  /* I tag come si vedono in una cella d'elenco: piccoli, sotto il resto.
+     Filtrarli non sta qui — e' una riga del foglio dei filtri come le altre. */
   /* Nella cella i tag stanno sotto le altre righe e non le spingono fuori:
      vanno a capo invece di allargare la riga, che a quel punto taglierebbe
      il nome del palcoscenico. */
@@ -854,11 +848,12 @@
           <button class="clear-btn" id="favSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
         </div>
       </div>
-      <!-- Le due schede "I miei / Mostra tutti" sono uscite di qui il 15
+      <!-- Qui c'erano le due schede "I miei / Mostra tutti", uscite il 15
            settembre 2026: adesso i preferiti sono di ciascuno, e "quelli
-           degli altri" non e' piu' una cosa che si possa guardare. Al loro
-           posto i tag, che sono il modo nuovo di restringere l'elenco. -->
-      <div class="mytag-strip" id="favTagStrip" hidden></div>
+           degli altri" non e' piu' una cosa che si possa guardare. Per un
+           attimo ci e' stata una striscia di bottoni con i tag, ma di tag
+           ce ne possono essere trenta: adesso sono una riga del foglio dei
+           filtri, insieme a tutti gli altri. -->
     </header>
     <div class="screen-scroll" id="scrollFavorites">
       <div id="favoritesList"></div>
@@ -1235,12 +1230,6 @@
           <div class="row-trail"><span class="row-badge" id="settingsCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
-        <div class="row" id="rowSettingsTags">
-          <div class="row-main"><div class="row-title">I miei tag</div>
-          <div class="row-sub">Le tue etichette sui palcoscenici: le vedi solo tu</div></div>
-          <div class="row-trail"><span class="row-badge" id="settingsTagsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
         <div class="row" id="rowSettingsContext">
           <div class="row-main"><div class="row-title">Contesto</div>
           <div class="row-sub">Si suona al chiuso, all’aperto o tutti e due</div></div>
@@ -1257,6 +1246,12 @@
           <div class="row-main"><div class="row-title">Periodo</div>
           <div class="row-sub">Quando ci fanno suonare dal vivo</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsLivePeriodCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsTags">
+          <div class="row-main"><div class="row-title">I miei tag</div>
+          <div class="row-sub">Le tue etichette sui palcoscenici: le vedi solo tu</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsTagsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="row" id="rowSettingsAd">
@@ -2140,6 +2135,11 @@
           <div class="picker-value"><span id="filterOwnerValue">Tutti</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowFilterTag">
+          <label>Tag</label>
+          <div class="picker-value"><span id="filterTagValue">Tutti</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
       </div>
 
       <div class="section-header">POSIZIONE</div>
@@ -2208,16 +2208,6 @@
 
       <div class="quick-actions" id="quickActions"></div>
 
-      <div class="section-header">I MIEI TAG</div>
-      <div class="grouped-list">
-        <div class="field-row picker" id="rowTags">
-          <label>Tag</label>
-          <div class="picker-value"><span id="tagsValue">— nessuno —</span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-      </div>
-      <div class="section-footer">I tag sono tuoi come la stella: nessun altro li vede, e servono a raggruppare i preferiti a modo tuo. Il <strong>nome</strong> invece è della band — se qualcuno ha già usato «anni80-90», appena scrivi «ann» te lo propone, così non diventano due tag per la stessa cosa. Si salvano appena li scegli.</div>
-
       <div class="section-header">DOVE</div>
       <div class="grouped-list">
         <div class="field-row picker" id="rowType">
@@ -2233,6 +2223,15 @@
         <div class="field-row picker" id="rowContext">
           <label>Contesto</label>
           <div class="picker-value"><span id="contextValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <!-- I tag sono l'unica riga di questa scheda che non e' del
+             palcoscenico ma tua. Sta qui in mezzo alle altre, e non in una
+             sezione sua, perche' e' li' che la si cerca: si legge come le
+             altre etichette del posto. -->
+        <div class="field-row picker" id="rowTags">
+          <label>Tag</label>
+          <div class="picker-value"><span id="tagsValue">— nessuno —</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="field-row"><label for="fAddress">Indirizzo</label><input id="fAddress" type="text" placeholder="Via, civico"></div>
@@ -2844,6 +2843,9 @@
   var filterType = "all";
   var filterCategory = "all";
   var filterOwner = "all";
+  // Il tag su cui stai filtrando. E' l'unico filtro personale: gli altri
+  // guardano dentro il palcoscenico, questo guarda dentro le tue etichette.
+  var filterTag = "all";
   var owners = [];
   var searchText = "";
   var nearMeEnabled = false;
@@ -3684,19 +3686,20 @@
 
   function filtriVuoti(){
     return {status:"all", type:"all", category:"all", owner:"all", regione:"all", provincia:"all",
-            nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
+            tag:"all", nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
   }
   function snapshotFiltri(){
     var liste = {};
     VENUE_LISTS.forEach(function(L){ liste[L.key] = L.filter; });
     return {status:filterStatus, type:filterType, category:filterCategory, owner:filterOwner,
-            regione:filterRegione, provincia:filterProvincia,
+            regione:filterRegione, provincia:filterProvincia, tag:filterTag,
             nearMe:nearMeEnabled, nearMeKm:nearMeRadiusKm, nearMeCoords:nearMeCoords,
             liste:liste, sortBy:sortBy};
   }
   function applicaFiltri(snap){
     filterStatus = snap.status; filterType = snap.type; filterCategory = snap.category; filterOwner = snap.owner;
     filterRegione = snap.regione; filterProvincia = snap.provincia;
+    filterTag = snap.tag || "all";
     nearMeEnabled = snap.nearMe; nearMeRadiusKm = snap.nearMeKm; nearMeCoords = snap.nearMeCoords;
     VENUE_LISTS.forEach(function(L){ L.filter = snap.liste[L.key] || "all"; });
     sortBy = snap.sortBy;
@@ -3709,7 +3712,7 @@
     if(!snap) return false;
     var liste = snap.liste || {};
     return snap.status !== "all" || snap.type !== "all" || snap.category !== "all" || snap.owner !== "all"
-        || snap.regione !== "all" || snap.provincia !== "all" || snap.nearMe
+        || snap.regione !== "all" || snap.provincia !== "all" || (snap.tag || "all") !== "all" || snap.nearMe
         || Object.keys(liste).some(function(k){ return liste[k] !== "all"; });
   }
   /* Il passaggio di consegne fra le due schermate: quella che lasci si
@@ -3764,6 +3767,31 @@
   function renderFilterOwnerRow(){
     setDato("filterOwnerValue", filterOwner === "all" ? "" : ownerLabel(filterOwner), "Tutti");
   }
+  function renderFilterTagRow(){
+    setDato("filterTagValue", filterTag === "all" ? "" : filterTag, "Tutti");
+  }
+  /* I tag nel foglio dei filtri e non piu' in una striscia di bottoni sopra
+     l'elenco: di tag ce ne possono essere trenta, e trenta bottoni da
+     scorrere di lato sono una fatica che un elenco con la ricerca non ha.
+     Qui dentro ci sono solo i tuoi — filtrare per un tag che non hai messo
+     su niente darebbe sempre zero. */
+  document.getElementById("rowFilterTag").addEventListener("click", function(){
+    var miei = mieiTagElenco();
+    var opts = [{label:"Tutti", checkmark: filterTag==="all", onSelect:function(){
+      filterTag = "all"; renderFilterTagRow(); renderAll();
+    }}];
+    miei.forEach(function(t){
+      opts.push({label:t.tag, dato:true, checkmark: chiaveTag(filterTag)===chiaveTag(t.tag), onSelect:function(){
+        filterTag = t.tag; renderFilterTagRow(); renderAll();
+      }});
+    });
+    openSheet({
+      title:"Filtra per tag",
+      searchable: miei.length > 6,
+      searchPlaceholder:"Cerca tag…",
+      options:opts
+    });
+  });
   document.getElementById("rowFilterStatus").addEventListener("click", function(){
     var opts = [{label:"Tutti", checkmark: filterStatus==="all", onSelect:function(){
       filterStatus = "all"; renderFilterStatusRow(); renderAll();
@@ -3887,6 +3915,10 @@
     renderGeoFilterRows();
     renderVenueListFilterRows();
     renderFilterOwnerRow();
+    renderFilterTagRow();
+    // La riga dei tag c'e' solo se ne hai: senza tag e' una riga che dice
+    // "Tutti" e non apre niente.
+    document.getElementById("rowFilterTag").hidden = !mieiTagElenco().length;
     renderNearMeRow();
     renderShowDeletedRow();
     document.getElementById("filtersArchiveSection").hidden = (filterScope === "favorites");
@@ -3907,11 +3939,11 @@
      palcoscenico che stavi andando a vedere. */
   function azzeraFiltri(opts){
     opts = opts || {};
-    filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all";
+    filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all"; filterTag = "all";
     resetVenueListFilters();
     resetGeoFilters();
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
-    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderGeoFilterRows(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderNearMeRow(); renderAll();
+    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderGeoFilterRows(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderFilterTagRow(); renderNearMeRow(); renderAll();
     if(!opts.tieniArchiviati && showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); renderAll(); }
   }
   document.getElementById("btnFiltersReset").addEventListener("click", function(){
@@ -3946,6 +3978,7 @@
     if(!venueMatchesVenueLists(v)) return false;
     if(!venueMatchesGeo(v)) return false;
     if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
+    if(filterTag !== "all" && !tagDi(v.id).some(function(t){ return chiaveTag(t) === chiaveTag(filterTag); })) return false;
     if(nearMeEnabled && nearMeCoords){
       if(v.lat == null || v.lng == null) return false;
       var dist = haversineKm(nearMeCoords.lat, nearMeCoords.lng, v.lat, v.lng);
@@ -4590,55 +4623,11 @@
   });
   wireClearBtn(elFavSearch, document.getElementById("favSearchClearBtn"));
 
-  /* La striscia dei tag, sopra l'elenco. Prende il posto delle due schede
-     "I miei / Mostra tutti", che non hanno piu' senso: da quando la stella e'
-     di chi la mette, qui dentro ci sono solo i tuoi preferiti e i preferiti
-     degli altri non sono una cosa che si possa guardare.
-
-     Nella striscia ci sono i tag che hai messo su almeno uno di questi
-     posti — non tutti quelli che esistono: una scorciatoia che mostra
-     scelte che non filtrano niente e' peggio che non averla. */
-  var favTag = null;
-  var elFavTagStrip = document.getElementById("favTagStrip");
-  function renderFavTagStrip(stellati){
-    var usati = [], visti = {};
-    stellati.forEach(function(v){
-      tagDi(v.id).forEach(function(t){
-        var k = t.toLowerCase();
-        if(!visti[k]){ visti[k] = true; usati.push(t); }
-      });
-    });
-    usati.sort(function(a, b){ return a.localeCompare(b, "it", {sensitivity:"base"}); });
-    // Il tag su cui stavi filtrando puo' essere appena sparito (l'hai tolto
-    // dall'ultimo posto che ce l'aveva): il filtro va sciolto, se no l'elenco
-    // resta vuoto per un motivo che non si vede piu' da nessuna parte.
-    if(favTag && !visti[favTag.toLowerCase()]) favTag = null;
-    elFavTagStrip.hidden = !usati.length;
-    if(!usati.length) return;
-    elFavTagStrip.innerHTML =
-      '<button class="mytag-chip'+(favTag ? '' : ' on')+'" data-fav-tag="">Tutti</button>' +
-      usati.map(function(t){
-        var on = favTag && favTag.toLowerCase() === t.toLowerCase();
-        return '<button class="mytag-chip'+(on ? ' on' : '')+'" data-fav-tag="'+esc(t)+'">'+dato(t)+'</button>';
-      }).join("");
-  }
-  elFavTagStrip.addEventListener("click", function(e){
-    var btn = e.target.closest("[data-fav-tag]");
-    if(!btn) return;
-    var t = btn.getAttribute("data-fav-tag");
-    favTag = t || null;
-    renderFavorites();
-  });
-
   function renderFavorites(){
     var stellati = venues.filter(function(v){ return sonoPreferito(v.id) && !v.deleted_at; });
-    renderFavTagStrip(stellati);
+    // Il tag lo filtra matchesFilter, insieme a tipo, categoria e tutto il
+    // resto: e' un filtro come gli altri e sta nello stesso posto.
     var favs = stellati.filter(matchesFilter);
-    if(favTag){
-      favs = favs.filter(function(v){
-        return tagDi(v.id).some(function(t){ return t.toLowerCase() === favTag.toLowerCase(); });
-      });
-    }
     if(favSearchText){
       favs = favs.filter(function(v){
         var hay = ((v.name||"") + " " + (v.city||"") + " " + (v.type||"")).toLowerCase();
@@ -4656,8 +4645,8 @@
         vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui. La stella è tua: la vedi solo tu, e lo stesso posto può stare anche fra i preferiti di un altro.</p>';
       } else if(favSearchText){
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>';
-      } else if(favTag){
-        vuoto = '<div class="glyph">🏷️</div><h2>Nessuno con questo tag</h2><p>I preferiti con «'+dato(favTag)+'» ci sono, ma i filtri li stanno escludendo tutti.</p>';
+      } else if(filterTag !== "all"){
+        vuoto = '<div class="glyph">🏷️</div><h2>Nessuno con questo tag</h2><p>Fra i tuoi preferiti non ce n\'è nessuno con «'+dato(filterTag)+'».</p>';
       } else {
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>I preferiti ci sono, ma i filtri li stanno escludendo tutti.</p>';
       }
