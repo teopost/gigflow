@@ -190,6 +190,21 @@
   /* Tre segmenti su uno schermo da telefono: un punto in meno e meno aria ai
      lati, altrimenti "Da pianificare" va a capo dentro il suo bottone. */
   .view-toggle.tre .view-toggle-btn{font-size:13px;padding:9px 2px;}
+  /* ---------- i mesi, in Agenda ---------- */
+  /* Dodici pastiglie in fila che scorrono: ci stanno tutte senza mandare a
+     capo niente, e sono bersagli grandi da toccare. Il numero accanto al
+     nome e' quello che l'elenco di un mese solo non puo' dire — dove c'e'
+     da lavorare negli altri undici. */
+  .month-bar{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .month-bar::-webkit-scrollbar{display:none;}
+  /* display:flex batte [hidden]: senza questa la barra dei mesi resterebbe
+     su anche negli altri due segmenti dell'Agenda. */
+  .month-bar[hidden]{display:none;}
+  .month-chip{flex:none;display:flex;align-items:baseline;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 13px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .month-chip .cnt{font-size:12px;font-variant-numeric:tabular-nums;color:var(--text-tertiary);}
+  .month-chip.vuoto{color:var(--text-tertiary);}
+  .month-chip.active{background:var(--tint);color:#fff;}
+  .month-chip.active .cnt{color:rgba(255,255,255,.75);}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
   /* Il colore del segnalino e' quello dello stato, lo stesso della pastiglia
@@ -891,10 +906,11 @@
           <button class="view-toggle-btn" data-agenda="gigs">Serate</button>
         </div>
       </div>
+      <div class="month-bar" id="recontactMonthBar"></div>
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact">
-        <div class="scope-note">I palcoscenici con una serata aperta e un periodo in cui richiamarli, ordinati per quando tocca. Fuori gli archiviati e chi ha già suonato: quella stagione è chiusa, e si riparte da «Riproponi».</div>
+        <div class="scope-note">Solo i palcoscenici da richiamare nel mese scelto qui sopra, serata aperta o no, in ordine di giorno. Fuori gli archiviati e chi non ha un promemoria: se ha una serata aperta lo trovi in «Da pianificare».</div>
         <div id="recontactBulk"></div>
         <div id="recontactList"></div>
       </div>
@@ -2494,7 +2510,14 @@
     var suo = passata.slice(0, 4) === oggi.slice(0, 4) ||
               (v.created_at || "").slice(0, 10) <= passata;
     var g = currentGig(v);
-    if(g && g.status === "opportunita" && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
+    /* Chi non ha nessuna serata aperta e' in ritardo come chi ce l'ha ferma
+       su "Opportunita'": in tutti e due i casi la data e' passata e la
+       telefonata non c'e' stata. Fino al 15 settembre 2026 qui si chiedeva
+       che la serata ci fosse, e siccome "Da contattare" teneva dentro solo
+       chi ne aveva una aperta la domanda non si vedeva. Adesso che l'elenco
+       tiene tutti, chi non ha niente di aperto e' anzi il caso piu' chiaro:
+       e' esattamente quello a cui offrire "Riproponi". */
+    if((!g || g.status === "opportunita") && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
       return {date: passata, late: true};
     return {date: prossima, late: false};
   }
@@ -4471,7 +4494,13 @@
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
   var elPlanList = document.getElementById("planList");
+  var elMonthBar = document.getElementById("recontactMonthBar");
   var agendaView = "recontact";
+  /* Il mese che stai guardando. Si parte da quello di oggi — aprendo
+     l'agenda la domanda e' chi chiamare adesso, non a gennaio — e la scelta
+     resta finche' l'app e' aperta: uno che sta programmando novembre non
+     vuole ricominciare da capo ogni volta che passa in Serate e torna. */
+  var meseAgenda = new Date().getMonth() + 1;
 
   document.getElementById("agendaToggle").addEventListener("click", function(e){
     var btn = e.target.closest("[data-agenda]");
@@ -4484,37 +4513,53 @@
     document.getElementById("agendaPanePlan").hidden = agendaView !== "plan";
     document.getElementById("agendaPaneGigs").hidden = agendaView !== "gigs";
     renderRecontact();
+    document.getElementById("scrollRecontact").scrollTop = 0;
   });
 
   /* Ogni riga si porta dietro quando tocca: la data non e' scritta da
-     nessuna parte, si calcola dal periodo e da oggi. Ordinate per quella.
+     nessuna parte, si calcola dal periodo e da oggi.
 
-     Chi ha appena suonato resta fuori: "Da contattare" e' un elenco di
-     cose da fare, e una serata andata a buon fine non lo e'. Si riparte
-     dalla sua riga in Serate, dove lo scorrimento offre "Riproponi" — e da
-     li' nasce l'opportunita' dell'anno dopo, quindi ricompare qui. */
-  /* Dentro solo chi ha una serata aperta: l'Agenda e' l'elenco di quello
-     che hai per le mani, e una stagione aperta e' esattamente quello. Ne
-     restano fuori i lead e i prospect, su cui non hai aperto niente, e chi
-     ha appena suonato — quella stagione e' chiusa, e si riparte dalla sua
-     riga in Serate con "Riproponi", che apre la serata nuova e lo rimette
-     qui. Il periodo intanto resta scritto nella scheda e torna buono da
-     solo.
+     Dentro ci va chiunque abbia un promemoria, che abbia una serata aperta
+     o no. Fino al 15 settembre 2026 ne servivi una, e l'elenco diceva una
+     cosa diversa da quella che prometteva: un palcoscenico a cui avevi
+     detto "risentiamoci a ottobre" e su cui non avevi aperto niente — il
+     caso normale dopo un no — a ottobre non compariva. Chiudere una
+     stagione lo faceva sparire dal suo mese, e il promemoria, che e' la
+     cosa che ti eri scritto, non serviva a niente.
 
-     Prima la domanda si faceva a v.status ("non e' lead, non e' suonato"),
-     che era la copia della serata: adesso si fa alla serata. */
+     Chi ha suonato non e' un'eccezione da scrivere qui: la sua serata si
+     chiude, non ne resta nessuna aperta, e col promemoria che si e' portato
+     dietro ricompare nel mese giusto. "Riproponi" apre quella nuova.
+
+     Fuori restano gli archiviati e chi il promemoria non ce l'ha: quelli
+     stanno in "Da pianificare", e i due segmenti continuano a non
+     sovrapporsi. */
   function venuesToRecontact(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.recontact_period && hasOpenGig(v);
+      return !v.deleted_at && v.recontact_period;
     })
-      .map(function(v){ return {v: v, due: recontactDue(v)}; })
+      .map(function(v){
+        var q = periodParts(v.recontact_period);
+        return {v: v, due: recontactDue(v), mese: q ? q.mese : 0, giorno: q ? q.giorno : 0};
+      })
       .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
+  }
+  /* Quelli del mese scelto, in ordine di giorno: dentro a un mese la
+     domanda e' quando, e "tutto il mese" (giorno 0) viene prima del giorno
+     1. A parita' di giorno, alfabetico. */
+  function recontactInMonth(m){
+    return venuesToRecontact().filter(function(x){ return x.mese === m; })
+      .sort(function(a, b){
+        if(a.giorno !== b.giorno) return a.giorno - b.giorno;
+        return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
+      });
   }
   /* Chi e' in ritardo e non ha niente di aperto: sono le righe su cui
      "Riproponi" ha senso, ed e' anche l'insieme su cui agisce il pulsante
-     cumulativo in cima. */
+     cumulativo in cima. Solo dentro al mese che stai guardando: un pulsante
+     che agisce anche su righe che non vedi non e' un pulsante. */
   function dueToRenew(){
-    return venuesToRecontact().filter(function(x){
+    return recontactInMonth(meseAgenda).filter(function(x){
       return x.due.late && !venueGigs(x.v).some(function(g){ return g.open; });
     });
   }
@@ -4625,7 +4670,45 @@
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
 
+  /* Dodici pastiglie, gennaio-dicembre, col numero di chi aspetta in quel
+     mese. Il numero e' la meta' del senso del selettore: l'elenco di un mese
+     solo non puo' dire dove c'e' da lavorare negli altri undici.
+
+     E' un selettore e non delle schede: dodici schede non ci stanno su un
+     telefono, e questa barra scorre. */
+  function renderMonthBar(){
+    var tutti = venuesToRecontact();
+    elMonthBar.innerHTML = MESI.map(function(nome, i){
+      var m = i + 1;
+      var n = tutti.filter(function(x){ return x.mese === m; }).length;
+      return '<button type="button" class="month-chip'+(m === meseAgenda ? " active" : "")+
+        (n ? "" : " vuoto")+'" data-mese="'+m+'"'+(m === meseAgenda ? ' aria-current="true"' : '')+'>'+
+        esc(nome)+(n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
+    }).join("");
+    centraMese();
+  }
+  /* Il mese scelto va portato in mezzo alla barra, altrimenti aprendo
+     l'agenda a settembre si vede gennaio e il mese attivo e' fuori dallo
+     schermo. Si scrive scrollLeft e non scrollIntoView apposta: quello
+     scorrerebbe anche la pagina, e la pagina sta dov'e'. */
+  function centraMese(){
+    var chip = elMonthBar.querySelector(".month-chip.active");
+    if(!chip || !elMonthBar.clientWidth) return;
+    elMonthBar.scrollLeft = Math.max(0, chip.offsetLeft - (elMonthBar.clientWidth - chip.offsetWidth) / 2);
+  }
+  elMonthBar.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-mese]");
+    if(!btn) return;
+    var m = Number(btn.getAttribute("data-mese"));
+    if(m === meseAgenda) return;
+    meseAgenda = m;
+    renderRecontact();
+    document.getElementById("scrollRecontact").scrollTop = 0;
+  });
+
   function renderRecontact(){
+    elMonthBar.hidden = agendaView !== "recontact";
+    renderMonthBar();
     renderRecontactList();
     renderRenewAll();
     renderPlanList();
@@ -4637,16 +4720,12 @@
       var p = venuesToPlan().length;
       elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza periodo" : " palcoscenici senza periodo");
     } else {
-      var w = venuesToRecontact().length;
-      elRecontactSub.textContent = w + (w===1 ? " palcoscenico in programma" : " palcoscenici in programma");
+      var w = recontactInMonth(meseAgenda).length;
+      elRecontactSub.textContent = w + (w===1 ? " palcoscenico" : " palcoscenici") +
+        " a " + MESI[meseAgenda - 1];
     }
   }
 
-  function monthLabel(dateStr){
-    var d = new Date((dateStr || "") + "T00:00:00");
-    if(isNaN(d)) return dateStr || "";
-    return d.toLocaleDateString("it-IT", {month:"long", year:"numeric"});
-  }
   /* Le stesse due azioni dell'elenco palcoscenici, con gli stessi colori:
      archiviare e' reversibile e sta in grigio, eliminare no e sta in rosso.
      Qui servono perche' l'agenda e' il posto dove ci si accorge che un
@@ -4679,11 +4758,31 @@
     return statusPillHtml(st.label, {color: st.color, soft: st.soft});
   }
 
+  /* Il "quando" letto dentro al mese che stai guardando. Fra tutte le
+     righe di marzo, a settembre, "tra 180g" e' vero e non serve a niente:
+     il mese l'hai scelto tu, la domanda e' a che punto e' quel mese.
+
+     Quattro risposte: scaduto (la data e' passata e non ti sei mosso — e'
+     quello che recontactDue chiama late), gia' passato (e' passata ma non
+     e' arretrato: o ti sei mosso, o e' vecchia abbastanza da non valere
+     piu' una telefonata), questo mese (il promemoria e' il mese intero e il
+     mese e' adesso), e quanto manca. */
+  function recontactWhen(x){
+    var d = daysUntil(x.due.date);
+    if(x.due.late) return {tag: "scaduto · " + Math.abs(d) + "g", color: "var(--red)"};
+    var oggi = todayStr();
+    var meseOggi = Number(oggi.slice(5, 7)), giornoOggi = Number(oggi.slice(8, 10));
+    if(x.mese === meseOggi){
+      if(!x.giorno) return {tag: "questo mese", color: "var(--orange)"};
+      if(x.giorno === giornoOggi) return {tag: "oggi", color: "var(--orange)"};
+    }
+    var passato = x.mese < meseOggi || (x.mese === meseOggi && x.giorno < giornoOggi);
+    if(passato) return {tag: "già passato", color: "var(--text-tertiary)"};
+    return {tag: "tra " + d + "g", color: d <= 30 ? "var(--orange)" : "var(--text-secondary)"};
+  }
   function recontactRowHtml(x){
-    var v = x.v, d = daysUntil(x.due.date);
-    var tag = d === 0 ? "oggi"
-      : (x.due.late ? ("scaduto · "+Math.abs(d)+"g") : ("tra "+d+"g"));
-    var color = x.due.late ? "var(--red)" : (d <= 30 ? "var(--orange)" : "var(--text-secondary)");
+    var v = x.v, quando = recontactWhen(x);
+    var tag = quando.tag, color = quando.color;
     // Il pulsante sta dove starebbe la freccia, e solo dove serve: se e'
     // arrivato il momento e non c'e' niente di aperto, la cosa da fare e'
     // una sola. Negli altri casi la riga si apre e basta.
@@ -4705,49 +4804,47 @@
       '</div>'+
     '</div>';
   }
-  /* Gli scaduti in un riquadro loro, in cima, e il resto raggruppato a
-     rottura di mese. L'elenco arriva gia' ordinato per data, quindi basta
-     confrontare l'anno-mese con quello della riga precedente: "questo mese
-     ne ho tre" e' la domanda vera quando pianifichi.
+  /* Un mese alla volta, quello scelto nella barra qui sopra, e dentro due
+     blocchi: gli scaduti in un riquadro loro, in cima, e il mese in ordine
+     di giorno.
 
-     Perche' due blocchi. Ordinati per data gli scaduti erano gia' primi —
-     la data che si portano dietro e' quella dell'occorrenza mancata, che e'
-     nel passato — ma stavano sotto un'intestazione tipo "settembre 2026",
-     che a ottobre si legge come un mese qualunque gia' passato: sembrano
-     roba archiviata invece che roba da fare, e chi guarda scende a cercare
-     il mese corrente. Adesso la loro intestazione dice "Scaduti".
+     Perche' gli scaduti a parte. Sono gia' primi comunque — la data che si
+     portano dietro e' quella dell'occorrenza mancata — ma sotto
+     l'intestazione del mese si leggono come roba passata, cioe' archivio,
+     mentre sono l'unica roba da fare della pagina. La loro intestazione lo
+     dice.
 
      Quanto ci restano: quattro mesi (MESI_SCADUTO), o finche' non ti muovi.
-     Si svuota da sola perche' chiamare cambia lo stato del palcoscenico, non
-     perche' scatta una mezzanotte. */
+     Si svuota da sola perche' chiamare cambia lo stato della serata, non
+     perche' scatta una mezzanotte — e quando quei quattro mesi passano la
+     riga non sparisce, torna in fila nel suo mese con l'occorrenza
+     dell'anno dopo. */
   function renderRecontactList(){
-    var righe = venuesToRecontact();
+    var mese = MESI[meseAgenda - 1];
+    var righe = recontactInMonth(meseAgenda);
     if(!righe.length){
-      elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div><h2>Niente da contattare</h2>'+
-        '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p></div>';
+      elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div>'+
+        (venuesToRecontact().length
+          ? '<h2>Niente a '+esc(mese)+'</h2>'+
+            '<p>Nessun palcoscenico da richiamare in questo mese. I numeri sulle pastiglie dicono dove sono gli altri.</p>'
+          : '<h2>Niente da contattare</h2>'+
+            '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p>')+
+        '</div>';
       return;
     }
     var scaduti = righe.filter(function(x){ return x.due.late; });
-    var prossimi = righe.filter(function(x){ return !x.due.late; });
+    var resto = righe.filter(function(x){ return !x.due.late; });
     var html = "";
     if(scaduti.length){
       html += '<div class="agenda-group late">Scaduti<span class="group-count">'+scaduti.length+
         '</span></div><div class="grouped-list late">'+
         scaduti.map(recontactRowHtml).join("")+'</div>';
     }
-    var currentMonth = null;
-    prossimi.forEach(function(x){
-      var month = x.due.date.slice(0, 7);
-      if(month !== currentMonth){
-        if(currentMonth !== null) html += '</div>';
-        var quanti = prossimi.filter(function(y){ return y.due.date.slice(0, 7) === month; }).length;
-        html += '<div class="agenda-group">'+esc(monthLabel(x.due.date))+
-          '<span class="group-count">'+quanti+'</span></div><div class="grouped-list">';
-        currentMonth = month;
-      }
-      html += recontactRowHtml(x);
-    });
-    if(currentMonth !== null) html += '</div>';
+    if(resto.length){
+      html += '<div class="agenda-group">'+esc(mese)+'<span class="group-count">'+resto.length+
+        '</span></div><div class="grouped-list">'+
+        resto.map(recontactRowHtml).join("")+'</div>';
+    }
     elRecontactList.innerHTML = html;
   }
   elRecontactList.addEventListener("click", function(e){
