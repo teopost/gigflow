@@ -544,6 +544,19 @@
   .act-strip + .act-strip{border-top:.5px solid var(--separator);}
   .note-dir{font-weight:600;}
   .act-chip:active{opacity:.55;}
+  /* I tag sono etichette di chi le mette, e hanno la stessa forma dovunque
+     compaiano: la striscia che filtra i preferiti, la riga della scheda,
+     il sottotitolo di una cella. Cambia la taglia, non il modo di leggerli. */
+  .mytag-chip{flex:none;display:inline-flex;align-items:center;gap:5px;border:none;border-radius:999px;background:var(--fill);color:var(--text);font-size:13px;font-weight:600;font-family:inherit;padding:7px 12px;cursor:pointer;white-space:nowrap;}
+  .mytag-chip.on{background:var(--tint);color:#fff;}
+  .mytag-chip:active{opacity:.55;}
+  .mytag-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 16px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .mytag-strip::-webkit-scrollbar{display:none;}
+  /* Nella cella i tag stanno sotto le altre righe e non le spingono fuori:
+     vanno a capo invece di allargare la riga, che a quel punto taglierebbe
+     il nome del palcoscenico. */
+  .mytag-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;}
+  .mytag-mini{flex:none;border-radius:999px;background:var(--fill);color:var(--text-secondary);font-size:11px;font-weight:600;padding:2px 8px;white-space:nowrap;}
 
   /* Il pulsante in coda a una riga dell'agenda: adesso ne e' rimasto uno
      solo, "Quando?" su "Da pianificare". Il nome viene da "Riproponi", che
@@ -841,18 +854,11 @@
           <button class="clear-btn" id="favSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
         </div>
       </div>
-      <div class="view-toggle-wrap" id="favScopeWrap">
-        <div class="view-toggle" id="favScopeToggle">
-          <button class="view-toggle-btn active" data-favscope="mine">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20v-1.8a5 5 0 0 0-5-5h-4a5 5 0 0 0-5 5V20"/><circle cx="12" cy="7" r="3.6"/></svg>
-            I miei preferiti
-          </button>
-          <button class="view-toggle-btn" data-favscope="all">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.6a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.2"/><path d="M22 20v-1.6a4 4 0 0 0-3-3.87"/><path d="M16.5 4.2a4 4 0 0 1 0 6.6"/></svg>
-            Mostra tutti
-          </button>
-        </div>
-      </div>
+      <!-- Le due schede "I miei / Mostra tutti" sono uscite di qui il 15
+           settembre 2026: adesso i preferiti sono di ciascuno, e "quelli
+           degli altri" non e' piu' una cosa che si possa guardare. Al loro
+           posto i tag, che sono il modo nuovo di restringere l'elenco. -->
+      <div class="mytag-strip" id="favTagStrip" hidden></div>
     </header>
     <div class="screen-scroll" id="scrollFavorites">
       <div id="favoritesList"></div>
@@ -1227,6 +1233,12 @@
           <div class="row-main"><div class="row-title">Categorie</div>
           <div class="row-sub">Come lo raggruppi tu, a modo tuo</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsTags">
+          <div class="row-main"><div class="row-title">I miei tag</div>
+          <div class="row-sub">Le tue etichette sui palcoscenici: le vedi solo tu</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsTagsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="row" id="rowSettingsContext">
@@ -1615,6 +1627,50 @@
     <div class="screen-scroll">
       <div class="d-title-name"><input id="costCatEditName" placeholder="Nome categoria" /></div>
       <div class="section-footer" id="costCatEditUsage"></div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: I MIEI TAG ============
+       Schermata sua e non quella generica delle liste del palcoscenico: i
+       valori di quelle sono della band e li cambi per tutti, questi sono
+       tuoi e nessun altro li vede. Il numero accanto conta i tuoi
+       palcoscenici con quel tag, non quelli di tutti. -->
+  <section class="screen pushed" id="tagsScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnTagsBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Impostazioni
+        </button>
+        <span class="inline-title">I miei tag</span>
+        <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">I MIEI TAG</div>
+      <div class="grouped-list" id="tagsItems"></div>
+      <div class="section-footer">I tag si mettono dalla scheda del palcoscenico, nella riga «Tag». Qui si rinominano e si tolgono: togliere un tag non tocca i palcoscenici, che restano dove sono — e restano nei preferiti se ce li avevi messi.</div>
+      <div class="section-header" id="tagsBandHeader" hidden>ANCHE NELLA BAND</div>
+      <div class="grouped-list" id="tagsBandItems" hidden></div>
+      <div class="section-footer" id="tagsBandFoot" hidden>Nomi che qualcun altro della band sta già usando. Non sono tuoi e non li puoi cambiare, ma scrivendoli te li ritrovi proposti: è così che «anni80-90» resta un tag solo invece di diventarne tre.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: RINOMINA UN MIO TAG ============ -->
+  <section class="screen pushed" id="tagEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnTagEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          I miei tag
+        </button>
+        <span class="inline-title">Tag</span>
+        <button class="nav-btn primary" id="btnTagEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="tagEditName" placeholder="Nome del tag" /></div>
+      <div class="section-footer" id="tagEditUsage"></div>
     </div>
   </section>
 
@@ -2151,6 +2207,16 @@
       <input type="file" id="photoFileInputLibrary" accept="image/*" hidden>
 
       <div class="quick-actions" id="quickActions"></div>
+
+      <div class="section-header">I MIEI TAG</div>
+      <div class="grouped-list">
+        <div class="field-row picker" id="rowTags">
+          <label>Tag</label>
+          <div class="picker-value"><span id="tagsValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+      </div>
+      <div class="section-footer">I tag sono tuoi come la stella: nessun altro li vede, e servono a raggruppare i preferiti a modo tuo. Il <strong>nome</strong> invece è della band — se qualcuno ha già usato «anni80-90», appena scrivi «ann» te lo propone, così non diventano due tag per la stessa cosa. Si salvano appena li scegli.</div>
 
       <div class="section-header">DOVE</div>
       <div class="grouped-list">
@@ -3486,7 +3552,18 @@
     var btn = e.target.closest(".sheet-option");
     if(!btn) return;
     if(btn.hasAttribute("data-custom")){
-      sheetFreeText.onSelect(elSheetSearchInput.value.trim());
+      var testoNuovo = elSheetSearchInput.value.trim();
+      // A scelta multipla creare una voce e' un passo dentro una scelta piu'
+      // lunga, non la fine: il foglio resta aperto, il campo si svuota e la
+      // voce nuova entra in cima gia' spuntata. Chiuderlo qui come fa il
+      // foglio a scelta singola vorrebbe dire riaprirlo per il tag dopo.
+      sheetFreeText.onSelect(testoNuovo);
+      if(sheetMultiSelect){
+        elSheetSearchInput.value = "";
+        syncSheetSearchClear();
+        renderSheetOptions("");
+        return;
+      }
       closeSheet();
       return;
     }
@@ -3534,6 +3611,36 @@
   function loadVenues(){
     return api("GET", "/api/locations?include_deleted=1").then(function(data){
       venues = data;
+      renderAll();
+    });
+  }
+
+  /* ---------------- le etichette personali: stella e tag ----------------
+     Il palcoscenico e' della band — nome, indirizzo, serate — ma quello che
+     tu ne pensi e' tuo: la stella e i tag sono intestati alla tua email e
+     nessun altro li vede. Per questo non arrivano dentro /api/locations
+     insieme al resto, ma da /api/my/labels, e vivono qui accanto invece che
+     dentro l'oggetto palcoscenico.
+
+     Tenerli separati non e' pignoleria: applyUpdatedVenue riscrive il
+     palcoscenico ogni volta che si salva una riga, e se la stella stesse li'
+     dentro basterebbe un salvataggio che non la include per cancellarla
+     sotto gli occhi. Fuori dall'oggetto non puo' succedere. */
+  var mieiPreferiti = {};   /* id -> true */
+  var mieiTag = {};         /* id -> [tag] */
+  var tagVocabolario = [];  /* [{tag, miei, band}] — i nomi in uso nella band */
+  function sonoPreferito(id){ return mieiPreferiti[String(id)] === true; }
+  function tagDi(id){ return mieiTag[String(id)] || []; }
+  function applyLabels(d){
+    mieiPreferiti = {};
+    (d.favorites || []).forEach(function(id){ mieiPreferiti[String(id)] = true; });
+    mieiTag = d.tags || {};
+    tagVocabolario = d.vocabolario || [];
+  }
+  function loadMyLabels(){
+    return api("GET", "/api/my/labels").then(function(d){
+      applyLabels(d);
+      updateTagsCount();
       renderAll();
     });
   }
@@ -3875,10 +3982,23 @@
     // si' che e' il dato utile da qui. Chi siano si legge nella scheda.
     if(v.contact_name) subParts.push('👤');
     if(v.art_director_name) subParts.push('🎨');
+    // I tuoi tag sotto il resto: nella cella dei preferiti dicono perche' quel
+    // posto e' li' — "anni80-90" accanto al nome vale piu' di dieci filtri.
+    var showTags = !!(opts && opts.showTags);
     var cover = (v.photos && v.photos.length) ? v.photos[0] : null;
-    var favHtml = '<button class="fav-star fav-star-lead'+(v.favorite ? ' active' : '')+'" data-fav-id="'+v.id+'" aria-label="Preferito">'+
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="'+(v.favorite ? 'currentColor' : 'none')+'" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>'+
+    var stellato = sonoPreferito(v.id);
+    var favHtml = '<button class="fav-star fav-star-lead'+(stellato ? ' active' : '')+'" data-fav-id="'+v.id+'" aria-label="Preferito">'+
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="'+(stellato ? 'currentColor' : 'none')+'" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>'+
     '</button>';
+    var tagsHtml = "";
+    if(showTags){
+      var mieiQui = tagDi(v.id);
+      if(mieiQui.length){
+        tagsHtml = '<div class="mytag-row">'+mieiQui.map(function(t){
+          return '<span class="mytag-mini">'+dato(t)+'</span>';
+        }).join("")+'</div>';
+      }
+    }
     var leadingHtml = cover
       ? '<img class="row-cover" src="/photos/'+encodeURIComponent(cover.filename)+'" loading="lazy" alt="">'
       : (showFav ? favHtml : '<span class="row-dot-wrap"><span class="row-dot" style="background:'+st.color+'"></span></span>');
@@ -3898,7 +4018,8 @@
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+
         (showOwner && v.owner_email ? '<div class="row-sub">di '+dato(ownerLabel(v.owner_email))+'</div>' : '')+
-        (showLastContact ? '<div class="row-sub" style="color:var(--text-tertiary);">'+esc(ultimoContattoLabel(v))+'</div>' : '')+'</div>'+
+        (showLastContact ? '<div class="row-sub" style="color:var(--text-tertiary);">'+esc(ultimoContattoLabel(v))+'</div>' : '')+
+        tagsHtml+'</div>'+
         '<div class="row-trail">'+
           badgeHtml+
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
@@ -3908,14 +4029,14 @@
     '</div>';
   }
   function toggleFavoriteRow(id){
-    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
-    if(!v) return;
-    var next = v.favorite ? 0 : 1;
-    venues = venues.map(function(x){ return String(x.id) === String(id) ? Object.assign({}, x, {favorite: next}) : x; });
+    var key = String(id);
+    var prima = sonoPreferito(id);
+    if(prima) delete mieiPreferiti[key]; else mieiPreferiti[key] = true;
     renderAll();
-    api("PUT", "/api/locations/" + id, {favorite: next}).catch(function(){
-      venues = venues.map(function(x){ return String(x.id) === String(id) ? Object.assign({}, x, {favorite: v.favorite}) : x; });
+    api("PUT", "/api/locations/" + id + "/favorite", {favorite: prima ? 0 : 1}).catch(function(){
+      if(prima) mieiPreferiti[key] = true; else delete mieiPreferiti[key];
       renderAll();
+      renderFavoriteButton(currentVenue());
       toast("Impossibile aggiornare i preferiti");
     });
   }
@@ -4469,41 +4590,54 @@
   });
   wireClearBtn(elFavSearch, document.getElementById("favSearchClearBtn"));
 
-  /* Le due schede sopra l'elenco. La stella e' della band — la mette uno e
-     la vedono tutti — quindi "Mostra tutti" e' quello che i Preferiti sono
-     sempre stati, e "I miei" restringe a quelli che porti avanti tu: il
-     proprietario del palcoscenico, non chi ha messo la stella, che non e'
-     scritto da nessuna parte. Senza login la domanda non esiste e le schede
-     nemmeno. */
-  /* Si apre sui propri (15 settembre 2026): la stella e' della band — la
-     mette uno e la vedono tutti — ma la domanda con cui si entra qui e'
-     "cosa ho segnato io", e i preferiti degli altri sono un secondo momento.
-     "Mostra tutti" resta a un tocco, e li' ogni riga dice di chi e'. */
-  var favScope = "mine";
-  var elFavScopeWrap = document.getElementById("favScopeWrap");
-  function favScopeUsabile(){ return !!(me && me.email); }
-  function renderFavScopeToggle(){
-    elFavScopeWrap.hidden = !favScopeUsabile();
-    document.querySelectorAll("#favScopeToggle .view-toggle-btn").forEach(function(b){
-      b.classList.toggle("active", b.getAttribute("data-favscope") === favScope);
+  /* La striscia dei tag, sopra l'elenco. Prende il posto delle due schede
+     "I miei / Mostra tutti", che non hanno piu' senso: da quando la stella e'
+     di chi la mette, qui dentro ci sono solo i tuoi preferiti e i preferiti
+     degli altri non sono una cosa che si possa guardare.
+
+     Nella striscia ci sono i tag che hai messo su almeno uno di questi
+     posti — non tutti quelli che esistono: una scorciatoia che mostra
+     scelte che non filtrano niente e' peggio che non averla. */
+  var favTag = null;
+  var elFavTagStrip = document.getElementById("favTagStrip");
+  function renderFavTagStrip(stellati){
+    var usati = [], visti = {};
+    stellati.forEach(function(v){
+      tagDi(v.id).forEach(function(t){
+        var k = t.toLowerCase();
+        if(!visti[k]){ visti[k] = true; usati.push(t); }
+      });
     });
+    usati.sort(function(a, b){ return a.localeCompare(b, "it", {sensitivity:"base"}); });
+    // Il tag su cui stavi filtrando puo' essere appena sparito (l'hai tolto
+    // dall'ultimo posto che ce l'aveva): il filtro va sciolto, se no l'elenco
+    // resta vuoto per un motivo che non si vede piu' da nessuna parte.
+    if(favTag && !visti[favTag.toLowerCase()]) favTag = null;
+    elFavTagStrip.hidden = !usati.length;
+    if(!usati.length) return;
+    elFavTagStrip.innerHTML =
+      '<button class="mytag-chip'+(favTag ? '' : ' on')+'" data-fav-tag="">Tutti</button>' +
+      usati.map(function(t){
+        var on = favTag && favTag.toLowerCase() === t.toLowerCase();
+        return '<button class="mytag-chip'+(on ? ' on' : '')+'" data-fav-tag="'+esc(t)+'">'+dato(t)+'</button>';
+      }).join("");
   }
-  document.getElementById("favScopeToggle").addEventListener("click", function(e){
-    var btn = e.target.closest("[data-favscope]");
+  elFavTagStrip.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-fav-tag]");
     if(!btn) return;
-    var scope = btn.getAttribute("data-favscope");
-    if(scope === favScope) return;
-    favScope = scope;
-    renderFavScopeToggle();
+    var t = btn.getAttribute("data-fav-tag");
+    favTag = t || null;
     renderFavorites();
   });
 
   function renderFavorites(){
-    renderFavScopeToggle();
-    var stellati = venues.filter(function(v){ return v.favorite && !v.deleted_at; });
+    var stellati = venues.filter(function(v){ return sonoPreferito(v.id) && !v.deleted_at; });
+    renderFavTagStrip(stellati);
     var favs = stellati.filter(matchesFilter);
-    if(favScope === "mine" && favScopeUsabile()){
-      favs = favs.filter(function(v){ return v.owner_email === me.email; });
+    if(favTag){
+      favs = favs.filter(function(v){
+        return tagDi(v.id).some(function(t){ return t.toLowerCase() === favTag.toLowerCase(); });
+      });
     }
     if(favSearchText){
       favs = favs.filter(function(v){
@@ -4519,11 +4653,11 @@
       // tre manda a cercare una stella che hai gia' messo.
       var vuoto;
       if(!stellati.length){
-        vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui.</p>';
+        vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui. La stella è tua: la vedi solo tu, e lo stesso posto può stare anche fra i preferiti di un altro.</p>';
       } else if(favSearchText){
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>';
-      } else if(favScope === "mine"){
-        vuoto = '<div class="glyph">⭐</div><h2>Nessuno tuo</h2><p>Fra i preferiti della band non ce n\'è nessuno di cui sei proprietario. Tocca “Mostra tutti” per vederli.</p>';
+      } else if(favTag){
+        vuoto = '<div class="glyph">🏷️</div><h2>Nessuno con questo tag</h2><p>I preferiti con «'+dato(favTag)+'» ci sono, ma i filtri li stanno escludendo tutti.</p>';
       } else {
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>I preferiti ci sono, ma i filtri li stanno escludendo tutti.</p>';
       }
@@ -4531,7 +4665,15 @@
       return;
     }
     elFavoritesList.innerHTML = '<div class="grouped-list">' +
-      sorted.map(function(v){ return venueRowHtml(v, {showOwner: favScope === "all"}); }).join("") + '</div>';
+      sorted.map(function(v){
+        // Di chi e' lo si dice solo quando non sei tu: adesso che i preferiti
+        // sono tuoi, l'elenco e' pieno di posti che porta avanti qualcun
+        // altro, ed e' quello il caso in cui il nome serve.
+        return venueRowHtml(v, {
+          showTags: true,
+          showOwner: !!(me && me.email && v.owner_email && v.owner_email !== me.email)
+        });
+      }).join("") + '</div>';
   }
   elFavoritesList.addEventListener("click", function(e){
     var del = e.target.closest("[data-del-id]");
@@ -7367,12 +7509,86 @@
     renderOwnerRow(v);
     renderNotes(v);
     renderFavoriteButton(v);
+    renderTagsRow(v);
   }
+
+  /* ---------------- la riga dei tag nella scheda ----------------
+     I tag si salvano da soli appena chiudi il foglio, come il tipo o la
+     citta': li' stai scegliendo, non scrivendo, e non c'entrano niente con
+     il Salva della scheda — che e' la bozza del palcoscenico, roba della
+     band. Questi sono tuoi e vanno subito. */
+  var elTagsValue = document.getElementById("tagsValue");
+  function chiaveTag(t){ return (t || "").trim().toLowerCase(); }
+  function renderTagsRow(v){
+    setDato(elTagsValue, v ? tagDi(v.id).join(" · ") : "", "— nessuno —");
+  }
+  function salvaTag(id, lista){
+    var key = String(id);
+    var prima = tagDi(id).slice();
+    // Prima si vede, poi si scrive: il foglio si e' appena chiuso e la riga
+    // deve gia' dire quello che hai scelto.
+    if(lista.length) mieiTag[key] = lista; else delete mieiTag[key];
+    if(String(currentId) === key) renderTagsRow(currentVenue());
+    renderAll();
+    api("PUT", "/api/locations/" + id + "/tags", {tags: lista}).then(function(esito){
+      // Il server puo' aver cambiato la grafia: se "anni80-90" nella band
+      // c'era gia', quello che torna e' come l'ha scritto chi e' arrivato
+      // prima, ed e' quello che si tiene.
+      if(esito.tags && esito.tags.length) mieiTag[key] = esito.tags; else delete mieiTag[key];
+      if(esito.vocabolario) tagVocabolario = esito.vocabolario;
+      if(String(currentId) === key) renderTagsRow(currentVenue());
+      updateTagsCount();
+      renderAll();
+    }).catch(function(err){
+      if(prima.length) mieiTag[key] = prima; else delete mieiTag[key];
+      if(String(currentId) === key) renderTagsRow(currentVenue());
+      renderAll();
+      toast(err.message || "Impossibile salvare i tag");
+    });
+  }
+  document.getElementById("rowTags").addEventListener("click", function(){
+    if(!currentId) return;
+    if(!(me && me.email)){ toast("Serve l’accesso per i tag"); return; }
+    var id = currentId;
+    var scelti = {};                       /* chiave -> il tag come e' scritto */
+    tagDi(id).forEach(function(t){ scelti[chiaveTag(t)] = t; });
+    var voci = [];
+    function aggiungi(testo, inTesta){
+      var k = chiaveTag(testo);
+      if(!k || voci.some(function(o){ return chiaveTag(o.label) === k; })) return;
+      var voce = {label: testo, dato: true, checkmark: !!scelti[k], onToggle: function(on){
+        if(on) scelti[k] = testo; else delete scelti[k];
+      }};
+      if(inTesta) voci.unshift(voce); else voci.push(voce);
+    }
+    // Prima i tag che questo posto ha gia', poi il resto del vocabolario
+    // della band: quello che c'e' si toglie senza doverlo cercare.
+    tagDi(id).forEach(function(t){ aggiungi(t); });
+    tagVocabolario.forEach(function(v){ aggiungi(v.tag); });
+    openSheet({
+      title: "I miei tag",
+      searchable: true,
+      searchPlaceholder: "Cerca o scrivi un tag nuovo…",
+      multiSelect: true,
+      freeText: true,
+      onFreeText: function(testo){
+        var k = chiaveTag(testo);
+        if(!k) return;
+        scelti[k] = testo;
+        aggiungi(testo, true);
+        voci.forEach(function(o){ if(chiaveTag(o.label) === k) o.checkmark = true; });
+      },
+      options: voci,
+      onDone: function(){
+        salvaTag(id, Object.keys(scelti).map(function(k){ return scelti[k]; }));
+      }
+    });
+  });
 
   var elBtnFavorite = document.getElementById("btnFavorite");
   var elBtnFavoriteIcon = document.getElementById("btnFavoriteIcon");
   function renderFavoriteButton(v){
-    var active = !!(v && v.favorite);
+    var active = !!(v && sonoPreferito(v.id));
     elBtnFavoriteIcon.setAttribute("fill", active ? "currentColor" : "none");
     elBtnFavorite.classList.toggle("fav-active", active);
   }
@@ -8820,6 +9036,112 @@
         ? ("Categoria rinominata (" + updated.affected_entries + " movimenti aggiornati)")
         : "Categoria rinominata");
       closeCostCatEditScreen();
+    }).catch(function(err){ toast(err.message); });
+  });
+
+  /* ---------------- Impostazioni: i miei tag ----------------
+     Rinominare e togliere. Mettere no: un tag si mette dove lo si usa, cioe'
+     sulla scheda del palcoscenico — un tag creato qui dentro non sarebbe
+     ancora su niente, e resterebbe un nome in un elenco.
+
+     Tutto quello che si fa qui tocca solo i tuoi: il nome e' della band (lo
+     vedono proposto tutti) ma i palcoscenici che ci hai messo sotto sono
+     cosa tua, e nessun altro se li vede cambiare sotto le mani. */
+  var elTagsScreen = document.getElementById("tagsScreen");
+  var elTagEditScreen = document.getElementById("tagEditScreen");
+  function mieiTagElenco(){
+    return tagVocabolario.filter(function(t){ return t.miei > 0; });
+  }
+  function updateTagsCount(){
+    var el = document.getElementById("settingsTagsCount");
+    if(el) el.textContent = mieiTagElenco().length;
+  }
+  function renderTagsItems(){
+    var el = document.getElementById("tagsItems");
+    if(!el) return;
+    var miei = mieiTagElenco();
+    el.innerHTML = miei.length ? miei.map(function(t){
+      return '<div class="swipe-row"><div class="row-content"><div class="row" data-tag="'+esc(t.tag)+'">'+
+        '<div class="row-main"><div class="row-title">'+dato(t.tag)+'</div></div>'+
+        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+t.miei+'</span>'+
+        '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
+      '</div></div><div class="row-actions"><button data-tag-del="'+esc(t.tag)+'">Togli da tutti</button></div></div>';
+    }).join("") : '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun tag ancora. Si mettono dalla scheda di un palcoscenico.</div>';
+
+    // Quelli degli altri stanno sotto, in chiaro e senza niente da toccare:
+    // servono a far vedere che il vocabolario e' di tutti.
+    var altrui = tagVocabolario.filter(function(t){ return !t.miei; });
+    var wrap = document.getElementById("tagsBandItems");
+    ["tagsBandHeader", "tagsBandItems", "tagsBandFoot"].forEach(function(idx){
+      document.getElementById(idx).hidden = !altrui.length;
+    });
+    if(altrui.length){
+      wrap.innerHTML = altrui.map(function(t){
+        return '<div class="field-row"><label style="flex:1;">'+dato(t.tag)+'</label></div>';
+      }).join("");
+    }
+  }
+  document.getElementById("rowSettingsTags").addEventListener("click", function(){
+    renderTagsItems();
+    elTagsScreen.hidden = false;
+    requestAnimationFrame(function(){ elTagsScreen.classList.add("in"); });
+  });
+  function closeTagsScreen(){
+    elTagsScreen.classList.remove("in");
+    setTimeout(function(){ elTagsScreen.hidden = true; }, 320);
+  }
+  document.getElementById("btnTagsBack").addEventListener("click", closeTagsScreen);
+  document.getElementById("tagsItems").addEventListener("click", function(e){
+    var del = e.target.closest("[data-tag-del]");
+    if(del){
+      var tag = del.getAttribute("data-tag-del");
+      confirmDestructive("Togliere «" + tag + "» da tutti i tuoi palcoscenici?", function(){
+        api("POST", "/api/my/tags/delete", {tag: tag}).then(function(d){
+          applyLabels(d);
+          renderTagsItems(); updateTagsCount(); renderAll();
+          if(currentId) renderTagsRow(currentVenue());
+          toast("Tag tolto");
+        }).catch(function(err){ toast(err.message); });
+      });
+      return;
+    }
+    var row = e.target.closest("[data-tag]");
+    if(row) openTagEditScreen(row.getAttribute("data-tag"));
+  });
+
+  var tagInModifica = null;
+  function openTagEditScreen(tag){
+    var voce = mieiTagElenco().filter(function(t){ return t.tag === tag; })[0];
+    if(!voce) return;
+    tagInModifica = voce.tag;
+    var input = document.getElementById("tagEditName");
+    input.value = voce.tag;
+    document.getElementById("tagEditUsage").textContent =
+      "Su " + voce.miei + (voce.miei === 1 ? " tuo palcoscenico." : " tuoi palcoscenici.") +
+      (voce.band > voce.miei ? " Nella band lo usa anche qualcun altro: rinominandolo cambi solo i tuoi." : "");
+    elTagEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elTagEditScreen.classList.add("in"); });
+    setTimeout(function(){ input.focus(); }, 260);
+  }
+  function closeTagEditScreen(){
+    elTagEditScreen.classList.remove("in");
+    setTimeout(function(){ elTagEditScreen.hidden = true; }, 320);
+    tagInModifica = null;
+  }
+  document.getElementById("btnTagEditBack").addEventListener("click", closeTagEditScreen);
+  document.getElementById("btnTagEditSave").addEventListener("click", function(){
+    if(tagInModifica == null) return;
+    var nome = document.getElementById("tagEditName").value.trim();
+    if(!nome){ toast("Il nome è obbligatorio"); return; }
+    var vecchio = tagInModifica;
+    withButtonBusy(this, function(){
+      return api("PUT", "/api/my/tags/rename", {tag: vecchio, nuovo: nome});
+    }).then(function(d){
+      applyLabels(d);
+      renderTagsItems(); updateTagsCount(); renderAll();
+      if(currentId) renderTagsRow(currentVenue());
+      toast("Tag rinominato");
+      closeTagEditScreen();
     }).catch(function(err){ toast(err.message); });
   });
 
@@ -10415,7 +10737,7 @@
      avvio, dopo un cambio band e dopo la creazione della prima band. */
   function loadAllData(){
     return Promise.all([
-      loadVenues(), loadArtDirectors(), loadBands(), loadVenueTypes(),
+      loadVenues(), loadMyLabels(), loadArtDirectors(), loadBands(), loadVenueTypes(),
       loadVenueCategories(), loadVenueLists(), loadProvince(), loadReports(), loadAdminReports(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates(), loadCash(), loadCostCategories()
     ]).catch(function(){

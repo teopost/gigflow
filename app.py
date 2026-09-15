@@ -223,8 +223,10 @@ LOCATION_FIELDS = [
     # Rinominare la colonna avrebbe voluto dire spostare i numeri gia'
     # inseriti, quindi il fisso arriva accanto come "landline".
     "contact_name", "landline", "phone", "email", "website", "capacity", "genre",
-    "art_director_id", "status", "recontact_period", "planning_note", "favorite",
+    "art_director_id", "status", "recontact_period", "planning_note",
     "owner_email",
+    # "favorite" non c'e' piu': la stella non e' un campo del palcoscenico,
+    # e' una riga di location_favorites intestata a chi l'ha messa.
 ]
 
 # --- le liste di valori configurabili --------------------------------
@@ -518,6 +520,27 @@ def init_db():
         -- kind, gig_id e direction arrivano da migrate_schema: la tabella e'
         -- nata prima di loro e si aggiunge una colonna per volta.
 
+        -- La stella e i tag sono di chi li mette, non del palcoscenico: il
+        -- posto e' della band, quello che ne pensi tu e' tuo. Per questo non
+        -- sono due colonne di locations ma due tabelle a parte, con l'email
+        -- dentro la chiave — cosi' lo stesso posto puo' stare nei preferiti
+        -- di Viciguerra e nei tuoi senza che uno cancelli l'altro.
+        -- Come notes e photos non portano workspace_id: seguono la location.
+        CREATE TABLE IF NOT EXISTS location_favorites (
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            email TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (location_id, email)
+        );
+
+        CREATE TABLE IF NOT EXISTS location_tags (
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            email TEXT NOT NULL,
+            tag TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (location_id, email, tag)
+        );
+
         CREATE TABLE IF NOT EXISTS bands (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -721,6 +744,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_locations_status ON locations(status);
         CREATE INDEX IF NOT EXISTS idx_photos_location ON photos(location_id);
         CREATE INDEX IF NOT EXISTS idx_notes_location ON notes(location_id);
+        CREATE INDEX IF NOT EXISTS idx_favorites_email ON location_favorites(email);
+        CREATE INDEX IF NOT EXISTS idx_tags_email ON location_tags(email);
+        CREATE INDEX IF NOT EXISTS idx_tags_tag ON location_tags(tag);
         CREATE INDEX IF NOT EXISTS idx_venue_list_values ON venue_list_values(workspace_id, list_key);
         CREATE INDEX IF NOT EXISTS idx_reports_email ON reports(email);
         CREATE INDEX IF NOT EXISTS idx_reports_workspace ON reports(workspace_id);
@@ -744,8 +770,31 @@ def migrate_schema(conn):
         conn.execute("ALTER TABLE locations ADD COLUMN contact_name TEXT")
     if "deleted_at" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN deleted_at TEXT")
-    if "favorite" not in cols:
-        conn.execute("ALTER TABLE locations ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
+    # La stella era una colonna del palcoscenico, quindi della band intera:
+    # la metteva uno e se la vedevano tutti, e due persone non potevano avere
+    # lo stesso posto fra i preferiti senza litigarsi la casella. Adesso sta
+    # in location_favorites, una riga per persona. Le stelle che c'erano
+    # passano al proprietario del palcoscenico — e' l'unico nome che il dato
+    # vecchio si porta dietro, e chi ha messo la stella non era scritto da
+    # nessuna parte. Finito il travaso la colonna se ne va: lasciarla li',
+    # morta e con quel nome, era una trappola per il prossimo che legge.
+    # Toglierla e' pero' un lusso di SQLite 3.35 in su, e non tutte le
+    # macchine che aprono questo file ce l'hanno. Dove non si puo' la si
+    # svuota, che e' quello che conta davvero: una colonna a zero non puo'
+    # far tornare domani una stella che oggi qualcuno ha tolto.
+    if "favorite" in cols:
+        conn.execute(
+            "INSERT OR IGNORE INTO location_favorites (location_id, email, created_at) "
+            "SELECT id, owner_email, ? FROM locations "
+            "WHERE favorite = 1 AND owner_email IS NOT NULL AND owner_email != ''",
+            (now_iso(),),
+        )
+        conn.execute("UPDATE locations SET favorite = 0 WHERE favorite = 1")
+        try:
+            conn.execute("ALTER TABLE locations DROP COLUMN favorite")
+            cols.discard("favorite")
+        except sqlite3.OperationalError:
+            pass
     if "category" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN category TEXT")
     if "owner_email" not in cols:
@@ -3028,8 +3077,6 @@ def clean_location_payload(body, partial):
             if value and value not in MANUAL_LOCATION_STATUSES:
                 raise ApiError(400, "Stato non valido")
             value = value or LEAD_STATUS
-        elif field == "favorite":
-            value = 1 if value else 0
         elif field == "recontact_period":
             # Vuoto vuol dire "non ricontattarli": si scrive NULL, non "",
             # cosi' e' lo stesso niente con cui nasce un palcoscenico e le
@@ -3137,6 +3184,10 @@ def purge_location(conn, ws, loc_id):
     ]
     conn.execute("DELETE FROM photos WHERE location_id = ?", (loc_id,))
     conn.execute("DELETE FROM notes WHERE location_id = ?", (loc_id,))
+    # Le stelle e i tag sono di chi li ha messi, ma stanno su questo posto:
+    # se il posto sparisce spariscono, di tutti quanti.
+    conn.execute("DELETE FROM location_favorites WHERE location_id = ?", (loc_id,))
+    conn.execute("DELETE FROM location_tags WHERE location_id = ?", (loc_id,))
     # Le spese segnate su quelle serate restano in cassa senza piu' la
     # serata: i soldi sono usciti davvero, e il bilancio dell'anno non si
     # aggiusta cancellando un palcoscenico.
@@ -3304,6 +3355,256 @@ def delete_note(conn, ws, note_id):
     conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
     conn.commit()
     return fetch_location(conn, ws, loc_id)
+
+
+# ------------------------------------------------- stelle e tag, di ciascuno
+# Quello che una persona pensa di un palcoscenico non sta dentro il
+# palcoscenico: sta qui, intestato alla sua email. Il posto e' della band —
+# nome, indirizzo, serate — ma la stella e i tag sono di chi li mette, e due
+# persone possono segnarsi lo stesso locale senza vedersi.
+#
+# Per questo non viaggiano dentro /api/locations insieme al resto: l'elenco
+# dei palcoscenici e' uguale per tutti e resta uguale per tutti. Le etichette
+# personali arrivano a parte, da /api/my/labels, e l'app le tiene accanto.
+# Cosi' nessun salvataggio del palcoscenico puo' portarsi via la tua stella
+# per sbaglio, che e' esattamente il modo in cui si sarebbe rotto.
+
+# Un tag lungo quanto una frase non si legge in una riga d'elenco, e quelli
+# che servono sono corti per natura ("anni80-90", "estivi", "da richiamare").
+TAG_MAX_LEN = 28
+# Oltre una manciata non sono piu' etichette, e' un'altra scheda.
+TAG_MAX_PER_VENUE = 12
+
+
+def tag_pulito(testo):
+    """Il tag come va scritto nel database: senza spazi ai bordi e senza
+    doppi spazi dentro. Il resto lo scrive la persona come vuole — sono
+    parole sue, non un elenco di valori."""
+    testo = re.sub(r"\s+", " ", (testo or "").strip())
+    return testo[:TAG_MAX_LEN].strip()
+
+
+def tag_chiave(testo):
+    """Come si confrontano due tag: minuscolo e senza accenti. "Anni80-90" e
+    "anni80-90" sono lo stesso tag scritto da due mani diverse, e il
+    vocabolario della band serve proprio a non farli diventare due."""
+    return " ".join(_parole_semplici(testo))
+
+
+def _location_di(conn, ws, loc_id):
+    row = conn.execute(
+        "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+    return row["id"]
+
+
+def _chi(email):
+    if not email:
+        raise ApiError(401, "Serve l'accesso per i preferiti")
+    return email
+
+
+def tag_vocabolario(conn, ws, email):
+    """I nomi di tag gia' in uso nella band, con quanti posti ci hai messo tu.
+
+    Il vocabolario e' di tutti, l'uso e' di ciascuno: se Viciguerra si e'
+    inventato "anni80-90", quando tu scrivi "ann" te lo propone anche a te —
+    ma quali palcoscenici ci ha messo lui non lo vedi, e mettercene uno tuo
+    non tocca i suoi. Scrivere due volte lo stesso nome in due modi ("Anni
+    80" e "anni 80") e' il modo tipico in cui un sistema di tag si sbriciola:
+    qui i due si riconoscono uguali e vince la grafia di chi e' arrivato
+    prima."""
+    righe = conn.execute(
+        "SELECT t.tag, t.email FROM location_tags t "
+        "JOIN locations l ON l.id = t.location_id "
+        "WHERE l.workspace_id = ? AND l.deleted_at IS NULL",
+        (ws,),
+    ).fetchall()
+    per_chiave = {}
+    for r in righe:
+        chiave = tag_chiave(r["tag"])
+        if not chiave:
+            continue
+        voce = per_chiave.setdefault(chiave, {"tag": r["tag"], "miei": 0, "band": 0})
+        voce["band"] += 1
+        if r["email"] == email:
+            voce["miei"] += 1
+            # La grafia che si tiene e' quella di chi lo usa: se l'hai
+            # scritto tu, nell'elenco lo rivedi come l'hai scritto tu.
+            voce["tag"] = r["tag"]
+    # Prima i tuoi, dal piu' usato; poi quelli della band, in ordine di nome.
+    return sorted(
+        per_chiave.values(),
+        key=lambda v: (0 if v["miei"] else 1, -v["miei"], tag_chiave(v["tag"])),
+    )
+
+
+def my_labels(conn, ws, email):
+    """Le stelle e i tag di chi sta guardando, piu' il vocabolario della band.
+
+    Una chiamata sola perche' e' un'informazione sola: "cosa ho segnato io
+    qui dentro". Arriva insieme all'elenco dei palcoscenici, all'avvio."""
+    if not email:
+        return {"favorites": [], "tags": {}, "vocabolario": []}
+    preferiti = [
+        r["location_id"]
+        for r in conn.execute(
+            "SELECT f.location_id FROM location_favorites f "
+            "JOIN locations l ON l.id = f.location_id "
+            "WHERE l.workspace_id = ? AND f.email = ?",
+            (ws, email),
+        ).fetchall()
+    ]
+    tags = {}
+    for r in conn.execute(
+        "SELECT t.location_id, t.tag FROM location_tags t "
+        "JOIN locations l ON l.id = t.location_id "
+        "WHERE l.workspace_id = ? AND t.email = ? "
+        "ORDER BY t.created_at ASC",
+        (ws, email),
+    ).fetchall():
+        tags.setdefault(str(r["location_id"]), []).append(r["tag"])
+    return {
+        "favorites": preferiti,
+        "tags": tags,
+        "vocabolario": tag_vocabolario(conn, ws, email),
+    }
+
+
+def set_favorite(conn, ws, email, loc_id, on):
+    """La stella di chi la tocca. Torna quello che serve a ridisegnare."""
+    email = _chi(email)
+    loc_id = _location_di(conn, ws, loc_id)
+    if on:
+        conn.execute(
+            "INSERT OR IGNORE INTO location_favorites (location_id, email, created_at) "
+            "VALUES (?, ?, ?)", (loc_id, email, now_iso()),
+        )
+    else:
+        conn.execute(
+            "DELETE FROM location_favorites WHERE location_id = ? AND email = ?",
+            (loc_id, email),
+        )
+    conn.commit()
+    return {"location_id": loc_id, "favorite": 1 if on else 0}
+
+
+def set_tags(conn, ws, email, loc_id, tags):
+    """I tag che questa persona mette su questo palcoscenico: si manda
+    l'elenco completo, non l'aggiunta.
+
+    Mandare la lista intera invece di "aggiungi questo" e "togli quello"
+    tiene il foglio dei tag e il database d'accordo anche quando si spunta e
+    si despunta piu' volte prima di chiudere: quello che vedi selezionato e'
+    quello che viene scritto.
+
+    Un nome gia' in uso nella band si riusa com'e' scritto li': e' l'unica
+    regola che tiene il vocabolario uno invece di dieci varianti."""
+    email = _chi(email)
+    loc_id = _location_di(conn, ws, loc_id)
+    if not isinstance(tags, list):
+        raise ApiError(400, "Tag non validi")
+
+    gia_in_uso = {tag_chiave(v["tag"]): v["tag"] for v in tag_vocabolario(conn, ws, email)}
+    puliti, viste = [], set()
+    for grezzo in tags:
+        if not isinstance(grezzo, str):
+            continue
+        tag = tag_pulito(grezzo)
+        chiave = tag_chiave(tag)
+        if not chiave or chiave in viste:
+            continue
+        viste.add(chiave)
+        puliti.append(gia_in_uso.get(chiave, tag))
+    if len(puliti) > TAG_MAX_PER_VENUE:
+        raise ApiError(400, f"Non piu' di {TAG_MAX_PER_VENUE} tag per palcoscenico")
+
+    ts = now_iso()
+    # Si riscrive solo la differenza: i tag che restano tengono la data in
+    # cui li hai messi, ed e' quella che da' l'ordine in cui li rivedi.
+    attuali = {
+        r["tag"]: tag_chiave(r["tag"])
+        for r in conn.execute(
+            "SELECT tag FROM location_tags WHERE location_id = ? AND email = ?",
+            (loc_id, email),
+        ).fetchall()
+    }
+    da_tenere = set(viste)
+    for tag, chiave in attuali.items():
+        if chiave not in da_tenere:
+            conn.execute(
+                "DELETE FROM location_tags WHERE location_id = ? AND email = ? AND tag = ?",
+                (loc_id, email, tag),
+            )
+    gia = set(attuali.values())
+    for tag in puliti:
+        if tag_chiave(tag) not in gia:
+            conn.execute(
+                "INSERT OR IGNORE INTO location_tags (location_id, email, tag, created_at) "
+                "VALUES (?, ?, ?, ?)", (loc_id, email, tag, ts),
+            )
+    conn.commit()
+    righe = conn.execute(
+        "SELECT tag FROM location_tags WHERE location_id = ? AND email = ? "
+        "ORDER BY created_at ASC", (loc_id, email),
+    ).fetchall()
+    return {
+        "location_id": loc_id,
+        "tags": [r["tag"] for r in righe],
+        "vocabolario": tag_vocabolario(conn, ws, email),
+    }
+
+
+def rename_tag(conn, ws, email, vecchio, nuovo):
+    """Ribattezza un tag su tutti i tuoi palcoscenici. Tocca solo i tuoi:
+    il nome e' della band, l'uso e' tuo."""
+    email = _chi(email)
+    nuovo = tag_pulito(nuovo)
+    if not tag_chiave(nuovo):
+        raise ApiError(400, "Serve un nome")
+    righe = conn.execute(
+        "SELECT t.location_id, t.tag FROM location_tags t "
+        "JOIN locations l ON l.id = t.location_id "
+        "WHERE l.workspace_id = ? AND t.email = ?", (ws, email),
+    ).fetchall()
+    chiave_vecchia = tag_chiave(vecchio)
+    ts = now_iso()
+    for r in righe:
+        if tag_chiave(r["tag"]) != chiave_vecchia:
+            continue
+        conn.execute(
+            "DELETE FROM location_tags WHERE location_id = ? AND email = ? AND tag = ?",
+            (r["location_id"], email, r["tag"]),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO location_tags (location_id, email, tag, created_at) "
+            "VALUES (?, ?, ?, ?)", (r["location_id"], email, nuovo, ts),
+        )
+    conn.commit()
+    return my_labels(conn, ws, email)
+
+
+def delete_tag(conn, ws, email, tag):
+    """Toglie un tag da tutti i tuoi palcoscenici. I palcoscenici restano, e
+    restano nei preferiti se ce li avevi messi: il tag e' un'etichetta, non
+    il modo in cui ci sono finiti."""
+    email = _chi(email)
+    chiave = tag_chiave(tag)
+    righe = conn.execute(
+        "SELECT t.location_id, t.tag FROM location_tags t "
+        "JOIN locations l ON l.id = t.location_id "
+        "WHERE l.workspace_id = ? AND t.email = ?", (ws, email),
+    ).fetchall()
+    for r in righe:
+        if tag_chiave(r["tag"]) == chiave:
+            conn.execute(
+                "DELETE FROM location_tags WHERE location_id = ? AND email = ? AND tag = ?",
+                (r["location_id"], email, r["tag"]),
+            )
+    conn.commit()
+    return my_labels(conn, ws, email)
 
 
 # ---------------------------------------------------------------- posizione
@@ -4880,18 +5181,39 @@ def export_zip(conn):
         ["id", "band", "nome", "tipo", "categoria", "contesto", "stagionalita", "periodo",
          "citta", "indirizzo", "lat", "lng", "capienza", "genere", "titolare", "telefono",
          "cellulare", "email", "sito", "art_director", "stato", "periodo_ricontatto",
-         "promemoria", "preferito", "inserito_da", "archiviato_il", "creato_il", "aggiornato_il"],
+         "promemoria", "inserito_da", "archiviato_il", "creato_il", "aggiornato_il"],
         [(r["id"], r["band"], r["name"], r["type"], r["category"], r["context"], r["seasonality"],
           r["live_period"], r["city"], r["address"], r["lat"], r["lng"], r["capacity"], r["genre"],
           r["contact_name"], r["landline"], r["phone"], r["email"], r["website"], r["ad"],
           r["status"], r["recontact_period"], r["planning_note"],
-          "sì" if r["favorite"] else "", r["owner_email"], r["deleted_at"],
+          r["owner_email"], r["deleted_at"],
           r["created_at"], r["updated_at"])
          for r in _query(conn,
             "SELECT l.*, w.name AS band, a.name AS ad FROM locations l "
             "LEFT JOIN workspaces w ON w.id = l.workspace_id "
             "LEFT JOIN art_directors a ON a.id = l.art_director_id "
             "ORDER BY w.name, l.name")])))
+
+    # Preferiti e tag escono in due fogli loro e non in una colonna del
+    # palcoscenico: sono di chi li mette, e sullo stesso posto ce ne possono
+    # essere di piu' persone. In una colonna sola non ci stavano.
+    fogli.append(("preferiti.csv", _csv_bytes(
+        ["palcoscenico_id", "palcoscenico", "band", "chi", "dal"],
+        [(r["location_id"], r["name"], r["band"], r["email"], r["created_at"])
+         for r in _query(conn,
+            "SELECT f.*, l.name, w.name AS band FROM location_favorites f "
+            "JOIN locations l ON l.id = f.location_id "
+            "LEFT JOIN workspaces w ON w.id = l.workspace_id "
+            "ORDER BY w.name, f.email, l.name")])))
+
+    fogli.append(("tag.csv", _csv_bytes(
+        ["palcoscenico_id", "palcoscenico", "band", "chi", "tag", "dal"],
+        [(r["location_id"], r["name"], r["band"], r["email"], r["tag"], r["created_at"])
+         for r in _query(conn,
+            "SELECT t.*, l.name, w.name AS band FROM location_tags t "
+            "JOIN locations l ON l.id = t.location_id "
+            "LEFT JOIN workspaces w ON w.id = l.workspace_id "
+            "ORDER BY w.name, t.email, t.tag, l.name")])))
 
     fogli.append(("serate.csv", _csv_bytes(
         ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "stato",
@@ -5067,6 +5389,30 @@ def _h_add_note(conn, match, query, body, ctx):
 
 def _h_geocode_location(conn, match, query, body, ctx):
     return 200, geocode_location(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_my_labels(conn, match, query, body, ctx):
+    return 200, my_labels(conn, require_ws(ctx), ctx.email)
+
+
+def _h_set_favorite(conn, match, query, body, ctx):
+    return 200, set_favorite(conn, require_ws(ctx), ctx.email,
+                             int(match.group(1)), bool((body or {}).get("favorite")))
+
+
+def _h_set_tags(conn, match, query, body, ctx):
+    return 200, set_tags(conn, require_ws(ctx), ctx.email,
+                         int(match.group(1)), (body or {}).get("tags"))
+
+
+def _h_rename_tag(conn, match, query, body, ctx):
+    body = body or {}
+    return 200, rename_tag(conn, require_ws(ctx), ctx.email,
+                           body.get("tag"), body.get("nuovo"))
+
+
+def _h_delete_tag(conn, match, query, body, ctx):
+    return 200, delete_tag(conn, require_ws(ctx), ctx.email, (body or {}).get("tag"))
 
 
 def _h_update_note(conn, match, query, body, ctx):
@@ -5407,6 +5753,13 @@ ROUTES = [
     ("POST", re.compile(r"^/api/locations/(\d+)/photos/social$"), _h_social_cover),
     ("POST", re.compile(r"^/api/locations/(\d+)/social/instagram$"), _h_instagram_cerca),
     ("POST", re.compile(r"^/api/locations/(\d+)/geocode$"), _h_geocode_location),
+    # Le etichette personali stanno fuori dal palcoscenico: hanno rotte loro,
+    # e /api/my/labels e' l'unica che l'app chiama all'avvio.
+    ("GET", re.compile(r"^/api/my/labels$"), _h_my_labels),
+    ("PUT", re.compile(r"^/api/locations/(\d+)/favorite$"), _h_set_favorite),
+    ("PUT", re.compile(r"^/api/locations/(\d+)/tags$"), _h_set_tags),
+    ("PUT", re.compile(r"^/api/my/tags/rename$"), _h_rename_tag),
+    ("POST", re.compile(r"^/api/my/tags/delete$"), _h_delete_tag),
     # Il nome vecchio, da quando la foto si poteva prendere solo da Facebook:
     # risponde ancora, e fa la stessa identica cosa. Serve alle app installate
     # con una versione precedente, che chiamano ancora questo indirizzo.
