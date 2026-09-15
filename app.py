@@ -3378,18 +3378,30 @@ def geo_best(domande, domanda_citta, cache=None):
 
 def geocode_location(conn, ws, loc_id, body=None):
     """Trova il punto di un palcoscenico e lo salva. Con "force" lo rifa'
-    anche se ce l'ha gia': serve quando l'indirizzo e' stato corretto."""
+    anche se ce l'ha gia': serve quando l'indirizzo e' stato corretto.
+
+    Nome, indirizzo e citta' possono arrivare dalla scheda aperta invece che
+    dal database: la scheda e' una bozza finche' non si salva, e cercare la
+    posizione di un indirizzo diverso da quello che hai davanti sarebbe
+    difficile da spiegare (stessa regola della copertina dai social)."""
     row = conn.execute(
         "SELECT id, name, address, city, lat, lng FROM locations "
         "WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not row:
         raise ApiError(404, "Palcoscenico non trovato")
-    force = bool((body or {}).get("force"))
+    body = body or {}
+    force = bool(body.get("force"))
     if row["lat"] is not None and row["lng"] is not None and not force:
         return {"esito": "gia_fatto", "location": fetch_location(conn, ws, loc_id)}
 
-    domande, domanda_citta = geo_candidates(row["name"], row["address"], row["city"])
+    def dalla_scheda(campo):
+        valore = body.get(campo)
+        return valore.strip() if isinstance(valore, str) and valore.strip() else row[campo]
+
+    domande, domanda_citta = geo_candidates(
+        dalla_scheda("name"), dalla_scheda("address"), dalla_scheda("city")
+    )
     if not domande:
         return {"esito": "senza_indirizzo", "location": fetch_location(conn, ws, loc_id)}
     try:

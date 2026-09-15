@@ -2077,6 +2077,10 @@
           <div class="picker-value"><span id="fCityValue" style="color:var(--text-tertiary);">Scegli una città</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <div class="field-row picker" id="rowCercaPosizione">
+          <label>Cerca posizione</label>
+          <div class="picker-value"><span id="posizioneValue" style="color:var(--text-tertiary);">—</span></div>
+        </div>
         <!-- Le coordinate restano, ma non si scrivono a mano: sono il
              risultato della geocodifica, non un dato da battere a tastiera.
              Restano qui dentro perche' la scheda le rimanda al server come
@@ -2085,7 +2089,7 @@
         <input id="fLat" type="hidden">
         <input id="fLng" type="hidden">
       </div>
-      <div class="section-footer">Il punto sulla mappa si ricava dall’indirizzo e dalla città: non c’è niente da scrivere. Chi non ce l’ha ancora lo prende dal giro che si lancia dall’Admin.</div>
+      <div class="section-footer">Tocca <strong>Cerca posizione</strong> e il punto si ricava dal nome, dall’indirizzo e dalla città scritti qui sopra: le coordinate compaiono nella riga e non si scrivono a mano. Toccandola di nuovo la cerca da capo, utile se hai appena corretto l’indirizzo.</div>
 
       <div class="section-header">INFO PALCOSCENICO</div>
       <div class="grouped-list">
@@ -6027,6 +6031,60 @@
       });
   });
 
+  /* Le coordinate si guardano, non si scrivono: la riga le mostra se ci
+     sono e le va a cercare quando la tocchi. Cerca sempre da capo — anche
+     quando il punto c'e' gia' — perche' toccarla e' un gesto apposta: di
+     solito succede subito dopo aver corretto l'indirizzo. */
+  var posizioneBusy = false;
+  function renderPosizioneRow(v){
+    var el = document.getElementById("posizioneValue");
+    if(!el || posizioneBusy) return;
+    var c = v && v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "";
+    el.textContent = c ? (Number(v.lat).toFixed(5) + ", " + Number(v.lng).toFixed(5)) : "—";
+    el.style.color = c ? "" : "var(--text-tertiary)";
+  }
+  document.getElementById("rowCercaPosizione").addEventListener("click", function(){
+    if(posizioneBusy || !currentId) return;
+    var idQuando = currentId;
+    var el = document.getElementById("posizioneValue");
+    var riga = document.getElementById("rowCercaPosizione");
+    posizioneBusy = true;
+    riga.classList.add("busy");
+    el.textContent = "cerco…";
+    el.style.color = "var(--text-tertiary)";
+    // Nome, indirizzo e citta' sono quelli che hai davanti, non quelli
+    // salvati: la scheda e' una bozza finche' non premi Salva.
+    var prima = currentVenue();
+    api("POST", "/api/locations/" + idQuando + "/geocode", {
+      force: true, name: fName.value, address: fAddress.value, city: (prima && prima.city) || ""
+    }).then(function(esito){
+      posizioneBusy = false;
+      var v = esito.location;
+      if(v){
+        applyUpdatedVenue(v);
+        // Anche nel modulo, se no il primo Salva rimetterebbe le vecchie.
+        fLat.value = v.lat != null ? v.lat : "";
+        fLng.value = v.lng != null ? v.lng : "";
+        if(String(currentId) === String(idQuando)) renderPosizioneRow(v);
+        renderAll();
+      }
+      if(esito.esito === "fatto"){
+        toast(esito.precisione === "preciso" ? "Posizione trovata" : "Trovata solo la città: punto al centro");
+      } else if(esito.esito === "senza_indirizzo"){
+        toast("Serve almeno la città per cercare");
+      } else if(esito.esito === "non_trovato"){
+        toast("Non l’ho trovato: prova a correggere l’indirizzo");
+      }
+    }).catch(function(err){
+      posizioneBusy = false;
+      var cv = currentVenue();
+      if(cv) renderPosizioneRow(cv);
+      toast(err.message || "La mappa non risponde");
+    }).then(function(){
+      riga.classList.remove("busy");
+    });
+  });
+
   function renderQuickActions(v){
     var actions = [];
     // Chiama ripiega sul fisso quando il cellulare manca: un posto che ha
@@ -6905,6 +6963,7 @@
     fAddress.value = v.address || "";
     fLat.value = v.lat != null ? v.lat : "";
     fLng.value = v.lng != null ? v.lng : "";
+    renderPosizioneRow(v);
     fCapacity.value = v.capacity || "";
     renderGenreRow(v);
     fContactName.value = v.contact_name || "";
