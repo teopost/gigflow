@@ -2426,25 +2426,27 @@ def set_location_status(conn, loc_id, status):
     )
 
 
-def advance_gig_on_activity(conn, loc_id, ts=None):
-    """Un'attivita' registrata fa avanzare la SERATA, non il palcoscenico:
+def advance_open_gig_on_activity(conn, gig, ts=None):
+    """Un'attivita' registrata fa avanzare la SERATA APERTA, se ce n'e' una:
     aver chiamato non cambia che rapporto hai con quel posto, cambia a che
     punto e' il tentativo di quest'anno.
 
-    Se la serata non c'e' — o l'ultima e' chiusa — ne apre una gia' a
-    "contattato": lavorare un posto vuol dire aver cominciato, e la nota
-    appena scritta e' la prova. Torna l'id della serata che ha toccato, che
-    serve per attaccarci la nota.
+    Se una serata aperta non c'e', qui non succede niente — e questo e' il
+    punto (15 settembre 2026). Prima l'attivita' ne apriva una a "contattato",
+    e il risultato si vede in archivio: 251 serate su 276 senza data, senza
+    compenso e senza una riga scritta, di cui 221 in stato "contattato". Erano
+    mail e telefonate, non occasioni di suonare. Una mail mandata a un lead e'
+    un'attivita' del palcoscenico; la serata nasce quando c'e' una data di cui
+    parlare, e la apre una persona dal suo pulsante.
     """
-    ts = ts or now_iso()
-    gig = current_gig_row(conn, loc_id)
     if gig is None or gig["closed_at"] is not None:
-        return insert_gig(conn, loc_id, "contattato", ts)
+        return
+    if gig["status"] not in GIG_PRE_CONTACT_STATUSES:
+        return
     conn.execute(
         "UPDATE gigs SET status = 'contattato', updated_at = ? WHERE id = ?",
-        (ts, gig["id"]),
+        (ts or now_iso(), gig["id"]),
     )
-    return gig["id"]
 
 
 def clean_gig_payload(body, partial):
@@ -3097,23 +3099,28 @@ def add_note(conn, ws, loc_id, body):
         raise ApiError(400, "Il testo della nota è obbligatorio")
     require_location(conn, ws, loc_id)
     ts = now_iso()
+    # L'attivita' e' del palcoscenico. Si lega a una serata solo se quella
+    # serata e' aperta adesso: appiccicarla all'ultima stagione chiusa vorrebbe
+    # dire far comparire una telefonata di quest'anno sotto la serata
+    # dell'anno scorso.
     gig = current_gig_row(conn, loc_id)
+    aperta = gig if (gig is not None and gig["closed_at"] is None) else None
     nota_id = conn.execute(
         "INSERT INTO notes (location_id, gig_id, kind, text, created_at) VALUES (?, ?, ?, ?, ?)",
-        (loc_id, gig["id"] if gig else None, kind, text, ts),
+        (loc_id, aperta["id"] if aperta else None, kind, text, ts),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
-    # Aver contattato il posto e' esattamente cosa distingue "da contattare"
+    # Aver contattato il posto e' esattamente cosa distingue "opportunita'"
     # da "contattato": avanzare la serata qui evita di doverlo fare a mano
     # ogni volta. Da "contattato" in poi non si tocca piu' niente: dove sia
     # arrivata la trattativa lo sa solo chi la sta portando avanti.
     #
-    # Lo stato del palcoscenico non si muove: una telefonata non fa di un
-    # lead un cliente. Quello lo fa una serata suonata, e nessun'altra cosa.
-    if kind != "nota" and (gig is None or gig["status"] in GIG_PRE_CONTACT_STATUSES):
-        nuova_id = advance_gig_on_activity(conn, loc_id, ts)
-        if gig is None and nuova_id is not None:
-            conn.execute("UPDATE notes SET gig_id = ? WHERE id = ?", (nuova_id, nota_id))
+    # Se serate aperte non ce ne sono, non ne nasce nessuna: l'attivita' resta
+    # attaccata al palcoscenico e basta. Lo stato del palcoscenico non si
+    # muove lo stesso: una telefonata non fa di un lead un cliente, quello lo
+    # fa una serata suonata.
+    if kind != "nota":
+        advance_open_gig_on_activity(conn, aperta, ts)
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 

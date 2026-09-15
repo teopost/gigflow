@@ -2119,7 +2119,7 @@
           <button type="button" class="act-chip" data-act="email">✉️ Email</button>
         </div>
       </div>
-      <div class="section-footer">Un tocco la registra con la data di oggi. Una serata ancora "Opportunità" passa a "Contattato", e se non c'è nessuna serata aperta ne nasce una già contattata. Lo stato del palcoscenico non si muove: una telefonata non fa di un lead un cliente.</div>
+      <div class="section-footer">Un tocco la registra con la data di oggi. Resta un’attività del palcoscenico: da qui non nasce nessuna serata. Se una serata è aperta ed è ancora «Opportunità», passa a «Contattato». Lo stato del palcoscenico non si muove: una telefonata non fa di un lead un cliente.</div>
 
       <div class="section-header">STORICO CONTATTI</div>
       <div class="grouped-list" id="notesList"></div>
@@ -6464,9 +6464,12 @@
     }).catch(function(err){ toast(err.message); });
   });
 
-  /* Registrare un'attivita' costa un tocco: il testo lo scrive il server, e
-     se la serata era ancora un'opportunita' avanza da sola — l'aver
-     contattato il posto e' esattamente cosa distingue i due stati. */
+  /* Registrare un'attivita' costa un tocco: il testo lo scrive il server.
+     Se c'e' una serata aperta ed e' ancora un'opportunita' avanza da sola —
+     l'aver contattato il posto e' esattamente cosa distingue i due stati —
+     ma una serata da qui non nasce mai (15 settembre 2026): mandare una mail
+     a un lead e' una cosa, aprire un tentativo di suonarci e' un'altra, e
+     tenerle insieme aveva riempito l'archivio di serate che non esistono. */
   /* `modello` c'e' solo quando il messaggio e' partito da un modello: il
      testo della nota lo compone il server, che e' dove stanno le etichette
      delle attivita' (vedi NOTE_KIND_LABELS in app.py). */
