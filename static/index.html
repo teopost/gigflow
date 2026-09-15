@@ -2215,6 +2215,15 @@
           <div class="picker-value"><span id="typeValue">— nessuno —</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
+        <!-- I tag sono l'unica riga di questa scheda che non e' del
+             palcoscenico ma tua. Sta qui in mezzo alle altre, e non in una
+             sezione sua, perche' e' li' che la si cerca: si legge come le
+             altre etichette del posto. -->
+        <div class="field-row picker" id="rowTags">
+          <label>Tag</label>
+          <div class="picker-value"><span id="tagsValue">— nessuno —</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row picker" id="rowCategory">
           <label>Categoria</label>
           <div class="picker-value"><span id="categoryValue">— nessuna —</span>
@@ -2223,15 +2232,6 @@
         <div class="field-row picker" id="rowContext">
           <label>Contesto</label>
           <div class="picker-value"><span id="contextValue">— nessuno —</span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-        <!-- I tag sono l'unica riga di questa scheda che non e' del
-             palcoscenico ma tua. Sta qui in mezzo alle altre, e non in una
-             sezione sua, perche' e' li' che la si cerca: si legge come le
-             altre etichette del posto. -->
-        <div class="field-row picker" id="rowTags">
-          <label>Tag</label>
-          <div class="picker-value"><span id="tagsValue">— nessuno —</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="field-row"><label for="fAddress">Indirizzo</label><input id="fAddress" type="text" placeholder="Via, civico"></div>
@@ -2843,9 +2843,15 @@
   var filterType = "all";
   var filterCategory = "all";
   var filterOwner = "all";
-  // Il tag su cui stai filtrando. E' l'unico filtro personale: gli altri
-  // guardano dentro il palcoscenico, questo guarda dentro le tue etichette.
-  var filterTag = "all";
+  /* I tag su cui stai filtrando, e sono piu' d'uno: gli altri filtri
+     scelgono un valore (un tipo, una categoria), i tag no — un posto ne
+     porta quanti ne vuoi, e la domanda vera e' "fammi vedere gli anni 80 e
+     gli estivi", non uno dei due. Elenco vuoto vuol dire "tutti", cosi' il
+     caso normale non ha bisogno di niente.
+     E' anche l'unico filtro personale: gli altri guardano dentro il
+     palcoscenico, questo dentro le tue etichette. */
+  var filterTags = [];
+  function filterTagsAttivi(){ return filterTags.length > 0; }
   var owners = [];
   var searchText = "";
   var nearMeEnabled = false;
@@ -3686,20 +3692,22 @@
 
   function filtriVuoti(){
     return {status:"all", type:"all", category:"all", owner:"all", regione:"all", provincia:"all",
-            tag:"all", nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
+            tags:[], nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
   }
   function snapshotFiltri(){
     var liste = {};
     VENUE_LISTS.forEach(function(L){ liste[L.key] = L.filter; });
     return {status:filterStatus, type:filterType, category:filterCategory, owner:filterOwner,
-            regione:filterRegione, provincia:filterProvincia, tag:filterTag,
+            regione:filterRegione, provincia:filterProvincia, tags:filterTags.slice(),
             nearMe:nearMeEnabled, nearMeKm:nearMeRadiusKm, nearMeCoords:nearMeCoords,
             liste:liste, sortBy:sortBy};
   }
   function applicaFiltri(snap){
     filterStatus = snap.status; filterType = snap.type; filterCategory = snap.category; filterOwner = snap.owner;
     filterRegione = snap.regione; filterProvincia = snap.provincia;
-    filterTag = snap.tag || "all";
+    // Una copia, se no le due schermate si ritroverebbero lo stesso elenco
+    // e spuntare un tag di qua lo spunterebbe anche di la'.
+    filterTags = (snap.tags || []).slice();
     nearMeEnabled = snap.nearMe; nearMeRadiusKm = snap.nearMeKm; nearMeCoords = snap.nearMeCoords;
     VENUE_LISTS.forEach(function(L){ L.filter = snap.liste[L.key] || "all"; });
     sortBy = snap.sortBy;
@@ -3712,7 +3720,7 @@
     if(!snap) return false;
     var liste = snap.liste || {};
     return snap.status !== "all" || snap.type !== "all" || snap.category !== "all" || snap.owner !== "all"
-        || snap.regione !== "all" || snap.provincia !== "all" || (snap.tag || "all") !== "all" || snap.nearMe
+        || snap.regione !== "all" || snap.provincia !== "all" || (snap.tags || []).length || snap.nearMe
         || Object.keys(liste).some(function(k){ return liste[k] !== "all"; });
   }
   /* Il passaggio di consegne fra le due schermate: quella che lasci si
@@ -3768,28 +3776,39 @@
     setDato("filterOwnerValue", filterOwner === "all" ? "" : ownerLabel(filterOwner), "Tutti");
   }
   function renderFilterTagRow(){
-    setDato("filterTagValue", filterTag === "all" ? "" : filterTag, "Tutti");
+    var n = filterTags.length;
+    // Uno si scrive per intero, da tre in su si contano: tre nomi di fila
+    // non ci stanno in una riga e verrebbero tagliati a meta'.
+    var testo = n === 0 ? "" : (n <= 2 ? filterTags.join(", ") : n + " tag");
+    setDato("filterTagValue", testo, "Tutti");
   }
   /* I tag nel foglio dei filtri e non piu' in una striscia di bottoni sopra
      l'elenco: di tag ce ne possono essere trenta, e trenta bottoni da
      scorrere di lato sono una fatica che un elenco con la ricerca non ha.
      Qui dentro ci sono solo i tuoi — filtrare per un tag che non hai messo
-     su niente darebbe sempre zero. */
+     su niente darebbe sempre zero.
+
+     A spunta multipla, come i generi: si sceglie, si tocca Fatto, e non
+     spuntare niente vuol dire tutti. */
   document.getElementById("rowFilterTag").addEventListener("click", function(){
-    var miei = mieiTagElenco();
-    var opts = [{label:"Tutti", checkmark: filterTag==="all", onSelect:function(){
-      filterTag = "all"; renderFilterTagRow(); renderAll();
-    }}];
-    miei.forEach(function(t){
-      opts.push({label:t.tag, dato:true, checkmark: chiaveTag(filterTag)===chiaveTag(t.tag), onSelect:function(){
-        filterTag = t.tag; renderFilterTagRow(); renderAll();
-      }});
+    var scelti = {};
+    filterTags.forEach(function(t){ scelti[chiaveTag(t)] = t; });
+    var opts = mieiTagElenco().map(function(t){
+      return {label:t.tag, dato:true, checkmark: !!scelti[chiaveTag(t.tag)], onToggle:function(on){
+        if(on) scelti[chiaveTag(t.tag)] = t.tag; else delete scelti[chiaveTag(t.tag)];
+      }};
     });
     openSheet({
       title:"Filtra per tag",
-      searchable: miei.length > 6,
+      searchable: opts.length > 6,
       searchPlaceholder:"Cerca tag…",
-      options:opts
+      multiSelect:true,
+      options:opts,
+      onDone:function(){
+        filterTags = Object.keys(scelti).map(function(k){ return scelti[k]; });
+        renderFilterTagRow();
+        renderAll();
+      }
     });
   });
   document.getElementById("rowFilterStatus").addEventListener("click", function(){
@@ -3939,7 +3958,7 @@
      palcoscenico che stavi andando a vedere. */
   function azzeraFiltri(opts){
     opts = opts || {};
-    filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all"; filterTag = "all";
+    filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all"; filterTags = [];
     resetVenueListFilters();
     resetGeoFilters();
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
@@ -3978,7 +3997,14 @@
     if(!venueMatchesVenueLists(v)) return false;
     if(!venueMatchesGeo(v)) return false;
     if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
-    if(filterTag !== "all" && !tagDi(v.id).some(function(t){ return chiaveTag(t) === chiaveTag(filterTag); })) return false;
+    // Basta che ne abbia uno di quelli chiesti: due tag spuntati allargano
+    // l'elenco, non lo stringono. "Anni 80 oppure estivi" e' la domanda che
+    // uno si fa; "anni 80 e anche estivi" quasi mai, e per quella c'e' la
+    // ricerca dentro l'elenco che resta.
+    if(filterTagsAttivi()){
+      var suoi = tagDi(v.id).map(chiaveTag);
+      if(!filterTags.some(function(t){ return suoi.indexOf(chiaveTag(t)) > -1; })) return false;
+    }
     if(nearMeEnabled && nearMeCoords){
       if(v.lat == null || v.lng == null) return false;
       var dist = haversineKm(nearMeCoords.lat, nearMeCoords.lng, v.lat, v.lng);
@@ -4645,8 +4671,9 @@
         vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui. La stella è tua: la vedi solo tu, e lo stesso posto può stare anche fra i preferiti di un altro.</p>';
       } else if(favSearchText){
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>';
-      } else if(filterTag !== "all"){
-        vuoto = '<div class="glyph">🏷️</div><h2>Nessuno con questo tag</h2><p>Fra i tuoi preferiti non ce n\'è nessuno con «'+dato(filterTag)+'».</p>';
+      } else if(filterTagsAttivi()){
+        vuoto = '<div class="glyph">🏷️</div><h2>Nessuno con questi tag</h2><p>Fra i tuoi preferiti non ce n\'è nessuno con '+
+          (filterTags.length === 1 ? '«'+dato(filterTags[0])+'»' : 'nessuno dei tag che hai scelto')+'.</p>';
       } else {
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>I preferiti ci sono, ma i filtri li stanno escludendo tutti.</p>';
       }
@@ -6775,8 +6802,22 @@
     });
   });
 
+  /* Una riga che offre una scelta senza avere niente da scegliere non e'
+     una riga: la tocchi, si apre un foglio vuoto, e l'unica cosa che impari
+     e' che non c'era niente da imparare. Finche' la lista e' vuota la riga
+     non c'e'.
+
+     L'eccezione e' il palcoscenico che quel valore ce l'ha gia' scritto —
+     importato da fuori, o rimasto dopo che qualcuno ha svuotato la lista:
+     nascondere la riga vorrebbe dire nascondere un dato, e per giunta uno
+     che non si potrebbe piu' togliere. */
+  function mostraSeHaSenso(rowId, valoreScritto, listaPiena){
+    var row = document.getElementById(rowId);
+    if(row) row.hidden = !listaPiena && !valoreScritto;
+  }
   function renderCategoryRow(v){
     setDato("categoryValue", v.category, "— nessuna —");
+    mostraSeHaSenso("rowCategory", v.category, venueCategories.length);
   }
   document.getElementById("rowCategory").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
@@ -8719,6 +8760,7 @@
   /* --- la riga nella scheda del palcoscenico --- */
   function renderVenueListPickerRow(L, v){
     setDato(L.ids.value, v[L.field], L.g.nessuno);
+    mostraSeHaSenso(L.ids.row, v[L.field], L.values.length);
   }
   VENUE_LISTS.forEach(function(L){
     document.getElementById(L.ids.row).addEventListener("click", function(){
