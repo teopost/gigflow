@@ -1127,6 +1127,18 @@
       </div>
       <div id="geoReport" hidden></div>
 
+      <div class="section-header">TIRA PER AGGIORNARE</div>
+      <div class="grouped-list">
+        <div class="field-row">
+          <label for="ptrToggle" style="flex:1;">Tira verso il basso per aggiornare</label>
+          <label class="ios-switch">
+            <input type="checkbox" id="ptrToggle">
+            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+          </label>
+        </div>
+      </div>
+      <div class="section-footer">Il gesto che ricarica i dati quando trascini un elenco verso il basso. Su un elenco corto — un trimestre dell’Agenda con poche righe — il dito trova sempre la cima, e quello che volevi fosse uno scorrimento diventa un ricaricamento: se la lista sfarfalla o si aggiorna da sola, spegnilo. Vale subito, senza riaprire l’app, e solo su questo dispositivo.</div>
+
       <div class="section-header">ESPORTAZIONE</div>
       <div class="grouped-list">
         <div class="row" id="rowAdminExport">
@@ -10844,6 +10856,15 @@
      scorrendo" a "sto ricaricando". */
   var PTR_SOGLIA = 62;   /* quanto dev'essere scesa la fascia perche' conti */
   var PTR_MAX = 92;      /* oltre non cresce piu': si sente che c'e' un fondo */
+  /* Acceso o spento, dall'Admin. Su un elenco corto il gesto e' in lite con
+     lo scorrimento — sei gia' in cima, quindi ogni trascinamento verso il
+     basso e' un ricaricamento — e chi guarda vede solo la lista che si
+     rinfresca da sola. Sta in una variabile e si legge a ogni tocco, non
+     una volta all'avvio: cosi' l'interruttore vale subito, senza riaprire.
+     Come il tema, resta su questo dispositivo: e' una preferenza di gesto,
+     non un dato della band. */
+  var PTR_CHIAVE = "gigflow-ptr";
+  var ptrAttivo = localStorage.getItem(PTR_CHIAVE) !== "off";
   function tiraPerAggiornare(scrollEl, ricarica){
     if(!scrollEl) return;
     var barra = document.createElement("div");
@@ -10864,7 +10885,7 @@
     }
 
     scrollEl.addEventListener("touchstart", function(e){
-      if(inCorso || e.touches.length !== 1) return;
+      if(!ptrAttivo || inCorso || e.touches.length !== 1) return;
       preso = scrollEl.scrollTop <= 0;
       deciso = false;
       y0 = e.touches[0].clientY;
@@ -10919,6 +10940,19 @@
     .forEach(function(id){ tiraPerAggiornare(document.getElementById(id), ricaricaDati); });
   tiraPerAggiornare(document.getElementById("scrollBands"), loadBands);
   tiraPerAggiornare(document.getElementById("scrollAd"), loadArtDirectors);
+
+  /* L'interruttore sta qui e non con le altre righe dell'Admin: comanda
+     questa variabile, e leggerlo lassu' vorrebbe dire trovarla non ancora
+     scritta. Spegnendo, i tre ascoltatori restano attaccati ma il primo si
+     tira indietro: niente fascia, niente preventDefault, il dito torna
+     tutto allo scorrimento. */
+  var elPtrToggle = document.getElementById("ptrToggle");
+  elPtrToggle.checked = ptrAttivo;
+  elPtrToggle.addEventListener("change", function(){
+    ptrAttivo = elPtrToggle.checked;
+    localStorage.setItem(PTR_CHIAVE, ptrAttivo ? "on" : "off");
+    toast(ptrAttivo ? "Tira per aggiornare acceso" : "Tira per aggiornare spento");
+  });
 
   /* ---------------- swipe da bordo sinistro per tornare indietro ---------------- */
   function addEdgeSwipeBack(screenEl, closeFn){
