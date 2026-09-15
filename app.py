@@ -3320,7 +3320,18 @@ def facebook_page_id(url):
         return valori[0] if valori and valori[0].isdigit() else None
     if segmenti[0] in ("pages", "p", "people"):
         numeri = [s for s in segmenti if s.isdigit()]
-        return numeri[-1] if numeri else None
+        if numeri:
+            return numeri[-1]
+        # /p/Ristorante-Barafonda-61574620851392/ — qui il numero non e' un
+        # pezzo di indirizzo per conto suo: sta appiccicato in fondo al nome,
+        # ed e' la forma che Facebook da' oggi dal telefono. Senza questa
+        # riga quattordici palcoscenici in archivio non avevano il pulsante
+        # della copertina (trovato il 15 settembre 2026).
+        for pezzo in reversed(segmenti[1:]):
+            trovato = FB_SLUG_ID.search(unquote(pezzo))
+            if trovato:
+                return trovato.group(1)
+        return None
     nome = unquote(segmenti[0])
     if not FB_ID_OK.match(nome):
         return None
@@ -3570,6 +3581,17 @@ def social_cover(conn, ws, loc_id, body=None):
 
     if page_id:
         foto_url = _facebook_pic_url(page_id)
+        if not foto_url and page_id.isdigit():
+            # Con un id numerico — profile.php, /p/Nome-123, le pagine nuove
+            # che cominciano per 61 — l'endpoint pubblico risponde con la
+            # sagoma grigia e basta: la foto c'e', non la da'. Dirlo com'e'
+            # vale piu' di "questa pagina non ha un'immagine", che e' falso.
+            raise ApiError(
+                404,
+                "Facebook non dà la foto per i link con il numero. "
+                "Se il locale ha una pagina col nome (facebook.com/nomelocale), usa quella.",
+                "senza_foto",
+            )
         if not foto_url:
             raise ApiError(404, "Questa pagina non ha un'immagine del profilo", "senza_foto")
     else:

@@ -5868,7 +5868,18 @@
     }
     if(seg[0] === "pages" || seg[0] === "p" || seg[0] === "people"){
       var numeri = seg.filter(function(x){ return /^\d+$/.test(x); });
-      return numeri.length ? numeri[numeri.length-1] : null;
+      if(numeri.length) return numeri[numeri.length-1];
+      // /p/Ristorante-Barafonda-61574620851392/ — il numero sta appiccicato
+      // in fondo al nome, non e' un pezzo di indirizzo suo. E' la forma che
+      // Facebook da' oggi dal telefono: senza questa riga il pulsante della
+      // copertina non compariva (stessa regola in facebook_page_id).
+      for(var i = seg.length - 1; i >= 1; i--){
+        var pezzo;
+        try { pezzo = decodeURIComponent(seg[i]); } catch(e){ pezzo = seg[i]; }
+        var coda = /-(\d{6,})$/.exec(pezzo);
+        if(coda) return coda[1];
+      }
+      return null;
     }
     var nome;
     try { nome = decodeURIComponent(seg[0]); } catch(e){ nome = seg[0]; }
