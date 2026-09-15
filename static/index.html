@@ -190,11 +190,6 @@
   /* Tre segmenti su uno schermo da telefono: un punto in meno e meno aria ai
      lati, altrimenti "Da pianificare" va a capo dentro il suo bottone. */
   .view-toggle.tre .view-toggle-btn{font-size:13px;padding:9px 2px;}
-  /* Quante ce ne sono sotto ogni scheda. E' il totale della scheda, non di
-     quello che stai guardando: ricerca e filtro cambiano l'elenco, non
-     quanti ne ha quella scheda. Chi lo guarda vuole sapere dove c'e' roba. */
-  .vt-count{font-size:11px;font-weight:700;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
-  .view-toggle-btn.active .vt-count{color:var(--tint);}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
   /* Il colore del segnalino e' quello dello stato, lo stesso della pastiglia
@@ -845,9 +840,9 @@
       </div>
       <div class="view-toggle-wrap">
         <div class="view-toggle tre" id="gigsScopeToggle">
-          <button class="view-toggle-btn active" data-gigscope="aperte">Aperte<span class="vt-count" id="gigsCountAperte"></span></button>
-          <button class="view-toggle-btn" data-gigscope="chiuse">Chiuse<span class="vt-count" id="gigsCountChiuse"></span></button>
-          <button class="view-toggle-btn" data-gigscope="tutte">Tutte<span class="vt-count" id="gigsCountTutte"></span></button>
+          <button class="view-toggle-btn active" data-gigscope="aperte">Aperte</button>
+          <button class="view-toggle-btn" data-gigscope="chiuse">Chiuse</button>
+          <button class="view-toggle-btn" data-gigscope="tutte">Tutte</button>
         </div>
       </div>
     </header>
@@ -4230,12 +4225,11 @@
      messo via non e' lavoro in corso, e in mezzo alle chiuse sarebbe
      rumore. In archivio ci finiscono anche stagioni vere, e quelle vanno
      ritrovate: per questo restano, ma in fondo. */
-  function gigsInScope(scheda){
-    var quale = scheda || gigsScope;
+  function gigsInScope(){
     return allGigRows().filter(function(x){
-      if(quale === "tutte") return true;
+      if(gigsScope === "tutte") return true;
       if(x.v.deleted_at) return false;
-      return isGigChiusa(x.g.status) === (quale === "chiuse");
+      return isGigChiusa(x.g.status) === (gigsScope === "chiuse");
     });
   }
   /* Due stati per riga, e sono due cose diverse: la pastiglia a destra dice
@@ -4265,9 +4259,6 @@
     document.querySelectorAll("#gigsScopeToggle .view-toggle-btn").forEach(function(b){
       b.classList.toggle("active", b.getAttribute("data-gigscope") === gigsScope);
     });
-    document.getElementById("gigsCountAperte").textContent = gigsInScope("aperte").length;
-    document.getElementById("gigsCountChiuse").textContent = gigsInScope("chiuse").length;
-    document.getElementById("gigsCountTutte").textContent = gigsInScope("tutte").length;
     document.getElementById("gigsFilterDot").hidden = !gigsStatusFilter.length;
   }
   /* Raggruppate per anno, e le senza data in cima: sono quelle in ballo
