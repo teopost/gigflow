@@ -4332,6 +4332,14 @@
   /* Senza data non si scriveva niente di utile ("Data da fissare" e' vero
      per tutte finche' non sono confermate). Al suo posto la cosa che serve
      davvero qui: quando l'hai sentito l'ultima volta. */
+  /* In coda alla cella la nota della serata — il campo "Note" della scheda,
+     quello in cui scrivi gli accordi presi o perche' ti hanno detto di no.
+     E' l'unica cosa che distingue due tentativi che dall'esterno si
+     leggono uguali: tre "Rifiutata" senza data sullo stesso palcoscenico
+     sono tre righe identiche finche' non si vede cosa c'era scritto.
+
+     Una riga sola, tagliata con i puntini: .row-sub lo fa gia' per tutte le
+     altre. Chi vuole il resto apre la scheda. */
   function allGigRowHtml(x){
     var quando = x.g.gig_date
       ? fmtDateShort(x.g.gig_date)
@@ -4346,6 +4354,7 @@
         '<div class="row-sub">'+quando+'</div>'+
         '<div class="row-sub">'+statusPillHtml(sv.label, {color: sv.color, soft: sv.soft})+
           (dove.length ? ' ' + dove.join(" · ") : '')+'</div>'+
+        (x.g.outcome_note ? '<div class="row-sub">'+dato(x.g.outcome_note)+'</div>' : '')+
       '</div>'+
       '<div class="row-trail">'+statusPillHtml(gigStateLabel(x.g), gigStateColors(x.g))+
       CHEVRON+'</div>'+
