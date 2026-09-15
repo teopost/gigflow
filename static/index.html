@@ -583,16 +583,10 @@
   .month-labels span{flex:1;text-align:center;font-size:10.5px;color:var(--text-tertiary);}
   .agenda-group{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
   .group-count{font-weight:600;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
-  /* Gli scaduti: intestazione rossa e un taglio rosso sul fianco. Non le
-     righe colorate dentro — il rosso li' dentro ce l'ha gia' il conto dei
-     giorni, e due rossi sovrapposti non gridano il doppio. */
-  .agenda-group.late,.agenda-group.late .group-count{color:var(--red);}
   /* L'elenco del mese non ha intestazione (il mese lo dice la pastiglia
      accesa qui sopra), quindi l'aria che gli starebbe sopra se la prende da
-     solo: dal riquadro degli scaduti, o dalla riga che dice cosa stai
-     guardando. E' la stessa dell'intestazione di un gruppo, 20 + 6. */
-  .grouped-list.staccato{margin-top:26px;}
-  .grouped-list.late{border-left:3px solid var(--red);}
+     solo, staccandosi dalla riga che dice cosa stai guardando. */
+  .grouped-list.staccato{margin-top:14px;}
   .year-head{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center;}
   .year-head .row-chevron{color:var(--text-tertiary);transition:transform .2s;}
   .year-head.open .row-chevron{transform:rotate(90deg);}
@@ -2782,7 +2776,7 @@
     document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.getAttribute("data-tab")===name); });
     if(name === "list" || name === "favorites") usaFiltriDi(name);
     if(name === "home") renderHome();
-    if(name === "recontact") renderRecontact();
+    if(name === "recontact"){ meseDaCentrare = true; renderRecontact(); }
     if(name === "favorites") renderFavorites();
     if(name === "gigs") renderAllGigs();
     if(name === "cash") renderCash();
@@ -4511,6 +4505,10 @@
      resta finche' l'app e' aperta: uno che sta programmando novembre non
      vuole ricominciare da capo ogni volta che passa in Serate e torna. */
   var meseAgenda = new Date().getMonth() + 1;
+  /* La barra si porta il mese scelto in mezzo solo quando entri: a giugno
+     ci vai toccandolo, e una pastiglia che scappa da sotto il dito mentre
+     la tocchi e' l'unica cosa che non deve fare. */
+  var meseDaCentrare = true;
 
   document.getElementById("agendaToggle").addEventListener("click", function(e){
     var btn = e.target.closest("[data-agenda]");
@@ -4522,6 +4520,7 @@
     document.getElementById("agendaPaneRecontact").hidden = agendaView !== "recontact";
     document.getElementById("agendaPanePlan").hidden = agendaView !== "plan";
     document.getElementById("agendaPaneGigs").hidden = agendaView !== "gigs";
+    if(agendaView === "recontact") meseDaCentrare = true;
     renderRecontact();
     document.getElementById("scrollRecontact").scrollTop = 0;
   });
@@ -4564,13 +4563,19 @@
         return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
       });
   }
-  /* Chi e' in ritardo e non ha niente di aperto: sono le righe su cui
-     "Riproponi" ha senso, ed e' anche l'insieme su cui agisce il pulsante
-     cumulativo in cima. Solo dentro al mese che stai guardando: un pulsante
-     che agisce anche su righe che non vedi non e' un pulsante. */
+  /* Chi non ha niente di aperto: sono le righe che mostrano "Riproponi",
+     ed e' lo stesso insieme su cui agisce il pulsante cumulativo in cima.
+     Solo dentro al mese che stai guardando: un pulsante che agisce anche su
+     righe che non vedi non e' un pulsante.
+
+     Prima la domanda era "e' in ritardo e non ha niente di aperto". La
+     prima meta' e' caduta con gli scaduti: in un mese che si sceglie a
+     mano, "in ritardo" voleva solo dire "l'hai aperto a settembre", e il
+     pulsante spariva da tutte le righe di ottobre per un motivo che non
+     c'entrava niente con loro. */
   function dueToRenew(){
     return recontactInMonth(meseAgenda).filter(function(x){
-      return x.due.late && !venueGigs(x.v).some(function(g){ return g.open; });
+      return !venueGigs(x.v).some(function(g){ return g.open; });
     });
   }
   /* Tutte le serate con una data, archiviati compresi. Il segmento Serate
@@ -4702,9 +4707,14 @@
      schermo. Si scrive scrollLeft e non scrollIntoView apposta: quello
      scorrerebbe anche la pagina, e la pagina sta dov'e'. */
   function centraMese(){
+    if(!meseDaCentrare) return;
     var chip = elMonthBar.querySelector(".mese-chip.active");
+    /* Entrando la prima volta l'Agenda e' ancora nascosta e la barra non ha
+       larghezza: non si centra niente e il compito resta in piedi, cosi' lo
+       fa il primo render con il tab davvero aperto. */
     if(!chip || !elMonthBar.clientWidth) return;
     elMonthBar.scrollLeft = Math.max(0, chip.offsetLeft - (elMonthBar.clientWidth - chip.offsetWidth) / 2);
+    meseDaCentrare = false;
   }
   elMonthBar.addEventListener("click", function(e){
     var btn = e.target.closest("[data-mese]");
@@ -4768,42 +4778,25 @@
     return statusPillHtml(st.label, {color: st.color, soft: st.soft});
   }
 
-  /* Il "quando" letto dentro al mese che stai guardando. Fra tutte le
-     righe di marzo, a settembre, "tra 180g" e' vero e non serve a niente:
-     il mese l'hai scelto tu, la domanda e' a che punto e' quel mese.
+  /* Niente conto dei giorni e niente "scaduto": il mese l'hai scelto tu, e
+     dentro a un mese la riga dice il giorno. Un elenco in cui a maggio
+     erano tutti rossi e a marzo tutti "già passato" dava un allarme al
+     posto di un'agenda — e l'allarme era sempre acceso, quindi non era un
+     allarme.
 
-     Quattro risposte: scaduto (la data e' passata e non ti sei mosso — e'
-     quello che recontactDue chiama late), gia' passato (e' passata ma non
-     e' arretrato: o ti sei mosso, o e' vecchia abbastanza da non valere
-     piu' una telefonata), questo mese (il promemoria e' il mese intero e il
-     mese e' adesso), e quanto manca. */
-  function recontactWhen(x){
-    var d = daysUntil(x.due.date);
-    if(x.due.late) return {tag: "scaduto · " + Math.abs(d) + "g", color: "var(--red)"};
-    var oggi = todayStr();
-    var meseOggi = Number(oggi.slice(5, 7)), giornoOggi = Number(oggi.slice(8, 10));
-    if(x.mese === meseOggi){
-      if(!x.giorno) return {tag: "questo mese", color: "var(--orange)"};
-      if(x.giorno === giornoOggi) return {tag: "oggi", color: "var(--orange)"};
-    }
-    var passato = x.mese < meseOggi || (x.mese === meseOggi && x.giorno < giornoOggi);
-    if(passato) return {tag: "già passato", color: "var(--text-tertiary)"};
-    return {tag: "tra " + d + "g", color: d <= 30 ? "var(--orange)" : "var(--text-secondary)"};
-  }
+     Il pulsante sta dove starebbe la freccia, e solo dove serve: su un
+     palcoscenico senza nessuna serata aperta la cosa da fare e' una sola,
+     riaprirla. Dove una serata aperta c'e' gia', la riga si apre e basta. */
   function recontactRowHtml(x){
-    var v = x.v, quando = recontactWhen(x);
-    var tag = quando.tag, color = quando.color;
-    // Il pulsante sta dove starebbe la freccia, e solo dove serve: se e'
-    // arrivato il momento e non c'e' niente di aperto, la cosa da fare e'
-    // una sola. Negli altri casi la riga si apre e basta.
+    var v = x.v;
     var aperta = venueGigs(v).some(function(g){ return g.open; });
-    var trail = (x.due.late && !aperta)
-      ? '<button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button>'
-      : CHEVRON;
+    var trail = aperta
+      ? CHEVRON
+      : '<button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button>';
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+esc(periodLabel(v.recontact_period))+' · '+whenHtml(tag, color)+
+        '<div class="row-sub">'+esc(periodLabel(v.recontact_period))+
           (v.planning_note ? ' · '+dato(v.planning_note) : '')+'</div>'+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+venueStatusPill(v)+trail+'</div>'+
@@ -4814,25 +4807,16 @@
       '</div>'+
     '</div>';
   }
-  /* Un mese alla volta, quello scelto nella barra qui sopra, e dentro due
-     blocchi: gli scaduti in un riquadro loro, in cima, e il resto del mese
-     in ordine di giorno.
+  /* Un mese alla volta, quello scelto nella barra qui sopra: un elenco
+     solo, in ordine di giorno, senza intestazione. Il mese lo dice la
+     pastiglia accesa due centimetri piu' su, e un titolo che ripete quello
+     che hai appena toccato e' rumore.
 
-     Il secondo blocco non ha intestazione: direbbe "settembre" dieci
-     centimetri sotto la pastiglia "settembre" accesa, e un titolo che
-     ripete quello che hai appena toccato e' rumore.
-
-     Perche' gli scaduti a parte. Sono gia' primi comunque — la data che si
-     portano dietro e' quella dell'occorrenza mancata — ma sotto
-     l'intestazione del mese si leggono come roba passata, cioe' archivio,
-     mentre sono l'unica roba da fare della pagina. La loro intestazione lo
-     dice.
-
-     Quanto ci restano: quattro mesi (MESI_SCADUTO), o finche' non ti muovi.
-     Si svuota da sola perche' chiamare cambia lo stato della serata, non
-     perche' scatta una mezzanotte — e quando quei quattro mesi passano la
-     riga non sparisce, torna in fila nel suo mese con l'occorrenza
-     dell'anno dopo. */
+     Fino al 15 settembre 2026 qui c'erano due blocchi e il primo era
+     "Scaduti", col bordo rosso. In un elenco che va a calendario non ha
+     senso: aprendo maggio a settembre sono scaduti tutti, e un riquadro
+     rosso che contiene tutta la pagina non avvisa di niente. Chi guarda
+     maggio sta guardando maggio. */
   function renderRecontactList(){
     var mese = MESI[meseAgenda - 1];
     var righe = recontactInMonth(meseAgenda);
@@ -4846,19 +4830,8 @@
         '</div>';
       return;
     }
-    var scaduti = righe.filter(function(x){ return x.due.late; });
-    var resto = righe.filter(function(x){ return !x.due.late; });
-    var html = "";
-    if(scaduti.length){
-      html += '<div class="agenda-group late">Scaduti<span class="group-count">'+scaduti.length+
-        '</span></div><div class="grouped-list late">'+
-        scaduti.map(recontactRowHtml).join("")+'</div>';
-    }
-    if(resto.length){
-      html += '<div class="grouped-list staccato">'+
-        resto.map(recontactRowHtml).join("")+'</div>';
-    }
-    elRecontactList.innerHTML = html;
+    elRecontactList.innerHTML = '<div class="grouped-list staccato">'+
+      righe.map(recontactRowHtml).join("")+'</div>';
   }
   elRecontactList.addEventListener("click", function(e){
     var purge = e.target.closest("[data-purge-id]");
