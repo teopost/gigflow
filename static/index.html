@@ -655,8 +655,6 @@
   .tab .tab-label{font-size:10.5px;font-weight:500;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   @media (max-width:400px){ .tab .tab-label{font-size:9.5px;letter-spacing:-.01em;} }
   .tab.active{color:var(--tint);}
-  .tab-badge-wrap{position:relative;}
-  .tab-dot{position:absolute;top:-2px;right:-6px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg-tabbar);}
   .filter-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--tint);margin-left:4px;vertical-align:middle;}
   /* Senza questa riga il pallino non si nasconde mai: "display:inline-block"
      qui sopra vince sull'attributo hidden, che il browser applica con una
@@ -2076,10 +2074,7 @@
       <span class="tab-label">Opportunità</span>
     </button>
     <button class="tab" data-tab="recontact">
-      <span class="tab-badge-wrap">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg>
-        <span class="tab-dot" id="tabRecontactDot" hidden></span>
-      </span>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg>
       <span class="tab-label">Agenda</span>
     </button>
     <button class="tab" data-tab="cash">
@@ -3707,7 +3702,6 @@
     renderAllGigs();
     renderRecontact();
     renderCash();
-    updateRecontactBadge();
     // Il conto dei tag si legge dai palcoscenici: cambia quando cambiano
     // loro, non quando qualcuno apre le impostazioni.
     updateTagsCount();
@@ -5529,15 +5523,6 @@
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
-
-  function updateRecontactBadge(){
-    var overdueOrSoon = venuesToRecontact().filter(function(x){ return daysUntil(x.due.date) <= 7; }).length;
-    var today = todayStr();
-    var toConfirm = datedGigRows().filter(function(x){
-      return x.g.status === "confermato" && x.g.gig_date < today;
-    }).length;
-    document.getElementById("tabRecontactDot").hidden = (overdueOrSoon + toConfirm) === 0;
-  }
 
   /* ---------------- CASSA: costi e ricavi della band ----------------
      Nell'elenco ci sono due razze di righe e si comportano diversamente.
