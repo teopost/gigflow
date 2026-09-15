@@ -820,6 +820,14 @@ def migrate_schema(conn):
             "WHERE profile_completed_at IS NULL"
         )
 
+    if "home_prefs" not in profile_cols:
+        # Quali riquadri della Home vuole vedere questa persona. Sta sul
+        # profilo e non nel browser perche' e' una scelta sua, non di questo
+        # telefono: chi spegne "Dove vanno i soldi" non vuole vederlo nemmeno
+        # dal computer. Chi c'e' gia' resta senza niente scritto, che vuol
+        # dire "vedo tutto" — l'impostazione nasce quando la tocchi.
+        conn.execute("ALTER TABLE user_profiles ADD COLUMN home_prefs TEXT")
+
     if "last_seen_at" not in profile_cols:
         conn.execute("ALTER TABLE user_profiles ADD COLUMN last_seen_at TEXT")
         # Chi era gia' dentro non e' mai stato visto: il dato piu' vicino al
@@ -1816,7 +1824,35 @@ def accept_invite(conn, token, email):
 
 # --- profilo utente (wizard di benvenuto + dati Google) -----------------
 
-ME_FIELDS = ["name", "artist_name", "genre", "city", "band_roles"]
+ME_FIELDS = ["name", "artist_name", "genre", "city", "band_roles", "home_prefs"]
+
+# Le preferenze della Home arrivano come oggetto di interruttori e si
+# riscrivono per intero a ogni cambio. Il server non sa quali riquadri
+# esistano — glieli dice l'interfaccia, che e' l'unica a saperlo — ma non
+# accetta chiavi strane ne' un dizionario lungo a piacere: quella colonna e'
+# di una persona sola e non e' un posto dove tenere roba.
+HOME_PREF_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+HOME_PREFS_MAX = 32
+
+
+def clean_home_prefs(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            raise ApiError(400, "Preferenze della Home non valide")
+    if not isinstance(value, dict):
+        raise ApiError(400, "Preferenze della Home non valide")
+    pulite = {}
+    for k, v in value.items():
+        if not isinstance(k, str) or not HOME_PREF_KEY_RE.match(k):
+            continue
+        pulite[k] = bool(v)
+        if len(pulite) >= HOME_PREFS_MAX:
+            break
+    return json.dumps(pulite, ensure_ascii=False)
 
 # Cosa suoni nella band. Sono piu' di uno perche' quasi sempre lo sono:
 # chi canta suona anche la chitarra. Lista chiusa e non libera: e'
@@ -1895,6 +1931,13 @@ def fetch_me(conn, email):
         else:
             d = dict(row)
             d["onboarded"] = bool(d.get("onboarded_at"))
+    # I riquadri spenti viaggiano come oggetto, non come stringa JSON: chi
+    # legge non deve sapere come sono scritti nella colonna. Niente scelta
+    # ancora fatta vuol dire "tutto acceso", ed e' un oggetto vuoto.
+    try:
+        d["home_prefs"] = json.loads(d.get("home_prefs") or "{}")
+    except (ValueError, TypeError):
+        d["home_prefs"] = {}
     # Senza login non c'e' un profilo da completare: l'app e' di chi ce l'ha
     # sul computer, e il modulo non avrebbe niente da chiedere.
     d["profile_completed"] = (not email) or bool(d.get("profile_completed_at"))
@@ -1920,6 +1963,9 @@ def update_me(conn, email, body):
         value = body[f]
         if f == "band_roles":
             value = clean_band_roles(value)
+        elif f == "home_prefs":
+            fields[f] = clean_home_prefs(value)
+            continue
         elif f == "name":
             value = (value or "").strip()
             if not value:

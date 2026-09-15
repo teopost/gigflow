@@ -739,7 +739,15 @@
        l'Agenda: nessun endpoint nuovo e nessun conto lato server. -->
   <section class="screen tab-screen" id="tabHome" data-tab="home">
     <header class="navbar" id="navHome">
-      <div class="navbar-row"><span class="inline-title" id="homeTitleSmall">Home</span></div>
+      <div class="navbar-row">
+        <span class="nav-btn nav-btn-spacer"></span>
+        <span class="inline-title" id="homeTitleSmall">Home</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn" id="btnHomePrefs" aria-label="Cosa vedere in Home" title="Cosa vedere in Home">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H2.9a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V2.9a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+          </button>
+        </div>
+      </div>
       <div class="large-title-wrap">
         <h1 class="large-title" id="homeTitle">Home</h1>
         <div class="subtitle-count" id="homeSub"></div>
@@ -1558,6 +1566,31 @@
         </div>
       </div>
       <div class="section-footer">Sono le voci con cui si classificano i costi in Cassa, e sono quelle che compongono il riquadro «Dove vanno i soldi» nella Home. Tocca una categoria per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome dice quanti movimenti la usano: una categoria in uso non si può eliminare, ma rinominandola si aggiornano da soli tutti i movimenti.</div>
+    </div>
+  </section>
+
+  <!-- ============ PUSHED: COSA VEDERE IN HOME ============
+       Gli interruttori dei riquadri della Home. Ognuno vede quello che gli
+       serve: chi tiene la cassa guarda i soldi, chi suona guarda le date, e
+       nessuno dei due deve scorrere la roba dell'altro.
+
+       Non c'e' niente da salvare a mano: ogni interruttore scrive subito sul
+       profilo, come tutti gli elenchi delle Impostazioni. -->
+  <section class="screen pushed" id="homePrefsScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnHomePrefsBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Home
+        </button>
+        <span class="inline-title">Cosa vedere</span>
+        <span class="nav-btn" style="visibility:hidden;">Home</span>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="section-header">RIQUADRI DELLA HOME</div>
+      <div class="grouped-list" id="homePrefsList"></div>
+      <div class="section-footer" id="homePrefsFooter"></div>
     </div>
   </section>
 
@@ -2912,6 +2945,82 @@
   /* "vai" e' dove porta la mattonella, nella forma "tab:segmento" — per ora
      solo l'Agenda ha dei segmenti. Chi non ce l'ha resta un numero da
      leggere. */
+  /* ---------------- cosa vedere in Home ----------------
+     I riquadri che si possono spegnere, nell'ordine in cui stanno nella
+     pagina. Quelli che non sono in questo elenco non si spengono: le
+     mattonelle delle serate e dei contatti sono l'unica cosa che la Home
+     deve a chiunque la apra, e "Serate suonate per anno" e "Incasso per
+     anno" sono i due grafici da cui nasce tutto il resto.
+
+     La chiave finisce nel profilo dell'utente e non piu' nel browser: chi
+     spegne "Dove vanno i soldi" non vuole vederlo nemmeno dal computer.
+     Assente vuol dire acceso, quindi chi non ha mai toccato niente vede
+     tutto e la colonna resta vuota finche' non serve. */
+  var HOME_RIQUADRI = [
+    {key:"cassa_tiles",  label:"Cassa e budget",        sub:"Le due mattonelle: i soldi che ci sono e come finirà"},
+    {key:"province",     label:"Province",              sub:"In quali province hai suonato, anno per anno"},
+    {key:"costi_anno",   label:"Costi per anno",        sub:"Quanto è uscito, stagione per stagione"},
+    {key:"netto_anno",   label:"Netto per anno",        sub:"Incassato meno speso, stagione per stagione"},
+    {key:"dove_soldi",   label:"Dove vanno i soldi",    sub:"I costi dell'anno divisi per categoria"},
+    {key:"dove_suonato", label:"Dove hai suonato di più", sub:"La classifica dei palcoscenici"}
+  ];
+  function homePrefs(){ return (me && me.home_prefs) || {}; }
+  function vedoInHome(key){ return homePrefs()[key] !== false; }
+  /* L'interruttore scrive subito. Il disegno della Home non aspetta il
+     server: la riga si muove sotto il dito e il salvataggio va per conto
+     suo, che e' come si comportano gia' i preferiti e le note. Se il server
+     rifiuta si torna indietro e lo si dice. */
+  function setHomePref(key, acceso){
+    var prima = homePrefs();
+    var nuovo = {};
+    Object.keys(prima).forEach(function(k){ nuovo[k] = prima[k]; });
+    nuovo[key] = !!acceso;
+    if(me) me.home_prefs = nuovo;
+    renderHome();
+    renderHomePrefsList();
+    api("PUT", "/api/me", {home_prefs: nuovo}).then(function(updated){
+      me = updated;
+    }).catch(function(err){
+      if(me) me.home_prefs = prima;
+      renderHome();
+      renderHomePrefsList();
+      toast(err.message);
+    });
+  }
+  function renderHomePrefsList(){
+    var el = document.getElementById("homePrefsList");
+    if(!el) return;
+    el.innerHTML = HOME_RIQUADRI.map(function(r){
+      return '<div class="field-row">'+
+        '<label for="homePref-'+r.key+'" style="flex:1;">'+esc(r.label)+
+          '<div class="row-sub" style="white-space:normal;">'+esc(r.sub)+'</div></label>'+
+        '<label class="ios-switch">'+
+          '<input type="checkbox" id="homePref-'+r.key+'" data-home-pref="'+r.key+'"'+
+          (vedoInHome(r.key) ? " checked" : "")+'>'+
+          '<span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>'+
+        '</label>'+
+      '</div>';
+    }).join("");
+    var spenti = HOME_RIQUADRI.filter(function(r){ return !vedoInHome(r.key); }).length;
+    document.getElementById("homePrefsFooter").textContent = (spenti
+      ? (spenti === 1 ? "Un riquadro spento. " : spenti + " riquadri spenti. ")
+      : "") + "La scelta è tua e ti segue: è scritta nel tuo profilo, non in questo browser, e gli altri della band vedono la loro.";
+  }
+  document.getElementById("homePrefsList").addEventListener("change", function(e){
+    var box = e.target.closest("[data-home-pref]");
+    if(box) setHomePref(box.getAttribute("data-home-pref"), box.checked);
+  });
+  var elHomePrefsScreen = document.getElementById("homePrefsScreen");
+  document.getElementById("btnHomePrefs").addEventListener("click", function(){
+    renderHomePrefsList();
+    elHomePrefsScreen.hidden = false;
+    requestAnimationFrame(function(){ elHomePrefsScreen.classList.add("in"); });
+  });
+  document.getElementById("btnHomePrefsBack").addEventListener("click", function(){
+    elHomePrefsScreen.classList.remove("in");
+    setTimeout(function(){ elHomePrefsScreen.hidden = true; }, 320);
+  });
+
   /* Dove abbiamo suonato, anno per anno. La provincia non e' un campo: si
      ricava dalla citta' del palcoscenico, che e' scritta "Comune (PR)", e
      ci pensa venueProvincia() — lo stesso conto che sta dietro al filtro
@@ -3063,15 +3172,20 @@
         prossime.length ? ("la prima il " + fmtDateShort(prossime[0].gig_date)) : "nessuna confermata",
         false, false, "recontact:gigs") +
       tileHtml(conFee.length ? fmtEuro(incasso / conFee.length) : "—", "media a serata") +
-      /* Il saldo di cassa non e' un numero della stagione: e' tutto
-         quello che e' entrato meno tutto quello che e' uscito, da sempre.
-         Sta qui in mezzo ai numeri dei soldi apposta — l'incasso di una
-         stagione da solo non dice quanto e' rimasto — e per questo la sua
-         etichetta non porta l'anno, mentre quelle intorno si'. */
-      tileHtml(fmtEuroCent(cassa.saldo), "cassa", "incassato meno speso", false, cassa.saldo < 0) +
-      tileHtml(fmtEuroCent(cassa.budget), "budget", sospesoText(cassa), false, cassa.budget < 0) +
       tileHtml(fmtEuro(incasso), "incassati nel " + anno,
         conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "") +
+      /* Budget e cassa non sono numeri della stagione: sono tutto quello che
+         e' entrato meno tutto quello che e' uscito, da sempre. Per questo le
+         loro etichette non portano l'anno, mentre quelle sopra si', e per
+         questo si possono spegnere insieme: chi non tiene la cassa non ha
+         niente da leggerci, e gli altri cinque numeri restano.
+
+         Vanno in coppia anche nell'ordine: prima come finira' se tutto
+         quello che e' segnato si avvera, poi quanto c'e' adesso. */
+      (vedoInHome("cassa_tiles")
+        ? tileHtml(fmtEuroCent(cassa.budget), "budget", sospesoText(cassa), false, cassa.budget < 0) +
+          tileHtml(fmtEuroCent(cassa.saldo), "cassa", "incassato meno speso", false, cassa.saldo < 0)
+        : "") +
       tileHtml(String(daFare), "da contattare nel trimestre",
         trimestreFrase(trimOggi), true, false, "recontact:recontact") +
     '</div>';
@@ -3088,7 +3202,7 @@
     var nota = perAnno.length < 2
       ? '<div class="chart-note">Hai una stagione sola: il confronto con gli anni precedenti si forma da sé, appena ci saranno le serate del '+(Number(anno)+1)+'.</div>'
       : "";
-    html += provinceTableHtml(played);
+    if(vedoInHome("province")) html += provinceTableHtml(played);
 
     html += '<div class="section-header">SERATE SUONATE PER ANNO</div><div class="chart-card">'+
       barsHtml(perAnno, function(n){ return String(n); }) + nota + '</div>';
@@ -3123,32 +3237,34 @@
 
     html += cashHomeChartsHtml(anno);
 
-    var perPosto = {};
-    played.forEach(function(x){
-      var r = perPosto[x.v.id] || (perPosto[x.v.id] = {v: x.v, n: 0, fee: 0});
-      r.n++; r.fee += gigFee(x.g);
-    });
-    var classifica = Object.keys(perPosto).map(function(k){ return perPosto[k]; })
-      .sort(function(a, b){
-        return b.n - a.n || b.fee - a.fee || (a.v.name||"").localeCompare(b.v.name||"");
-      }).slice(0, 8);
-    var totale = played.reduce(function(t, x){ return t + gigFee(x.g); }, 0);
-    html += '<div class="section-header">DOVE HAI SUONATO DI PIÙ</div><div class="grouped-list">'+
-      classifica.map(function(r){
-        var trail = r.n + (r.n === 1 ? " serata" : " serate") + (r.fee ? " · " + fmtEuro(r.fee) : "");
-        // Un archiviato nella classifica non e' un errore: ci hai suonato
-        // davvero. Lo si dice, per non far pensare a un posto rimasto li'
-        // per sbaglio.
-        var sotto = [r.v.city ? dato(r.v.city) : "", r.v.deleted_at ? "archiviato" : ""]
-          .filter(Boolean).join(" · ");
-        return '<div class="row" data-open-id="'+r.v.id+'">'+
-          '<div class="row-main"><div class="row-title">'+dato(r.v.name||"Senza nome")+'</div>'+
-          (sotto ? '<div class="row-sub">'+sotto+'</div>' : '')+'</div>'+
-          '<div class="row-trail"><span class="row-badge" style="background:transparent;color:var(--text-secondary);">'+esc(trail)+'</span>'+
-          CHEVRON+'</div></div>';
-      }).join("") +'</div>'+
-      '<div class="section-footer">In tutto '+played.length+(played.length === 1 ? " serata" : " serate")+
-      (totale ? " e "+fmtEuro(totale)+" incassati" : "")+", da quando usi GigFlow.</div>";
+    if(vedoInHome("dove_suonato")){
+      var perPosto = {};
+      played.forEach(function(x){
+        var r = perPosto[x.v.id] || (perPosto[x.v.id] = {v: x.v, n: 0, fee: 0});
+        r.n++; r.fee += gigFee(x.g);
+      });
+      var classifica = Object.keys(perPosto).map(function(k){ return perPosto[k]; })
+        .sort(function(a, b){
+          return b.n - a.n || b.fee - a.fee || (a.v.name||"").localeCompare(b.v.name||"");
+        }).slice(0, 8);
+      var totale = played.reduce(function(t, x){ return t + gigFee(x.g); }, 0);
+      html += '<div class="section-header">DOVE HAI SUONATO DI PIÙ</div><div class="grouped-list">'+
+        classifica.map(function(r){
+          var trail = r.n + (r.n === 1 ? " serata" : " serate") + (r.fee ? " · " + fmtEuro(r.fee) : "");
+          // Un archiviato nella classifica non e' un errore: ci hai suonato
+          // davvero. Lo si dice, per non far pensare a un posto rimasto li'
+          // per sbaglio.
+          var sotto = [r.v.city ? dato(r.v.city) : "", r.v.deleted_at ? "archiviato" : ""]
+            .filter(Boolean).join(" · ");
+          return '<div class="row" data-open-id="'+r.v.id+'">'+
+            '<div class="row-main"><div class="row-title">'+dato(r.v.name||"Senza nome")+'</div>'+
+            (sotto ? '<div class="row-sub">'+sotto+'</div>' : '')+'</div>'+
+            '<div class="row-trail"><span class="row-badge" style="background:transparent;color:var(--text-secondary);">'+esc(trail)+'</span>'+
+            CHEVRON+'</div></div>';
+        }).join("") +'</div>'+
+        '<div class="section-footer">In tutto '+played.length+(played.length === 1 ? " serata" : " serate")+
+        (totale ? " e "+fmtEuro(totale)+" incassati" : "")+", da quando usi GigFlow.</div>";
+    }
 
     el.innerHTML = html;
   }
@@ -5532,16 +5648,20 @@
 
     var conCosti = anni.filter(function(y){ return perAnno[y].costi > 0; });
     if(conCosti.length){
-      html += '<div class="section-header">COSTI PER ANNO</div><div class="chart-card">'+
-        barsHtml(anni.map(function(y){ return {key:y, value:perAnno[y].costi}; }), fmtEuro)+
-        '</div>';
+      if(vedoInHome("costi_anno")){
+        html += '<div class="section-header">COSTI PER ANNO</div><div class="chart-card">'+
+          barsHtml(anni.map(function(y){ return {key:y, value:perAnno[y].costi}; }), fmtEuro)+
+          '</div>';
+      }
       /* Il netto puo' essere negativo e una barra negativa non si disegna:
          in quel caso il numero si scrive lo stesso, con la barra a zero, che
          e' piu' onesto che nascondere l'anno in perdita. */
-      html += '<div class="section-header">NETTO PER ANNO</div><div class="chart-card">'+
-        barsHtml(anni.map(function(y){
-          return {key:y, value: perAnno[y].ricavi - perAnno[y].costi};
-        }), fmtEuro)+'</div>';
+      if(vedoInHome("netto_anno")){
+        html += '<div class="section-header">NETTO PER ANNO</div><div class="chart-card">'+
+          barsHtml(anni.map(function(y){
+            return {key:y, value: perAnno[y].ricavi - perAnno[y].costi};
+          }), fmtEuro)+'</div>';
+      }
     }
 
     var perCat = {}, totCosti = 0, nSospesi = 0, totSospesi = 0;
@@ -5557,7 +5677,7 @@
       perCat[k] = (perCat[k] || 0) + cashAmount(m);
       totCosti += cashAmount(m);
     });
-    if(totCosti > 0){
+    if(totCosti > 0 && vedoInHome("dove_soldi")){
       var voci = Object.keys(perCat).sort(function(a, b){ return perCat[b] - perCat[a]; })
         .map(function(k){ return {key:k, value:perCat[k]}; });
       html += '<div class="section-header">DOVE VANNO I SOLDI · '+esc(anno)+'</div><div class="chart-card">'+
