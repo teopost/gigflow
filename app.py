@@ -16,7 +16,9 @@ import re
 import secrets
 import sqlite3
 import socket
+import math
 import threading
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -3258,6 +3260,153 @@ def delete_note(conn, ws, note_id):
     return fetch_location(conn, ws, loc_id)
 
 
+# ---------------------------------------------------------------- posizione
+# Le coordinate non si scrivono a mano: si ricavano dall'indirizzo. Il codice
+# sta qui e non nello script perche' adesso lo chiamano in due — il giro in
+# blocco dall'Admin e geocode_venues.py da riga di comando — e due copie
+# della stessa regola si sarebbero divise al primo ritocco.
+#
+# Nominatim e' gratuito e senza chiave, in cambio chiede di non superare una
+# richiesta al secondo e di dire chi sei. Il freno sta qui sotto, in un posto
+# solo: cosi' vale anche se l'app decidesse di chiamare piu' in fretta.
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+GEO_USER_AGENT = "PalcosceniciCRM/1.0 (gestionale locale per band, uso personale)"
+GEO_RATE_LIMIT_SECONDS = 1.1
+# Oltre questa distanza dal centro della citta' dichiarata, il risultato
+# "preciso" e' sospetto: di solito e' un omonimo dall'altra parte d'Italia.
+GEO_MAX_DRIFT_KM = 30
+CITY_PROVINCE_RE = re.compile(r"^(.*?)\s*\(([A-Za-z]{2,3})\)\s*$")
+_geo_lock = threading.Lock()
+_geo_ultima = [0.0]
+
+
+def geo_normalize_city(city):
+    """"Cesena (FC)" -> ("Cesena", "FC"). La provimcia fra parentesi e' come
+    la scrive l'elenco dei comuni, e a Nominatim va data separata."""
+    city = (city or "").strip()
+    trovato = CITY_PROVINCE_RE.match(city)
+    if trovato:
+        return trovato.group(1).strip(), trovato.group(2).strip()
+    return city, None
+
+
+def geo_candidates(name, address, city):
+    """Le domande da fare, dalla piu' precisa alla piu' vaga: il nome del
+    locale (che su OpenStreetMap a volte c'e' gia'), poi l'indirizzo, poi la
+    sola citta'. L'ultima torna anche a parte, che serve per la convalida."""
+    citta, provincia = geo_normalize_city(city)
+    dove = f"{citta}, {provincia}" if provincia else citta
+    name = (name or "").strip()
+    address = (address or "").strip()
+
+    domande = []
+    if name and dove:
+        domande.append(f"{name}, {dove}, Italia")
+    if address and dove:
+        domande.append(f"{address}, {dove}, Italia")
+    elif address:
+        domande.append(f"{address}, Italia")
+    domanda_citta = f"{dove}, Italia" if dove else None
+    if domanda_citta:
+        domande.append(domanda_citta)
+
+    viste, ordinate = set(), []
+    for d in domande:
+        if d not in viste:
+            viste.add(d)
+            ordinate.append(d)
+    return ordinate, domanda_citta
+
+
+def geo_lookup(query):
+    """Una domanda a Nominatim, non piu' di una al secondo. None se non sa."""
+    params = urlencode({
+        "q": query, "format": "json", "limit": 1,
+        "countrycodes": "it", "addressdetails": 1,
+    })
+    req = urllib.request.Request(
+        f"{NOMINATIM_URL}?{params}", headers={"User-Agent": GEO_USER_AGENT}
+    )
+    with _geo_lock:
+        attesa = GEO_RATE_LIMIT_SECONDS - (time.monotonic() - _geo_ultima[0])
+        if attesa > 0:
+            time.sleep(attesa)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                dati = json.load(resp)
+        finally:
+            _geo_ultima[0] = time.monotonic()
+    if not dati:
+        return None
+    return float(dati[0]["lat"]), float(dati[0]["lon"])
+
+
+def geo_distanza_km(lat1, lon1, lat2, lon2):
+    r = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def geo_best(domande, domanda_citta, cache=None):
+    """Prova le domande in ordine e scarta il risultato preciso che cade
+    troppo lontano dal centro citta'. Torna (lat, lng, quanto e' preciso)."""
+    cache = cache if cache is not None else {}
+    punto_citta = None
+    if domanda_citta:
+        if domanda_citta not in cache:
+            cache[domanda_citta] = geo_lookup(domanda_citta)
+        punto_citta = cache[domanda_citta]
+
+    for domanda in domande:
+        if domanda == domanda_citta:
+            continue
+        if domanda not in cache:
+            cache[domanda] = geo_lookup(domanda)
+        punto = cache[domanda]
+        if not punto:
+            continue
+        if punto_citta and geo_distanza_km(punto[0], punto[1], *punto_citta) > GEO_MAX_DRIFT_KM:
+            continue
+        return punto[0], punto[1], "preciso"
+    if punto_citta:
+        return punto_citta[0], punto_citta[1], "centro citta'"
+    return None
+
+
+def geocode_location(conn, ws, loc_id, body=None):
+    """Trova il punto di un palcoscenico e lo salva. Con "force" lo rifa'
+    anche se ce l'ha gia': serve quando l'indirizzo e' stato corretto."""
+    row = conn.execute(
+        "SELECT id, name, address, city, lat, lng FROM locations "
+        "WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+    force = bool((body or {}).get("force"))
+    if row["lat"] is not None and row["lng"] is not None and not force:
+        return {"esito": "gia_fatto", "location": fetch_location(conn, ws, loc_id)}
+
+    domande, domanda_citta = geo_candidates(row["name"], row["address"], row["city"])
+    if not domande:
+        return {"esito": "senza_indirizzo", "location": fetch_location(conn, ws, loc_id)}
+    try:
+        punto = geo_best(domande, domanda_citta)
+    except Exception:
+        raise ApiError(502, "La mappa non risponde, riprova fra poco", "rete")
+    if not punto:
+        return {"esito": "non_trovato", "location": fetch_location(conn, ws, loc_id)}
+
+    conn.execute(
+        "UPDATE locations SET lat = ?, lng = ?, updated_at = ? WHERE id = ?",
+        (punto[0], punto[1], now_iso(), loc_id),
+    )
+    conn.commit()
+    return {"esito": "fatto", "precisione": punto[2], "location": fetch_location(conn, ws, loc_id)}
+
+
 DATA_URL_RE = re.compile(r"^data:image/(\w+);base64,(.+)$", re.S)
 
 
@@ -4699,6 +4848,10 @@ def _h_add_note(conn, match, query, body, ctx):
     return 201, add_note(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_geocode_location(conn, match, query, body, ctx):
+    return 200, geocode_location(conn, require_ws(ctx), int(match.group(1)), body)
+
+
 def _h_update_note(conn, match, query, body, ctx):
     return 200, update_note(conn, require_ws(ctx), int(match.group(1)), body)
 
@@ -5036,6 +5189,7 @@ ROUTES = [
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos/social$"), _h_social_cover),
     ("POST", re.compile(r"^/api/locations/(\d+)/social/instagram$"), _h_instagram_cerca),
+    ("POST", re.compile(r"^/api/locations/(\d+)/geocode$"), _h_geocode_location),
     # Il nome vecchio, da quando la foto si poteva prendere solo da Facebook:
     # risponde ancora, e fa la stessa identica cosa. Serve alle app installate
     # con una versione precedente, che chiamano ancora questo indirizzo.

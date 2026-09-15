@@ -1045,6 +1045,27 @@
       </div>
       <div class="section-footer">Scorri una segnalazione a sinistra per segnarla come fatta o rifiutata. Chi l'ha scritta vede cambiare la pastiglia dalle informazioni dell'app.</div>
 
+      <div class="section-header">POSIZIONE SULLA MAPPA</div>
+      <div class="grouped-list">
+        <div class="field-row"><label style="flex:1;">Senza posizione</label><span id="geoTodo">0</span></div>
+        <div class="field-row"><label style="flex:1;">Già sulla mappa</label><span id="geoDone">0</span></div>
+      </div>
+      <div class="section-footer">Cerca il punto partendo dal nome del locale, dall’indirizzo e dalla città, e lo salva: da lì il palcoscenico compare sulla mappa e nella sua scheda arriva il pulsante Mappa. Si può chiedere una posizione al secondo, quindi ci vuole qualche minuto: si può fermare quando vuoi, e quello che è passato resta fatto. Chi ha già un punto non viene toccato.</div>
+      <div class="grouped-list" id="geoStartWrap">
+        <div class="field-row picker" id="rowGeoStart"><span class="link-action">Trova le posizioni mancanti</span></div>
+      </div>
+      <div id="geoRunning" hidden>
+        <div class="grouped-list">
+          <div class="field-row stacked">
+            <label id="geoProgressLabel">0 di 0</label>
+            <div class="bulk-bar"><i id="geoBar"></i></div>
+            <div class="bulk-now" id="geoNow"></div>
+          </div>
+          <div class="field-row picker" id="rowGeoStop"><span class="link-action" style="color:var(--destructive);">Ferma</span></div>
+        </div>
+      </div>
+      <div id="geoReport" hidden></div>
+
       <div class="section-header">ESPORTAZIONE</div>
       <div class="grouped-list">
         <div class="row" id="rowAdminExport">
@@ -1147,41 +1168,46 @@
 
       <div class="section-header">PALCOSCENICI</div>
       <div class="grouped-list">
+        <div class="row" id="rowSettingsTypes">
+          <div class="row-main"><div class="row-title">Tipologie</div>
+          <div class="row-sub">Che posto è: pub, sagra, bagno, teatro</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsTypesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsCategories">
+          <div class="row-main"><div class="row-title">Categorie</div>
+          <div class="row-sub">Come lo raggruppi tu, a modo tuo</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsContext">
+          <div class="row-main"><div class="row-title">Contesto</div>
+          <div class="row-sub">Si suona al chiuso, all’aperto o tutti e due</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsContextCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsSeasonality">
+          <div class="row-main"><div class="row-title">Stagionalità</div>
+          <div class="row-sub">Quando il posto è aperto</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsSeasonalityCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="row" id="rowSettingsLivePeriod">
+          <div class="row-main"><div class="row-title">Periodo</div>
+          <div class="row-sub">Quando ci fanno suonare dal vivo</div></div>
+          <div class="row-trail"><span class="row-badge" id="settingsLivePeriodCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="row" id="rowSettingsAd">
           <div class="row-main"><div class="row-title">Art director</div>
           <div class="row-sub">I referenti booking da associare ai palcoscenici</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsAdCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
-        <div class="row" id="rowSettingsTypes">
-          <div class="row-main"><div class="row-title">Tipologie</div></div>
-          <div class="row-trail"><span class="row-badge" id="settingsTypesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-        <div class="row" id="rowSettingsCategories">
-          <div class="row-main"><div class="row-title">Categorie</div></div>
-          <div class="row-trail"><span class="row-badge" id="settingsCategoriesCount" style="background:var(--fill);color:var(--text-secondary);"></span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-        <div class="row" id="rowSettingsContext">
-          <div class="row-main"><div class="row-title">Contesto</div></div>
-          <div class="row-trail"><span class="row-badge" id="settingsContextCount" style="background:var(--fill);color:var(--text-secondary);"></span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-        <div class="row" id="rowSettingsSeasonality">
-          <div class="row-main"><div class="row-title">Stagionalità</div></div>
-          <div class="row-trail"><span class="row-badge" id="settingsSeasonalityCount" style="background:var(--fill);color:var(--text-secondary);"></span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
         <div class="row" id="rowSettingsSocialCovers">
           <div class="row-main"><div class="row-title">Copertine dai social</div>
           <div class="row-sub" id="socialCoversSub">Senza copertina, con un profilo Facebook o Instagram</div></div>
           <div class="row-trail"><span class="row-badge" id="socialCoversCount" style="background:var(--fill);color:var(--text-secondary);"></span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-        <div class="row" id="rowSettingsLivePeriod">
-          <div class="row-main"><div class="row-title">Periodo</div></div>
-          <div class="row-trail"><span class="row-badge" id="settingsLivePeriodCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
@@ -2051,9 +2077,6 @@
           <div class="picker-value"><span id="fCityValue" style="color:var(--text-tertiary);">Scegli una città</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
-        <div class="field-row"><label>Posizione</label>
-          <div class="picker-value"><span id="posizioneValue" style="color:var(--text-tertiary);">non trovata</span></div>
-        </div>
         <!-- Le coordinate restano, ma non si scrivono a mano: sono il
              risultato della geocodifica, non un dato da battere a tastiera.
              Restano qui dentro perche' la scheda le rimanda al server come
@@ -2062,7 +2085,7 @@
         <input id="fLat" type="hidden">
         <input id="fLng" type="hidden">
       </div>
-      <div class="section-footer">La posizione sulla mappa si ricava dall’indirizzo e dalla città: non c’è niente da scrivere. Chi ce l’ha compare sulla mappa e ha il pulsante Mappa qui sopra.</div>
+      <div class="section-footer">Il punto sulla mappa si ricava dall’indirizzo e dalla città: non c’è niente da scrivere. Chi non ce l’ha ancora lo prende dal giro che si lancia dall’Admin.</div>
 
       <div class="section-header">INFO PALCOSCENICO</div>
       <div class="grouped-list">
@@ -6004,17 +6027,6 @@
       });
   });
 
-  /* Dove sta, detto a parole: le due cifre non le legge nessuno, e il
-     perche' si e' li' o non si e' da nessuna parte e' l'unica cosa che
-     interessa a chi guarda la scheda. */
-  function renderPosizioneRow(v){
-    var el = document.getElementById("posizioneValue");
-    if(!el) return;
-    var c = v && v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "";
-    el.textContent = c ? "sulla mappa" : "non trovata";
-    el.style.color = c ? "" : "var(--text-tertiary)";
-  }
-
   function renderQuickActions(v){
     var actions = [];
     // Chiama ripiega sul fisso quando il cellulare manca: un posto che ha
@@ -6893,7 +6905,6 @@
     fAddress.value = v.address || "";
     fLat.value = v.lat != null ? v.lat : "";
     fLng.value = v.lng != null ? v.lng : "";
-    renderPosizioneRow(v);
     fCapacity.value = v.capacity || "";
     renderGenreRow(v);
     fContactName.value = v.contact_name || "";
@@ -9392,8 +9403,98 @@
   var elAdminScreen = document.getElementById("adminScreen");
   function openAdminScreen(){
     elAdminScreen.hidden = false;
+    renderGeoSection();
     requestAnimationFrame(function(){ elAdminScreen.classList.add("in"); });
   }
+
+  /* ---------------- le posizioni che mancano ----------------
+     Stesso giro delle copertine: una richiesta per palcoscenico, la barra
+     che avanza, e si puo' fermare. Non e' pigrizia di chi l'ha scritto —
+     si puo' chiedere una posizione al secondo, e cinque minuti di attesa
+     senza niente sullo schermo si leggono come "si e' bloccato".
+
+     Sta nell'Admin e non nelle Impostazioni perche' e' una cosa che si fa
+     una volta ogni tanto, dopo un import, e tocca i palcoscenici di tutti. */
+  var geoRunning = false, geoStop = false;
+  var GEO_PAUSA = 1200;   /* il server ha gia' il suo freno: questa e' l'aria per l'app */
+  function venuesSenzaPosizione(){
+    return venues.filter(function(v){
+      var senza = v.lat == null || v.lat === "" || v.lng == null || v.lng === "";
+      return !v.deleted_at && senza && ((v.address || "").trim() || (v.city || "").trim());
+    });
+  }
+  function renderGeoSection(){
+    var mancano = venuesSenzaPosizione().length;
+    var fatti = venues.filter(function(v){ return !v.deleted_at && v.lat != null && v.lat !== ""; }).length;
+    document.getElementById("geoTodo").textContent = mancano;
+    document.getElementById("geoDone").textContent = fatti;
+    document.getElementById("rowGeoStart").classList.toggle("busy", mancano === 0);
+  }
+  document.getElementById("rowGeoStop").addEventListener("click", function(){ geoStop = true; });
+  document.getElementById("rowGeoStart").addEventListener("click", function(){
+    if(geoRunning) return;
+    var coda = venuesSenzaPosizione();
+    if(!coda.length){ toast("Sono tutti sulla mappa"); return; }
+    geoRunning = true;
+    geoStop = false;
+    var esiti = {precisi:0, citta:0, non_trovati:[], errori:[]};
+    var fatti = 0;
+    document.getElementById("geoRunning").hidden = false;
+    document.getElementById("geoReport").hidden = true;
+    document.getElementById("geoReport").innerHTML = "";
+
+    function avanzamento(v){
+      document.getElementById("geoProgressLabel").textContent = fatti + " di " + coda.length;
+      document.getElementById("geoBar").style.width = Math.round(fatti * 100 / coda.length) + "%";
+      if(v) document.getElementById("geoNow").textContent = v.name || "Senza nome";
+    }
+    function passo(i){
+      if(geoStop || i >= coda.length) return fine();
+      var v = coda[i];
+      avanzamento(v);
+      api("POST", "/api/locations/" + v.id + "/geocode", {})
+        .then(function(esito){
+          if(esito.location) applyUpdatedVenue(esito.location);
+          if(esito.esito === "fatto"){
+            if(esito.precisione === "preciso") esiti.precisi++;
+            else esiti.citta++;
+          } else if(esito.esito === "non_trovato" || esito.esito === "senza_indirizzo"){
+            esiti.non_trovati.push(v);
+          }
+        })
+        .catch(function(err){ esiti.errori.push({v:v, msg:err.message}); })
+        .then(function(){
+          fatti++;
+          avanzamento(null);
+          setTimeout(function(){ passo(i + 1); }, GEO_PAUSA);
+        });
+    }
+    function elenco(titolo, righe){
+      if(!righe.length) return "";
+      var nomi = righe.map(function(r){ return esc((r.v || r).name || "Senza nome"); }).join(" · ");
+      return '<div class="section-header">'+titolo+'</div>'+
+             '<div class="grouped-list"><div class="field-row stacked"><div class="bulk-falliti">'+nomi+'</div></div></div>';
+    }
+    function fine(){
+      geoRunning = false;
+      document.getElementById("geoRunning").hidden = true;
+      renderGeoSection();
+      renderAll();
+      var interrotto = fatti < coda.length;
+      document.getElementById("geoReport").innerHTML =
+        '<div class="section-header">'+(interrotto ? "FERMATO DOPO "+fatti+" DI "+coda.length : "FATTO")+'</div>'+
+        '<div class="grouped-list">'+
+          '<div class="bulk-esito"><b>'+esiti.precisi+'</b><span>messi sul punto giusto</span></div>'+
+          '<div class="bulk-esito"><b>'+esiti.citta+'</b><span>messi al centro della loro città</span></div>'+
+          (esiti.non_trovati.length ? '<div class="bulk-esito"><b>'+esiti.non_trovati.length+'</b><span>non trovati</span></div>' : '')+
+          (esiti.errori.length ? '<div class="bulk-esito"><b>'+esiti.errori.length+'</b><span>non riusciti per altri motivi</span></div>' : '')+
+        '</div>'+
+        elenco("NON TROVATI", esiti.non_trovati)+
+        elenco("ALTRI ERRORI", esiti.errori);
+      document.getElementById("geoReport").hidden = false;
+    }
+    passo(0);
+  });
   function closeAdminScreen(){
     elAdminScreen.classList.remove("in");
     setTimeout(function(){ elAdminScreen.hidden = true; }, 320);
