@@ -1249,8 +1249,8 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="row" id="rowSettingsTags">
-          <div class="row-main"><div class="row-title">I miei tag</div>
-          <div class="row-sub">Le tue etichette sui palcoscenici: le vedi solo tu</div></div>
+          <div class="row-main"><div class="row-title">Tag</div>
+          <div class="row-sub">Le etichette libere sui palcoscenici, di tutta la band</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsTagsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
@@ -1625,11 +1625,12 @@
     </div>
   </section>
 
-  <!-- ============ PUSHED: I MIEI TAG ============
+  <!-- ============ PUSHED: TAG ============
        Schermata sua e non quella generica delle liste del palcoscenico: i
-       valori di quelle sono della band e li cambi per tutti, questi sono
-       tuoi e nessun altro li vede. Il numero accanto conta i tuoi
-       palcoscenici con quel tag, non quelli di tutti. -->
+       valori di quelle si scelgono da un elenco chiuso che qualcuno cura,
+       i tag nascono scrivendoli sulla scheda e qui si possono solo
+       rinominare o togliere. Il numero accanto conta i palcoscenici su cui
+       quel tag e' scritto. -->
   <section class="screen pushed" id="tagsScreen" hidden>
     <header class="navbar">
       <div class="navbar-row">
@@ -1637,17 +1638,14 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           Impostazioni
         </button>
-        <span class="inline-title">I miei tag</span>
+        <span class="inline-title">Tag</span>
         <span class="nav-btn" style="visibility:hidden;">Impostazioni</span>
       </div>
     </header>
     <div class="screen-scroll">
-      <div class="section-header">I MIEI TAG</div>
+      <div class="section-header">TAG DELLA BAND</div>
       <div class="grouped-list" id="tagsItems"></div>
-      <div class="section-footer">I tag si mettono dalla scheda del palcoscenico, nella riga «Tag». Qui si rinominano e si tolgono: togliere un tag non tocca i palcoscenici, che restano dove sono — e restano nei preferiti se ce li avevi messi.</div>
-      <div class="section-header" id="tagsBandHeader" hidden>ANCHE NELLA BAND</div>
-      <div class="grouped-list" id="tagsBandItems" hidden></div>
-      <div class="section-footer" id="tagsBandFoot" hidden>Nomi che qualcun altro della band sta già usando. Non sono tuoi e non li puoi cambiare, ma scrivendoli te li ritrovi proposti: è così che «anni80-90» resta un tag solo invece di diventarne tre.</div>
+      <div class="section-footer">I tag si mettono dalla scheda del palcoscenico, nella riga «Tag», e sono di tutta la band: li scrive uno e li vedono tutti. Qui si rinominano e si tolgono, dovunque siano scritti. Togliere un tag non tocca i palcoscenici, che restano dove sono — e restano nei preferiti di chi ce li aveva messi.</div>
     </div>
   </section>
 
@@ -1657,7 +1655,7 @@
       <div class="navbar-row">
         <button class="nav-btn" id="btnTagEditBack">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          I miei tag
+          Tag
         </button>
         <span class="inline-title">Tag</span>
         <button class="nav-btn primary" id="btnTagEditSave">Salva</button>
@@ -3623,32 +3621,44 @@
     });
   }
 
-  /* ---------------- le etichette personali: stella e tag ----------------
-     Il palcoscenico e' della band — nome, indirizzo, serate — ma quello che
-     tu ne pensi e' tuo: la stella e i tag sono intestati alla tua email e
-     nessun altro li vede. Per questo non arrivano dentro /api/locations
-     insieme al resto, ma da /api/my/labels, e vivono qui accanto invece che
-     dentro l'oggetto palcoscenico.
+  /* ---------------- la stella, che e' tua ----------------
+     Il palcoscenico e' della band — nome, indirizzo, serate, e da oggi anche
+     i tag — ma che ti interessi o no lo decidi tu. Per questo la stella non
+     arriva dentro /api/locations insieme al resto: sta qui accanto, letta da
+     /api/my/favorites, e lo stesso locale puo' essere segnato da te e da
+     Viciguerra senza che uno cancelli l'altro.
 
-     Tenerli separati non e' pignoleria: applyUpdatedVenue riscrive il
-     palcoscenico ogni volta che si salva una riga, e se la stella stesse li'
-     dentro basterebbe un salvataggio che non la include per cancellarla
-     sotto gli occhi. Fuori dall'oggetto non puo' succedere. */
+     Tenerla fuori dall'oggetto palcoscenico non e' pignoleria:
+     applyUpdatedVenue lo riscrive intero ogni volta che si salva una riga, e
+     se la stella stesse li' dentro basterebbe un salvataggio che non la
+     include per cancellarla sotto gli occhi. */
   var mieiPreferiti = {};   /* id -> true */
-  var mieiTag = {};         /* id -> [tag] */
-  var tagVocabolario = [];  /* [{tag, miei, band}] — i nomi in uso nella band */
   function sonoPreferito(id){ return mieiPreferiti[String(id)] === true; }
-  function tagDi(id){ return mieiTag[String(id)] || []; }
-  function applyLabels(d){
-    mieiPreferiti = {};
-    (d.favorites || []).forEach(function(id){ mieiPreferiti[String(id)] = true; });
-    mieiTag = d.tags || {};
-    tagVocabolario = d.vocabolario || [];
+  /* I tag invece sono del palcoscenico, come il tipo: si leggono da li'. */
+  function tagDi(id){
+    var v = venues.find(function(x){ return String(x.id) === String(id); });
+    return (v && v.tags) || [];
   }
-  function loadMyLabels(){
-    return api("GET", "/api/my/labels").then(function(d){
-      applyLabels(d);
-      updateTagsCount();
+  /* Il vocabolario della band non e' un elenco a parte da tenere in pari:
+     e' quello che c'e' scritto sui palcoscenici, contato al volo. Due grafie
+     dello stesso nome contano per una, e vince quella che si incontra prima. */
+  function tagVocabolario(){
+    var per_chiave = {};
+    venues.forEach(function(v){
+      if(v.deleted_at) return;
+      (v.tags || []).forEach(function(t){
+        var k = chiaveTag(t);
+        if(!k) return;
+        if(!per_chiave[k]) per_chiave[k] = {tag:t, usi:0};
+        per_chiave[k].usi++;
+      });
+    });
+    return Object.keys(per_chiave).sort().map(function(k){ return per_chiave[k]; });
+  }
+  function loadMyFavorites(){
+    return api("GET", "/api/my/favorites").then(function(d){
+      mieiPreferiti = {};
+      (d.favorites || []).forEach(function(id){ mieiPreferiti[String(id)] = true; });
       renderAll();
     });
   }
@@ -3662,6 +3672,9 @@
     renderRecontact();
     renderCash();
     updateRecontactBadge();
+    // Il conto dei tag si legge dai palcoscenici: cambia quando cambiano
+    // loro, non quando qualcuno apre le impostazioni.
+    updateTagsCount();
   }
   function loadArtDirectors(){
     return api("GET", "/api/art_directors").then(function(data){
@@ -3682,11 +3695,15 @@
       owners = data;
     });
   }
+  var venueCategoriesCaricate = false;
   function loadVenueCategories(){
     return api("GET", "/api/venue_categories").then(function(data){
       venueCategories = data;
+      venueCategoriesCaricate = true;
       renderCategoriesList();
       updateSettingsCategoriesCount();
+      var v = currentVenue();
+      if(v) renderCategoryRow(v);
     });
   }
 
@@ -3785,15 +3802,15 @@
   /* I tag nel foglio dei filtri e non piu' in una striscia di bottoni sopra
      l'elenco: di tag ce ne possono essere trenta, e trenta bottoni da
      scorrere di lato sono una fatica che un elenco con la ricerca non ha.
-     Qui dentro ci sono solo i tuoi — filtrare per un tag che non hai messo
-     su niente darebbe sempre zero.
+     Qui dentro ci sono i tag della band, che sono quelli che esistono:
+     filtrare per un nome che non e' scritto su niente darebbe sempre zero.
 
      A spunta multipla, come i generi: si sceglie, si tocca Fatto, e non
      spuntare niente vuol dire tutti. */
   document.getElementById("rowFilterTag").addEventListener("click", function(){
     var scelti = {};
     filterTags.forEach(function(t){ scelti[chiaveTag(t)] = t; });
-    var opts = mieiTagElenco().map(function(t){
+    var opts = tagVocabolario().map(function(t){
       return {label:t.tag, dato:true, checkmark: !!scelti[chiaveTag(t.tag)], onToggle:function(on){
         if(on) scelti[chiaveTag(t.tag)] = t.tag; else delete scelti[chiaveTag(t.tag)];
       }};
@@ -3937,7 +3954,7 @@
     renderFilterTagRow();
     // La riga dei tag c'e' solo se ne hai: senza tag e' una riga che dice
     // "Tutti" e non apre niente.
-    document.getElementById("rowFilterTag").hidden = !mieiTagElenco().length;
+    document.getElementById("rowFilterTag").hidden = !tagVocabolario().length;
     renderNearMeRow();
     renderShowDeletedRow();
     document.getElementById("filtersArchiveSection").hidden = (filterScope === "favorites");
@@ -6811,13 +6828,22 @@
      importato da fuori, o rimasto dopo che qualcuno ha svuotato la lista:
      nascondere la riga vorrebbe dire nascondere un dato, e per giunta uno
      che non si potrebbe piu' togliere. */
-  function mostraSeHaSenso(rowId, valoreScritto, listaPiena){
+  /* "caricata" non e' pignoleria: finche' la lista non e' tornata dal
+     server e' vuota perche' non si sa ancora, non perche' non ci sia
+     niente, e nascondere una riga in quel momento vuol dire farla sparire
+     a chi apre la scheda mentre l'app sta ancora finendo di caricarsi.
+     Nel dubbio la riga resta: una riga di troppo per mezzo secondo si
+     perdona, una che sparisce senza motivo no. */
+  function mostraSeHaSenso(rowId, valoreScritto, lista){
     var row = document.getElementById(rowId);
-    if(row) row.hidden = !listaPiena && !valoreScritto;
+    if(!row) return;
+    var vuotaDavvero = lista.caricata && !lista.valori.length;
+    row.hidden = vuotaDavvero && !valoreScritto;
   }
   function renderCategoryRow(v){
     setDato("categoryValue", v.category, "— nessuna —");
-    mostraSeHaSenso("rowCategory", v.category, venueCategories.length);
+    mostraSeHaSenso("rowCategory", v.category,
+                    {caricata: venueCategoriesCaricate, valori: venueCategories});
   }
   document.getElementById("rowCategory").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
@@ -7545,8 +7571,12 @@
   /* ---------------- la riga dei tag nella scheda ----------------
      I tag si salvano da soli appena chiudi il foglio, come il tipo o la
      citta': li' stai scegliendo, non scrivendo, e non c'entrano niente con
-     il Salva della scheda — che e' la bozza del palcoscenico, roba della
-     band. Questi sono tuoi e vanno subito. */
+     il Salva della scheda, che e' la bozza del palcoscenico.
+
+     Sono della band: quello che scrivi qui lo vedono tutti, e chiunque puo'
+     toglierlo. Il vocabolario di nomi che l'autocompletamento propone non e'
+     un elenco da nessuna parte — e' quello che c'e' scritto sugli altri
+     palcoscenici. */
   var elTagsValue = document.getElementById("tagsValue");
   function chiaveTag(t){ return (t || "").trim().toLowerCase(); }
   function renderTagsRow(v){
@@ -7554,23 +7584,23 @@
   }
   function salvaTag(id, lista){
     var key = String(id);
-    var prima = tagDi(id).slice();
+    var v = venues.find(function(x){ return String(x.id) === key; });
+    var prima = (v && v.tags) ? v.tags.slice() : [];
     // Prima si vede, poi si scrive: il foglio si e' appena chiuso e la riga
     // deve gia' dire quello che hai scelto.
-    if(lista.length) mieiTag[key] = lista; else delete mieiTag[key];
+    if(v) v.tags = lista;
     if(String(currentId) === key) renderTagsRow(currentVenue());
     renderAll();
-    api("PUT", "/api/locations/" + id + "/tags", {tags: lista}).then(function(esito){
-      // Il server puo' aver cambiato la grafia: se "anni80-90" nella band
-      // c'era gia', quello che torna e' come l'ha scritto chi e' arrivato
-      // prima, ed e' quello che si tiene.
-      if(esito.tags && esito.tags.length) mieiTag[key] = esito.tags; else delete mieiTag[key];
-      if(esito.vocabolario) tagVocabolario = esito.vocabolario;
+    api("PUT", "/api/locations/" + id + "/tags", {tags: lista}).then(function(updated){
+      // Torna il palcoscenico intero, con i tag come li ha scritti il
+      // server: se "anni80-90" nella band c'era gia', quella che si tiene e'
+      // la grafia di chi e' arrivato prima.
+      applyUpdatedVenue(updated);
       if(String(currentId) === key) renderTagsRow(currentVenue());
       updateTagsCount();
       renderAll();
     }).catch(function(err){
-      if(prima.length) mieiTag[key] = prima; else delete mieiTag[key];
+      if(v) v.tags = prima;
       if(String(currentId) === key) renderTagsRow(currentVenue());
       renderAll();
       toast(err.message || "Impossibile salvare i tag");
@@ -7594,9 +7624,9 @@
     // Prima i tag che questo posto ha gia', poi il resto del vocabolario
     // della band: quello che c'e' si toglie senza doverlo cercare.
     tagDi(id).forEach(function(t){ aggiungi(t); });
-    tagVocabolario.forEach(function(v){ aggiungi(v.tag); });
+    tagVocabolario().forEach(function(v){ aggiungi(v.tag); });
     openSheet({
-      title: "I miei tag",
+      title: "Tag",
       searchable: true,
       searchPlaceholder: "Cerca o scrivi un tag nuovo…",
       multiSelect: true,
@@ -8730,6 +8760,7 @@
     L.g = g;
     L.field = L.key;
     L.values = [];
+    L.caricata = false;
     L.filter = "all";
   });
   function venueListByKey(key){
@@ -8739,8 +8770,14 @@
   function loadVenueList(L){
     return api("GET", "/api/venue_lists/" + L.key).then(function(data){
       L.values = data;
+      L.caricata = true;
       updateVenueListCount(L);
       if(currentVenueList === L) renderVenueListItems();
+      // La scheda aperta si rimette in pari da sola: e' l'unico momento in
+      // cui una riga puo' dover comparire o sparire senza che tu abbia
+      // toccato niente.
+      var v = currentVenue();
+      if(v) renderVenueListPickerRow(L, v);
     });
   }
   function loadVenueLists(){
@@ -8760,7 +8797,7 @@
   /* --- la riga nella scheda del palcoscenico --- */
   function renderVenueListPickerRow(L, v){
     setDato(L.ids.value, v[L.field], L.g.nessuno);
-    mostraSeHaSenso(L.ids.row, v[L.field], L.values.length);
+    mostraSeHaSenso(L.ids.row, v[L.field], {caricata: L.caricata, valori: L.values});
   }
   VENUE_LISTS.forEach(function(L){
     document.getElementById(L.ids.row).addEventListener("click", function(){
@@ -9070,47 +9107,31 @@
     }).catch(function(err){ toast(err.message); });
   });
 
-  /* ---------------- Impostazioni: i miei tag ----------------
+  /* ---------------- Impostazioni: i tag della band ----------------
      Rinominare e togliere. Mettere no: un tag si mette dove lo si usa, cioe'
      sulla scheda del palcoscenico — un tag creato qui dentro non sarebbe
      ancora su niente, e resterebbe un nome in un elenco.
 
-     Tutto quello che si fa qui tocca solo i tuoi: il nome e' della band (lo
-     vedono proposto tutti) ma i palcoscenici che ci hai messo sotto sono
-     cosa tua, e nessun altro se li vede cambiare sotto le mani. */
+     Quello che si fa qui vale per la band intera: i tag sono del
+     palcoscenico come il tipo, e rinominarne uno lo rinomina dovunque sia
+     scritto. Per questo la conferma dice quanti posti tocca. */
   var elTagsScreen = document.getElementById("tagsScreen");
   var elTagEditScreen = document.getElementById("tagEditScreen");
-  function mieiTagElenco(){
-    return tagVocabolario.filter(function(t){ return t.miei > 0; });
-  }
   function updateTagsCount(){
     var el = document.getElementById("settingsTagsCount");
-    if(el) el.textContent = mieiTagElenco().length;
+    if(el) el.textContent = tagVocabolario().length;
   }
   function renderTagsItems(){
     var el = document.getElementById("tagsItems");
     if(!el) return;
-    var miei = mieiTagElenco();
-    el.innerHTML = miei.length ? miei.map(function(t){
+    var tutti = tagVocabolario();
+    el.innerHTML = tutti.length ? tutti.map(function(t){
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-tag="'+esc(t.tag)+'">'+
         '<div class="row-main"><div class="row-title">'+dato(t.tag)+'</div></div>'+
-        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+t.miei+'</span>'+
+        '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+t.usi+'</span>'+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-tag-del="'+esc(t.tag)+'">Togli da tutti</button></div></div>';
     }).join("") : '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun tag ancora. Si mettono dalla scheda di un palcoscenico.</div>';
-
-    // Quelli degli altri stanno sotto, in chiaro e senza niente da toccare:
-    // servono a far vedere che il vocabolario e' di tutti.
-    var altrui = tagVocabolario.filter(function(t){ return !t.miei; });
-    var wrap = document.getElementById("tagsBandItems");
-    ["tagsBandHeader", "tagsBandItems", "tagsBandFoot"].forEach(function(idx){
-      document.getElementById(idx).hidden = !altrui.length;
-    });
-    if(altrui.length){
-      wrap.innerHTML = altrui.map(function(t){
-        return '<div class="field-row"><label style="flex:1;">'+dato(t.tag)+'</label></div>';
-      }).join("");
-    }
   }
   document.getElementById("rowSettingsTags").addEventListener("click", function(){
     renderTagsItems();
@@ -9126,10 +9147,13 @@
     var del = e.target.closest("[data-tag-del]");
     if(del){
       var tag = del.getAttribute("data-tag-del");
-      confirmDestructive("Togliere «" + tag + "» da tutti i tuoi palcoscenici?", function(){
-        api("POST", "/api/my/tags/delete", {tag: tag}).then(function(d){
-          applyLabels(d);
-          renderTagsItems(); updateTagsCount(); renderAll();
+      var quanti = (tagVocabolario().filter(function(t){ return chiaveTag(t.tag) === chiaveTag(tag); })[0] || {}).usi || 0;
+      confirmDestructive("Togliere «" + tag + "» da " + quanti +
+          (quanti === 1 ? " palcoscenico? Lo perde tutta la band." : " palcoscenici? Lo perde tutta la band."), function(){
+        api("POST", "/api/tags/delete", {tag: tag}).then(function(){
+          return loadVenues();
+        }).then(function(){
+          renderTagsItems(); updateTagsCount();
           if(currentId) renderTagsRow(currentVenue());
           toast("Tag tolto");
         }).catch(function(err){ toast(err.message); });
@@ -9142,14 +9166,14 @@
 
   var tagInModifica = null;
   function openTagEditScreen(tag){
-    var voce = mieiTagElenco().filter(function(t){ return t.tag === tag; })[0];
+    var voce = tagVocabolario().filter(function(t){ return t.tag === tag; })[0];
     if(!voce) return;
     tagInModifica = voce.tag;
     var input = document.getElementById("tagEditName");
     input.value = voce.tag;
     document.getElementById("tagEditUsage").textContent =
-      "Su " + voce.miei + (voce.miei === 1 ? " tuo palcoscenico." : " tuoi palcoscenici.") +
-      (voce.band > voce.miei ? " Nella band lo usa anche qualcun altro: rinominandolo cambi solo i tuoi." : "");
+      "Su " + voce.usi + (voce.usi === 1 ? " palcoscenico." : " palcoscenici.") +
+      " I tag sono della band: rinominandolo cambia per tutti.";
     elTagEditScreen.hidden = false;
     requestAnimationFrame(function(){ elTagEditScreen.classList.add("in"); });
     setTimeout(function(){ input.focus(); }, 260);
@@ -9166,10 +9190,9 @@
     if(!nome){ toast("Il nome è obbligatorio"); return; }
     var vecchio = tagInModifica;
     withButtonBusy(this, function(){
-      return api("PUT", "/api/my/tags/rename", {tag: vecchio, nuovo: nome});
-    }).then(function(d){
-      applyLabels(d);
-      renderTagsItems(); updateTagsCount(); renderAll();
+      return api("PUT", "/api/tags/rename", {tag: vecchio, nuovo: nome}).then(loadVenues);
+    }).then(function(){
+      renderTagsItems(); updateTagsCount();
       if(currentId) renderTagsRow(currentVenue());
       toast("Tag rinominato");
       closeTagEditScreen();
@@ -10768,7 +10791,7 @@
      avvio, dopo un cambio band e dopo la creazione della prima band. */
   function loadAllData(){
     return Promise.all([
-      loadVenues(), loadMyLabels(), loadArtDirectors(), loadBands(), loadVenueTypes(),
+      loadVenues(), loadMyFavorites(), loadArtDirectors(), loadBands(), loadVenueTypes(),
       loadVenueCategories(), loadVenueLists(), loadProvince(), loadReports(), loadAdminReports(), loadOwners(), loadMyBands(), loadWaTemplates(), loadMailTemplates(),
       loadTemplates(), loadCash(), loadCostCategories()
     ]).catch(function(){
