@@ -173,6 +173,17 @@
   .btn-spinner{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:btn-spin .6s linear infinite;vertical-align:-2px;}
   @keyframes btn-spin{to{transform:rotate(360deg);}}
   @media (prefers-reduced-motion:reduce){.btn-spinner{animation-duration:1.4s;}}
+  /* Tira l'elenco verso il basso e si ricarica. La fascia e' una riga alta
+     zero in cima al contenuto: cresce con il dito e spinge giu' l'elenco,
+     come fa il telefono da solo, invece di galleggiarci sopra — cosi' non
+     deve sapere niente di quanto e' alta la navbar, che qui cambia da una
+     schermata all'altra. */
+  .ptr{height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);}
+  .ptr .btn-spinner{opacity:.35;animation:none;}
+  /* Acceso quando hai tirato abbastanza: e' l'unico modo di sapere, prima
+     di mollare, che il gesto conta. */
+  .ptr-pronto .btn-spinner{opacity:1;color:var(--tint);}
+  .ptr-gira .btn-spinner{opacity:1;color:var(--tint);animation:btn-spin .6s linear infinite;transform:none !important;}
   .navbar-trailing{display:flex;align-items:center;gap:13px;}
   .navbar-row .nav-btn svg{display:block;}
   .navbar-row .inline-title{position:absolute;left:50%;transform:translateX(-50%);font-size:17px;font-weight:600;opacity:0;transition:opacity .2s;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
@@ -10810,6 +10821,91 @@
     else toast(error);
     history.replaceState(null, "", window.location.pathname);
   }
+
+  /* ---------------- tira verso il basso per aggiornare ----------------
+     Si prende solo se l'elenco e' gia' in cima e solo se il dito va giu'.
+     Di traverso stai scoprendo le azioni di una riga — archivia, elimina —
+     e quello non deve mai diventare un ricaricamento; verso l'alto stai
+     semplicemente scorrendo. Deciso una volta all'inizio del movimento, il
+     gesto non cambia idea: a meta' trascinamento non si passa da "sto
+     scorrendo" a "sto ricaricando". */
+  var PTR_SOGLIA = 62;   /* quanto dev'essere scesa la fascia perche' conti */
+  var PTR_MAX = 92;      /* oltre non cresce piu': si sente che c'e' un fondo */
+  function tiraPerAggiornare(scrollEl, ricarica){
+    if(!scrollEl) return;
+    var barra = document.createElement("div");
+    barra.className = "ptr";
+    barra.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span>';
+    scrollEl.insertBefore(barra, scrollEl.firstChild);
+    var gira = barra.firstChild;
+    var y0 = 0, x0 = 0, preso = false, deciso = false, inCorso = false;
+
+    function altezza(h, morbido){
+      barra.style.transition = morbido ? "height .22s" : "none";
+      barra.style.height = h + "px";
+    }
+    function chiudi(){
+      barra.classList.remove("ptr-pronto", "ptr-gira");
+      gira.style.transform = "";
+      altezza(0, true);
+    }
+
+    scrollEl.addEventListener("touchstart", function(e){
+      if(inCorso || e.touches.length !== 1) return;
+      preso = scrollEl.scrollTop <= 0;
+      deciso = false;
+      y0 = e.touches[0].clientY;
+      x0 = e.touches[0].clientX;
+    }, {passive:true});
+
+    scrollEl.addEventListener("touchmove", function(e){
+      if(!preso || inCorso || e.touches.length !== 1) return;
+      var dy = e.touches[0].clientY - y0;
+      var dx = Math.abs(e.touches[0].clientX - x0);
+      if(!deciso){
+        if(Math.abs(dy) < 8 && dx < 8) return;   // troppo poco per capire dove vai
+        deciso = true;
+        if(dy <= 0 || dx > Math.abs(dy)){ preso = false; return; }
+      }
+      if(dy <= 0){ altezza(0, false); return; }
+      // Piu' tiri, meno scende: senza questa frenata la fascia seguirebbe il
+      // dito fino a mezzo schermo e non si capirebbe piu' dov'e' la soglia.
+      var h = Math.min(PTR_MAX, dy * 0.5);
+      altezza(h, false);
+      barra.classList.toggle("ptr-pronto", h >= PTR_SOGLIA);
+      gira.style.transform = "rotate(" + Math.round(h * 4) + "deg)";
+      if(e.cancelable) e.preventDefault();
+    }, {passive:false});
+
+    scrollEl.addEventListener("touchend", function(){
+      if(!preso || inCorso) return;
+      preso = false;
+      if((parseFloat(barra.style.height) || 0) < PTR_SOGLIA){ chiudi(); return; }
+      inCorso = true;
+      barra.classList.remove("ptr-pronto");
+      barra.classList.add("ptr-gira");
+      altezza(44, true);
+      Promise.resolve()
+        .then(ricarica)
+        .catch(function(){ toast("Non sono riuscito ad aggiornare"); })
+        .then(function(){
+          inCorso = false;
+          chiudi();
+        });
+    }, {passive:true});
+  }
+
+  /* Cosa si ricarica: i palcoscenici (da cui vengono Home, elenco, preferiti,
+     opportunita' e agenda), la tua stella e la cassa. Sono le tre cose che
+     cambiano mentre la band lavora; tipologie e categorie no, e ricaricarle a
+     ogni trascinamento sarebbe una decina di richieste per niente. */
+  function ricaricaDati(){
+    return Promise.all([loadVenues(), loadMyFavorites(), loadCash()]);
+  }
+  ["scrollHome", "scrollList", "scrollFavorites", "scrollGigs", "scrollRecontact", "scrollCash"]
+    .forEach(function(id){ tiraPerAggiornare(document.getElementById(id), ricaricaDati); });
+  tiraPerAggiornare(document.getElementById("scrollBands"), loadBands);
+  tiraPerAggiornare(document.getElementById("scrollAd"), loadArtDirectors);
 
   /* ---------------- swipe da bordo sinistro per tornare indietro ---------------- */
   function addEdgeSwipeBack(screenEl, closeFn){
