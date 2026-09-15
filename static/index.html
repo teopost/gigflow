@@ -825,10 +825,11 @@
        segmento "Serate" dell'Agenda tiene solo quelle con una data, perche'
        li' si lavora a calendario, e la scheda ne mostra solo le sue.
 
-       Tre schede, e la prima e' quella da lavorare: Aperte (la trattativa e'
-       ancora in mano a qualcuno), Chiuse (com'e' finita), Tutte in fondo
-       perche' e' l'archivio, non il lavoro di oggi. Ognuna porta il suo
-       conteggio, che non cambia con la ricerca: dice dove c'e' roba.
+       Due schede, e la prima e' quella da lavorare: Aperte (la trattativa e'
+       ancora in mano a qualcuno) e Chiuse (com'e' finita). Ognuna porta il
+       suo conteggio, che non cambia con la ricerca: dice dove c'e' roba.
+       Una terza, "Tutte", c'e' stata fino al 15 settembre 2026: era la somma
+       delle altre due, e nessuno ci lavorava dentro.
 
        Sta fra Preferiti e Agenda perche' e' un archivio da sfogliare, come i
        Preferiti, e non un elenco di cose da fare come l'Agenda. -->
@@ -856,10 +857,9 @@
         </div>
       </div>
       <div class="view-toggle-wrap">
-        <div class="view-toggle tre" id="gigsScopeToggle">
+        <div class="view-toggle" id="gigsScopeToggle">
           <button class="view-toggle-btn active" data-gigscope="aperte">Aperte</button>
           <button class="view-toggle-btn" data-gigscope="chiuse">Chiuse</button>
-          <button class="view-toggle-btn" data-gigscope="tutte">Tutte</button>
         </div>
       </div>
     </header>
@@ -894,13 +894,16 @@
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact">
+        <div class="scope-note">I palcoscenici con una serata aperta e un periodo in cui richiamarli, ordinati per quando tocca. Fuori gli archiviati e chi ha già suonato: quella stagione è chiusa, e si riparte da «Riproponi».</div>
         <div id="recontactBulk"></div>
         <div id="recontactList"></div>
       </div>
       <div id="agendaPanePlan" hidden>
+        <div class="scope-note">I palcoscenici con una serata aperta a cui non hai ancora detto quando richiamarli: è l’arretrato. Fuori gli archiviati. Scegliere il periodo è l’unico gesto che serve, e sposta la riga in «Da contattare».</div>
         <div id="planList"></div>
       </div>
       <div id="agendaPaneGigs" hidden>
+        <div class="scope-note">Le serate con una data, di ogni stagione, comprese quelle dei palcoscenici archiviati: una sera in cui hai suonato è successa lo stesso. Quelle senza data stanno in Opportunità.</div>
         <div id="agendaGigsList"></div>
       </div>
     </div>
@@ -4238,7 +4241,7 @@
   });
 
   /* ---------------- SERATE tab ----------------
-     Tutte le serate di tutti i palcoscenici, di ogni stagione: e' l'archivio
+     Le serate di tutti i palcoscenici, di ogni stagione: e' l'archivio
      dei tentativi, non una coda di lavoro — per quella c'e' l'Agenda.
 
      Quelle senza data ci sono come le altre, ed e' il motivo per cui questo
@@ -4273,7 +4276,6 @@
   var GIG_SCOPE_NOTE = {
     aperte: "Le trattative ancora in ballo: Opportunità, Contattato, Interessato, Trattativa. Fuori i palcoscenici archiviati.",
     chiuse: "Le serate arrivate a un esito: Confermato, Rifiutata, Suonato, Annullato. Una confermata sta qui perché non c’è più niente da trattare, anche se deve ancora essere suonata. Fuori i palcoscenici archiviati.",
-    tutte: "Tutte le serate di tutti i palcoscenici, di ogni stagione, con la data o senza — comprese quelle dei palcoscenici archiviati."
   };
   function isGigChiusa(k){ return GIG_CHIUSE.indexOf(k) > -1; }
   /* Gli stati che ha senso filtrare qui dentro: quelli della scheda aperta.
@@ -4281,7 +4283,7 @@
      vuoto. */
   function gigsScopeStatuses(){
     return GIG_STATUSES.filter(function(s){
-      return gigsScope === "tutte" || isGigChiusa(s.key) === (gigsScope === "chiuse");
+      return isGigChiusa(s.key) === (gigsScope === "chiuse");
     });
   }
 
@@ -4292,13 +4294,13 @@
     });
     return out;
   }
-  /* Le serate dei palcoscenici archiviati stanno solo in "Tutte": un posto
-     messo via non e' lavoro in corso, e in mezzo alle chiuse sarebbe
-     rumore. In archivio ci finiscono anche stagioni vere, e quelle vanno
-     ritrovate: per questo restano, ma in fondo. */
+  /* Le serate dei palcoscenici archiviati restano fuori da tutte e due le
+     schede: un posto messo via non e' lavoro in corso. Fino al 15 settembre
+     2026 si ritrovavano in "Tutte"; adesso che quella scheda non c'e' piu'
+     si leggono dalla scheda del palcoscenico, e quelle con una data anche
+     dal segmento Serate dell'Agenda, che gli archiviati li tiene dentro. */
   function gigsInScope(){
     return allGigRows().filter(function(x){
-      if(gigsScope === "tutte") return true;
       if(x.v.deleted_at) return false;
       return isGigChiusa(x.g.status) === (gigsScope === "chiuse");
     });
@@ -4343,8 +4345,8 @@
      divideva niente. Per stato invece l'elenco si legge come una pila: le
      trattative in cima, le opportunita' appena aperte in fondo.
 
-     In "Chiuse" e in "Tutte" per anno, dalla piu' recente: li' la data c'e'
-     e la domanda e' quando, non a che punto. */
+     In "Chiuse" per anno, dalla piu' recente: li' la data c'e' e la domanda
+     e' quando, non a che punto. */
   function gruppiPerStato(righe){
     var ordine = GIG_STATUSES.map(function(s){ return s.key; }).reverse();
     var gruppi = {};
@@ -4456,8 +4458,15 @@
   /* ---------------- AGENDA tab ----------------
      Tre segmenti: quando chiamare (il periodo), a chi manca la serata
      aperta, e cosa ne e' uscito (le serate con una data). I palcoscenici
-     archiviati restano fuori da tutti e tre: in agenda ci va solo quello su
-     cui si lavora davvero. */
+     archiviati restano fuori dai primi due, che sono code di lavoro: in
+     agenda ci va solo quello su cui si lavora davvero. Nel terzo ci sono,
+     perche' li' c'e' il calendario di quello che e' successo — il motivo
+     sta su datedGigRows().
+
+     Sotto le schede, una riga che dice cosa entra in quel segmento e cosa
+     no: sono regole (serata aperta, periodo, data) che dalle righe non si
+     vedono, e senza quella riga l'unico modo di sapere perche' un
+     palcoscenico non c'e' e' indovinarlo. Stessa cosa in Opportunita'. */
   var elRecontactList = document.getElementById("recontactList");
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
