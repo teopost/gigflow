@@ -4335,10 +4335,45 @@
     });
     document.getElementById("gigsFilterDot").hidden = !gigsStatusFilter.length;
   }
-  /* Raggruppate per anno, e le senza data in cima: sono quelle in ballo
-     adesso, e in fondo a un elenco lungo trecento righe non le vedrebbe
-     nessuno. Dentro l'anno, dalla piu' recente; fra le senza data, in ordine
-     di palcoscenico, che e' l'unica cosa per cui si distinguono. */
+  /* Come si raggruppa dipende da cosa stai guardando.
+
+     In "Aperte" per stato: una serata prende la data solo quando e'
+     confermata, e una confermata sta nelle chiuse — quindi li' dentro erano
+     tutte "Senza data", un'intestazione sola sopra trenta righe che non
+     divideva niente. Per stato invece l'elenco si legge come una pila: le
+     trattative in cima, le opportunita' appena aperte in fondo.
+
+     In "Chiuse" e in "Tutte" per anno, dalla piu' recente: li' la data c'e'
+     e la domanda e' quando, non a che punto. */
+  function gruppiPerStato(righe){
+    var ordine = GIG_STATUSES.map(function(s){ return s.key; }).reverse();
+    var gruppi = {};
+    righe.forEach(function(x){ (gruppi[x.g.status] = gruppi[x.g.status] || []).push(x); });
+    return ordine.filter(function(k){ return gruppi[k]; }).map(function(k){
+      return {titolo: gigStatusInfo(k).label, righe: gruppi[k].sort(perNomePalcoscenico)};
+    });
+  }
+  function gruppiPerAnno(righe){
+    var gruppi = {};
+    righe.forEach(function(x){
+      var k = gigYear(x.g) || "";
+      (gruppi[k] = gruppi[k] || []).push(x);
+    });
+    return Object.keys(gruppi).sort(function(a, b){
+      if(a === "" || b === "") return a === "" ? -1 : 1;
+      return a < b ? 1 : -1;
+    }).map(function(k){
+      return {
+        titolo: k === "" ? "Senza data" : k,
+        righe: gruppi[k].sort(k === "" ? perNomePalcoscenico : function(a, b){
+          return a.g.gig_date < b.g.gig_date ? 1 : -1;
+        })
+      };
+    });
+  }
+  function perNomePalcoscenico(a, b){
+    return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
+  }
   function renderAllGigs(){
     var ambito = gigsInScope();
     var righe = ambito;
@@ -4372,22 +4407,12 @@
         '<div class="empty-state">'+vuoto+'</div>';
       return;
     }
-    var gruppi = {};
-    righe.forEach(function(x){
-      var k = gigYear(x.g) || "";
-      (gruppi[k] = gruppi[k] || []).push(x);
-    });
     var html = '<div class="scope-note">'+esc(GIG_SCOPE_NOTE[gigsScope] || "")+'</div>';
-    Object.keys(gruppi).sort(function(a, b){
-      if(a === "" || b === "") return a === "" ? -1 : 1;
-      return a < b ? 1 : -1;
-    }).forEach(function(k){
-      var gruppo = gruppi[k].sort(k === ""
-        ? function(a, b){ return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it"); }
-        : function(a, b){ return a.g.gig_date < b.g.gig_date ? 1 : -1; });
-      html += '<div class="agenda-group">'+(k === "" ? "Senza data" : esc(k))+
-        '<span class="group-count">'+gruppo.length+'</span></div>'+
-        '<div class="grouped-list">'+gruppo.map(allGigRowHtml).join("")+'</div>';
+    var gruppi = gigsScope === "aperte" ? gruppiPerStato(righe) : gruppiPerAnno(righe);
+    gruppi.forEach(function(g){
+      html += '<div class="agenda-group">'+esc(g.titolo)+
+        '<span class="group-count">'+g.righe.length+'</span></div>'+
+        '<div class="grouped-list">'+g.righe.map(allGigRowHtml).join("")+'</div>';
     });
     elAllGigs.innerHTML = html;
   }
