@@ -37,6 +37,7 @@
     --shadow:rgba(0,0,0,.14);
 
     --slate:#8e8e93;   --slate-soft:#e9e9eb;
+    --indigo:#5e5ce6;  --indigo-soft:#e4e3fd;
     --teal:#0d8ca3;    --teal-soft:#d3eef4;
     --blue:#007aff;    --blue-soft:#d9ecff;
     --orange:#ff9500;  --orange-soft:#ffedd1;
@@ -68,6 +69,7 @@
       --shadow:rgba(0,0,0,.5);
 
       --slate:#98989f;   --slate-soft:#28282a;
+      --indigo:#7d7aff;  --indigo-soft:#1e1b42;
       --teal:#40c8e0;    --teal-soft:#0e3239;
       --blue:#0a84ff;    --blue-soft:#122a42;
       --orange:#ff9f0a;  --orange-soft:#3a2a10;
@@ -96,6 +98,7 @@
     --shadow:rgba(0,0,0,.5);
 
     --slate:#98989f;   --slate-soft:#28282a;
+    --indigo:#7d7aff;  --indigo-soft:#1e1b42;
     --teal:#40c8e0;    --teal-soft:#0e3239;
     --blue:#0a84ff;    --blue-soft:#122a42;
     --orange:#ff9f0a;  --orange-soft:#3a2a10;
@@ -569,9 +572,10 @@
   .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:var(--bg-tabbar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid var(--separator);padding-bottom:env(safe-area-inset-bottom);}
   .tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 3px 6px;background:none;border:none;color:var(--text-secondary);cursor:pointer;}
   .tab svg{display:block;}
-  /* Con la Cassa le voci sono sette: su un telefono stretto l'etichetta piu'
-     lunga non ci sta piu' per intero. Meglio accorciarla con i puntini che
-     lasciarla sfondare la riga o mandare le icone a capo. */
+  /* Con la Cassa le voci erano sette, con le Serate sono otto (a chi ha piu'
+     di una band): su un telefono stretto l'etichetta piu' lunga non ci sta
+     piu' per intero. Meglio accorciarla con i puntini che lasciarla sfondare
+     la riga o mandare le icone a capo. */
   .tab .tab-label{font-size:10.5px;font-weight:500;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   @media (max-width:400px){ .tab .tab-label{font-size:9.5px;letter-spacing:-.01em;} }
   .tab.active{color:var(--tint);}
@@ -638,6 +642,9 @@
   .sheet-search-field input::placeholder{color:var(--text-secondary);}
   .sheet-option{width:100%;display:flex;align-items:center;gap:10px;justify-content:center;padding:16px;border:none;background:none;font-size:17px;color:var(--tint);cursor:pointer;text-align:center;}
   .sheet-option + .sheet-option{border-top:.5px solid var(--separator);}
+  /* La foto del profilo dentro il foglio: su un elenco di nomi utente che si
+     somigliano tutti e' l'unica cosa che fa riconoscere il locale. */
+  .sheet-thumb{flex:none;width:34px;height:34px;border-radius:50%;object-fit:cover;background:var(--fill);}
   .sheet-option.destructive{color:var(--destructive);}
   .sheet-option .dot{width:10px;height:10px;border-radius:50%;flex:none;}
   .sheet-option .check{margin-left:4px;}
@@ -770,13 +777,13 @@
       </div>
       <div class="view-toggle-wrap" id="favScopeWrap">
         <div class="view-toggle" id="favScopeToggle">
-          <button class="view-toggle-btn active" data-favscope="all">
+          <button class="view-toggle-btn active" data-favscope="mine">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20v-1.8a5 5 0 0 0-5-5h-4a5 5 0 0 0-5 5V20"/><circle cx="12" cy="7" r="3.6"/></svg>
+            I miei preferiti
+          </button>
+          <button class="view-toggle-btn" data-favscope="all">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.6a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.2"/><path d="M22 20v-1.6a4 4 0 0 0-3-3.87"/><path d="M16.5 4.2a4 4 0 0 1 0 6.6"/></svg>
             Mostra tutti
-          </button>
-          <button class="view-toggle-btn" data-favscope="mine">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20v-1.8a5 5 0 0 0-5-5h-4a5 5 0 0 0-5 5V20"/><circle cx="12" cy="7" r="3.6"/></svg>
-            I miei
           </button>
         </div>
       </div>
@@ -786,11 +793,50 @@
     </div>
   </section>
 
+  <!-- ============ TAB: SERATE ============
+       L'elenco completo: ogni tentativo di ogni palcoscenico, di ogni
+       stagione, con la data o senza. E' l'unico posto dove ci sono tutte —
+       il segmento "Serate" dell'Agenda tiene solo quelle con una data,
+       perche' li' si lavora a calendario, e la scheda ne mostra solo le sue.
+
+       Sta fra Preferiti e Agenda perche' e' un archivio da sfogliare, come i
+       Preferiti, e non un elenco di cose da fare come l'Agenda. -->
+  <section class="screen tab-screen" id="tabGigs" data-tab="gigs" hidden>
+    <header class="navbar" id="navGigs">
+      <div class="navbar-row"><span class="inline-title">Serate</span></div>
+      <div class="large-title-wrap">
+        <h1 class="large-title">Serate</h1>
+        <div class="subtitle-count" id="gigsSub">0 serate</div>
+      </div>
+      <div class="searchbar-wrap">
+        <div class="searchbar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="gigsSearchInput" type="text" placeholder="Cerca per palcoscenico o città…" autocomplete="off">
+          <button class="clear-btn" id="gigsSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
+        </div>
+      </div>
+      <div class="view-toggle-wrap">
+        <div class="view-toggle tre" id="gigsScopeToggle">
+          <button class="view-toggle-btn active" data-gigscope="all">Tutte</button>
+          <button class="view-toggle-btn" data-gigscope="open">Aperte</button>
+          <button class="view-toggle-btn" data-gigscope="played">Suonate</button>
+        </div>
+      </div>
+    </header>
+    <div class="screen-scroll" id="scrollGigs">
+      <div id="allGigsList"></div>
+    </div>
+  </section>
+
   <!-- ============ TAB: AGENDA ============
        Tre facce della stessa domanda: chi chiamare e quando (Da contattare),
        a chi manca ancora la serata da aprire (Da pianificare), e cosa ne e'
-       uscito (Serate). Stanno in un tab solo perche' la tabbar di un
-       telefono non regge una voce in piu'. -->
+       uscito (Serate). Stanno in un tab solo perche' sono tre code di
+       lavoro, e si passa dall'una all'altra nella stessa giornata.
+
+       Il terzo segmento va a calendario e tiene solo le serate con una
+       data: l'elenco completo, quelle senza data comprese, sta nel suo tab
+       (Serate, qui sopra nella tabbar). -->
   <section class="screen tab-screen" id="tabRecontact" data-tab="recontact" hidden>
     <header class="navbar" id="navRecontact">
       <div class="navbar-row"><span class="inline-title">Agenda</span></div>
@@ -1087,10 +1133,10 @@
           <div class="row-trail"><span class="row-badge" id="settingsSeasonalityCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
-        <div class="row" id="rowSettingsFbCovers">
-          <div class="row-main"><div class="row-title">Copertine da Facebook</div>
-          <div class="row-sub" id="fbCoversSub">Senza copertina, con una pagina Facebook</div></div>
-          <div class="row-trail"><span class="row-badge" id="fbCoversCount" style="background:var(--fill);color:var(--text-secondary);"></span>
+        <div class="row" id="rowSettingsSocialCovers">
+          <div class="row-main"><div class="row-title">Copertine dai social</div>
+          <div class="row-sub" id="socialCoversSub">Senza copertina, con un profilo Facebook o Instagram</div></div>
+          <div class="row-trail"><span class="row-badge" id="socialCoversCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="row" id="rowSettingsLivePeriod">
@@ -1161,10 +1207,10 @@
   </section>
 
   <!-- ============ PUSHED: COPERTINE DA FACEBOOK ============ -->
-  <section class="screen pushed" id="fbCoversScreen" hidden>
+  <section class="screen pushed" id="socialCoversScreen" hidden>
     <header class="navbar">
       <div class="navbar-row">
-        <button class="nav-btn" id="btnFbCoversBack">
+        <button class="nav-btn" id="btnSocialCoversBack">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           Impostazioni
         </button>
@@ -1175,27 +1221,27 @@
     <div class="screen-scroll">
       <div class="section-header">DA FARE</div>
       <div class="grouped-list">
-        <div class="field-row"><label style="flex:1;">Senza copertina, con pagina Facebook</label><span id="fbBulkTodo">0</span></div>
-        <div class="field-row"><label style="flex:1;">Copertine già a posto</label><span id="fbBulkDone">0</span></div>
+        <div class="field-row"><label style="flex:1;">Senza copertina, con un profilo social</label><span id="bulkCoverTodo">0</span></div>
+        <div class="field-row"><label style="flex:1;">Copertine già a posto</label><span id="bulkCoverDone">0</span></div>
       </div>
-      <div class="section-footer">Prende l’immagine del profilo della pagina Facebook — quella quadrata, non la copertina larga — e la mette come copertina del palcoscenico. Tocca solo chi non ha nessuna foto: quelle che avete messo voi restano dove sono. Ci vuole qualche minuto, e si può fermare quando vuoi: quello che è passato resta fatto.</div>
+      <div class="section-footer">Prende l’immagine del profilo dal link che sta nel campo <strong>Sito / social</strong>: da Facebook quella quadrata (non la copertina larga), da Instagram la foto del profilo — più piccola, 150 pixel, perché più grande Instagram non la dà. La mette come copertina del palcoscenico. Tocca solo chi non ha nessuna foto: quelle che avete messo voi restano dove sono. Ci vuole qualche minuto, e si può fermare quando vuoi: quello che è passato resta fatto.</div>
 
-      <div class="grouped-list" id="fbBulkStartWrap">
-        <div class="field-row picker" id="rowFbBulkStart"><span class="link-action">Prendi le copertine</span></div>
+      <div class="grouped-list" id="bulkCoverStartWrap">
+        <div class="field-row picker" id="rowBulkCoverStart"><span class="link-action">Prendi le copertine</span></div>
       </div>
 
-      <div id="fbBulkRunning" hidden>
+      <div id="bulkCoverRunning" hidden>
         <div class="grouped-list">
           <div class="field-row stacked">
-            <label id="fbBulkProgressLabel">0 di 0</label>
-            <div class="bulk-bar"><i id="fbBulkBar"></i></div>
-            <div class="bulk-now" id="fbBulkNow"></div>
+            <label id="bulkCoverProgressLabel">0 di 0</label>
+            <div class="bulk-bar"><i id="bulkCoverBar"></i></div>
+            <div class="bulk-now" id="bulkCoverNow"></div>
           </div>
-          <div class="field-row picker" id="rowFbBulkStop"><span class="link-action" style="color:var(--destructive);">Ferma</span></div>
+          <div class="field-row picker" id="rowBulkCoverStop"><span class="link-action" style="color:var(--destructive);">Ferma</span></div>
         </div>
       </div>
 
-      <div id="fbBulkReport" hidden></div>
+      <div id="bulkCoverReport" hidden></div>
     </div>
   </section>
 
@@ -1789,6 +1835,10 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>
       <span class="tab-label">Preferiti</span>
     </button>
+    <button class="tab" data-tab="gigs">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.7c4.6 0 8.3 2.1 8.3 5.1 0 4.4-4.8 11.5-8.3 11.5S3.7 13.2 3.7 8.8c0-3 3.7-5.1 8.3-5.1Z"/></svg>
+      <span class="tab-label">Serate</span>
+    </button>
     <button class="tab" data-tab="recontact">
       <span class="tab-badge-wrap">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg>
@@ -2003,17 +2053,25 @@
         <div class="field-row"><label for="fPhone">Cellulare</label><input id="fPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palcoscenico.it"></div>
         <div class="field-row"><label for="fWebsite">Sito / social</label><input id="fWebsite" type="text" placeholder="instagram.com/…"></div>
-        <div class="field-row picker" id="rowFbCover" hidden><span class="link-action" id="fbCoverLabel">Copertina dal profilo Facebook</span></div>
+        <div class="field-row picker" id="rowSocialCover" hidden><span class="link-action" id="socialCoverLabel">Copertina dal profilo Facebook</span></div>
+        <div class="field-row picker" id="rowIgSearch" hidden><span class="link-action" id="igSearchLabel">Cerca il profilo Instagram</span></div>
       </div>
       <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palcoscenici. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
 
-      <div class="section-header">STATO DELLA TRATTATIVA</div>
+      <div class="section-header">STATO</div>
       <div class="grouped-list">
+        <div class="field-row picker" id="rowVenueStatus">
+          <label>Palcoscenico</label>
+          <div class="picker-value"><span class="dot" id="venueStatusDot"></span><span id="venueStatusValue">Lead</span>
+          <svg class="row-chevron" id="venueStatusChevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
         <div class="field-row" id="rowStatus">
           <label>Serata</label>
-          <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Da contattare</span></div>
+          <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Opportunità</span></div>
         </div>
       </div>
+      <div class="section-footer" id="venueStatusFoot">Due cose diverse. Il <strong>palcoscenico</strong> dice che rapporto c'è con questo posto e lo scegli tu: <strong>Lead</strong> è un nome in rubrica, <strong>Prospect</strong> uno su cui stai puntando, <strong>Inattivo</strong> uno dove ci hai provato senza suonarci. <strong>Cliente</strong> si accende da solo la prima volta che una serata diventa «Suonato». La <strong>serata</strong> dice invece come sta andando il tentativo di quest'anno, e si cambia sulla sua riga qui sotto.</div>
+
       <div class="section-header" id="gigsHeader">SERATE</div>
       <div class="grouped-list" id="gigsList"></div>
       <div class="grouped-list" style="margin-top:10px;">
@@ -2061,7 +2119,7 @@
           <button type="button" class="act-chip" data-act="email">✉️ Email</button>
         </div>
       </div>
-      <div class="section-footer">Un tocco la registra con la data di oggi. Se la trattativa era "Lead" o "Da contattare" passa a "Contattato".</div>
+      <div class="section-footer">Un tocco la registra con la data di oggi. Una serata ancora "Opportunità" passa a "Contattato", e se non c'è nessuna serata aperta ne nasce una già contattata. Lo stato del palcoscenico non si muove: una telefonata non fa di un lead un cliente.</div>
 
       <div class="section-header">STORICO CONTATTI</div>
       <div class="grouped-list" id="notesList"></div>
@@ -2178,39 +2236,70 @@
 (function(){
   "use strict";
 
-  /* I due stati di partenza sono due e non uno, e la differenza e' tutta
-     qui: "lead" e' quello che e' finito in rubrica — un import, un nome
-     scritto al volo — e non promette niente; "da contattare" e' quello che
-     hai guardato da vicino e su cui vuoi davvero provarci. Sono due code di
-     lavoro diverse: la prima si smaltisce guardando i social, la seconda col
-     telefono in mano. Nessuna delle due dice che qualcuno ti abbia risposto,
-     quindi registrare un'attivita' le fa avanzare tutte e due a "contattato"
-     (lo fa il server, vedi PRE_CONTACT_STATUSES in app.py).
+  /* Due liste che non si somigliano piu' (15 settembre 2026). Il
+     palcoscenico e' un posto, e il suo stato dice che rapporto c'e' fra la
+     band e quel posto: un nome in rubrica (Lead), uno su cui stai puntando
+     (Prospect), uno dove hai gia' suonato (Cliente), uno dove ci hai provato
+     e non e' successo (Inattivo), uno messo via (Archiviato). La serata e' il
+     tentativo di suonarci in una stagione, e il suo stato dice come sta
+     andando quel tentativo.
+
+     Prima erano la stessa lista, perche' lo stato del palcoscenico era la
+     copia di quello della sua serata in corso: l'elenco diceva "Contattato"
+     perche' lo diceva la serata. Adesso a che punto e' la trattativa lo
+     racconta la serata, e lo racconta dove la serata si vede — nella scheda,
+     in Agenda, sulla riga della stagione.
+
+     I nomi delle serate sono cambiati il 15 settembre 2026: "Da contattare"
+     e' diventato "Opportunita'" (si chiamava come il primo segmento
+     dell'Agenda, che e' un'altra cosa: li' ci sono i palcoscenici da
+     richiamare adesso), "In trattativa" e' diventato "Trattativa", ed e'
+     entrato "Interessato" fra Contattato e Trattativa — hanno detto che gli
+     interessa, che e' piu' di una telefonata fatta e meno di una trattativa
+     su data e compenso. La chiave sul database e' cambiata con l'etichetta
+     (vedi migrate_to_gig_opportunita in app.py): due parole diverse per la
+     stessa cosa, una nel codice e una sullo schermo, si pagano ogni volta
+     che si legge una query.
+
+     Cliente e' l'unico che si accende da solo, alla prima serata suonata, e
+     non si spegne piu' da solo. Inattivo non vuol dire "lasciato perdere":
+     vuol dire che ci hai provato e non ci hai suonato, e ci stanno dentro
+     anche le trattative in piedi. Archiviato non si sceglie: e' la faccia
+     leggibile dell'archivio, e lo scrivono Archivia e Ripristina.
 
      Il grigio spento sta sul lead apposta: in un elenco dove quasi tutto e'
      ancora in rubrica, il colore deve restare a chi si sta muovendo. */
-  var STATUSES = [
-    {key:"lead",          label:"Lead",          color:"var(--slate)", soft:"var(--slate-soft)"},
-    {key:"da_contattare", label:"Da contattare", color:"var(--teal)",  soft:"var(--teal-soft)"},
+  var VENUE_STATUSES = [
+    {key:"lead",       label:"Lead",       color:"var(--slate)",  soft:"var(--slate-soft)"},
+    {key:"prospect",   label:"Prospect",   color:"var(--indigo)", soft:"var(--indigo-soft)"},
+    {key:"cliente",    label:"Cliente",    color:"var(--green)",  soft:"var(--green-soft)"},
+    {key:"inattivo",   label:"Inattivo",   color:"var(--brown)",  soft:"var(--brown-soft)"},
+    {key:"archiviato", label:"Archiviato", color:"var(--text-tertiary)", soft:"var(--fill)"}
+  ];
+  /* Quelli che si scelgono dalla scheda: l'archivio ha i suoi due pulsanti,
+     e passare di li' e' come si archivia da sempre. */
+  var MANUAL_VENUE_STATUSES = VENUE_STATUSES.filter(function(s){ return s.key !== "archiviato"; });
+  var GIG_STATUSES = [
+    {key:"opportunita",   label:"Opportunità",   color:"var(--teal)",  soft:"var(--teal-soft)"},
     {key:"contattato",    label:"Contattato",    color:"var(--blue)",  soft:"var(--blue-soft)"},
-    {key:"trattativa",    label:"In trattativa", color:"var(--orange)",soft:"var(--orange-soft)"},
+    {key:"interessato",   label:"Interessato",   color:"var(--indigo)",soft:"var(--indigo-soft)"},
+    {key:"trattativa",    label:"Trattativa",    color:"var(--orange)",soft:"var(--orange-soft)"},
     {key:"confermato",    label:"Confermato",    color:"var(--green)", soft:"var(--green-soft)"},
+    {key:"rifiutata",     label:"Rifiutata",     color:"var(--red)",   soft:"var(--red-soft)"},
     {key:"suonato",       label:"Suonato",       color:"var(--purple)",soft:"var(--purple-soft)"},
     {key:"annullato",     label:"Annullato",     color:"var(--brown)", soft:"var(--brown-soft)"}
   ];
-  function statusInfo(k){ return STATUSES.find(function(s){return s.key===k;}) || STATUSES[0]; }
-  /* Gli stati che una serata puo' avere: tutti tranne "lead". Un lead e' un
-     palcoscenico su cui non hai ancora aperto niente, e nel momento in cui
-     apri la serata quel momento e' passato. Per tornare indietro si elimina
-     la serata, non si rimette l'etichetta. */
-  var GIG_STATUSES = STATUSES.filter(function(s){ return s.key !== "lead"; });
+  function venueStatusInfo(k){ return VENUE_STATUSES.find(function(s){return s.key===k;}) || VENUE_STATUSES[0]; }
+  function gigStatusInfo(k){ return GIG_STATUSES.find(function(s){return s.key===k;}) || GIG_STATUSES[0]; }
 
-  /* I due modi in cui una serata finisce davvero: ci sei andato, oppure era
-     fissata e poi e' saltata — piove, il locale chiude, succede. Un no del
-     titolare non e' la fine di niente: e' un anno che non si e' fatto, e
-     quel posto o lo richiami l'anno prossimo o esce dalla rubrica.
-     Stessa lista di CLOSING_STATUSES in app.py. */
-  var CLOSING_STATUSES = ["suonato", "annullato"];
+  /* I tre modi in cui una serata finisce: ci sei andato, era fissata e poi
+     e' saltata (piove, il locale chiude, succede), oppure il titolare ha
+     detto di no. Chiudere vuol dire che quella stagione li' e' andata come
+     e' andata: il palcoscenico esce dall'Agenda e per riprovarci l'anno
+     prossimo c'e' "Riproponi", che apre l'opportunita' nuova senza
+     cancellare com'e' finita questa. Stessa lista di CLOSING_STATUSES in
+     app.py. */
+  var CLOSING_STATUSES = ["suonato", "annullato", "rifiutata"];
   function isClosingStatus(s){ return CLOSING_STATUSES.indexOf(s) > -1; }
 
   var CHEVRON = '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>';
@@ -2286,14 +2375,19 @@
      ritardo il primo di gennaio — due mesi invece di quattro, e proprio nel
      mese in cui si programma la stagione.
 
-     "Non l'ho chiamato" e' lo stato del palcoscenico, non l'esistenza di una
-     serata. Prima qui si guardava se c'era un tentativo aperto dopo
+     "Non l'ho chiamato" si legge sulla serata in corso, non sull'esistenza
+     di una serata. Prima qui si guardava se c'era un tentativo aperto dopo
      l'occorrenza, e bastava quello a dire "fatto": ma un giro di "Riproponi"
-     apre le serate a pacchi e le lascia tutte su "Da contattare" — il
+     apre le serate a pacchi e le lascia tutte su "Opportunita'" — il
      tentativo c'e', la telefonata no, ed era esattamente il caso che questo
      elenco deve far vedere. Chi si e' mosso davvero e' passato a Contattato,
-     In trattativa o Confermato, e quelli non sono in ritardo: hanno una
-     trattativa per le mani, non una chiamata da fare.
+     Interessato, Trattativa o Confermato, e quelli non sono in ritardo:
+     hanno una trattativa per le mani, non una chiamata da fare.
+
+     Questa riga leggeva v.status, che diceva la stessa cosa perche' era la
+     copia della serata. Adesso lo stato del palcoscenico dice un'altra cosa
+     (Lead, Prospect, Cliente...) e la domanda la si fa alla serata, che e'
+     dove la risposta e' sempre stata.
 
      La data di nascita del palcoscenico continua a contare, ma solo per
      l'occorrenza di un anno passato. Serviva a non dare dell'inadempiente a
@@ -2315,7 +2409,8 @@
     var prossima = quest > oggi ? quest : periodOccurrence(p, anno + 1);
     var suo = passata.slice(0, 4) === oggi.slice(0, 4) ||
               (v.created_at || "").slice(0, 10) <= passata;
-    if(v.status === "da_contattare" && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
+    var g = currentGig(v);
+    if(g && g.status === "opportunita" && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
       return {date: passata, late: true};
     return {date: prossima, late: false};
   }
@@ -2348,14 +2443,21 @@
     openSheet({title:"Il giorno", options: opts});
   }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
+  /* La serata in corso, se c'e'. Da quando lo stato del palcoscenico ha
+     smesso di copiarla, e' l'unico posto dove sta scritto a che punto sei
+     quest'anno: chi prima leggeva v.status per saperlo, adesso legge qui. */
+  function currentGig(v){
+    return venueGigs(v).filter(function(g){ return g.open; })[0] || null;
+  }
+  function hasOpenGig(v){ return !!currentGig(v); }
   /* Una stagione chiusa che non e' finita in nessuno dei tre modi buoni e'
      semplicemente finita nel nulla: dirlo e' piu' onesto che mostrare "In
      trattativa" su una trattativa di tre anni fa. */
   function gigStalled(g){ return !g.open && !isClosingStatus(g.status); }
-  function gigStateLabel(g){ return gigStalled(g) ? "Non conclusa" : statusInfo(g.status).label; }
+  function gigStateLabel(g){ return gigStalled(g) ? "Non conclusa" : gigStatusInfo(g.status).label; }
   function gigStateColors(g){
     if(gigStalled(g)) return {color:"var(--text-tertiary)", soft:"var(--fill)"};
-    var st = statusInfo(g.status);
+    var st = gigStatusInfo(g.status);
     return {color:st.color, soft:st.soft};
   }
   function fmtFee(fee){
@@ -2514,7 +2616,7 @@
   }
 
   /* ---------------- navbar scroll collapse ---------------- */
-  [["scrollHome","navHome"],["scrollList","navList"],["scrollFavorites","navFavorites"],["scrollRecontact","navRecontact"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
+  [["scrollHome","navHome"],["scrollList","navList"],["scrollFavorites","navFavorites"],["scrollGigs","navGigs"],["scrollRecontact","navRecontact"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
     var scroller = document.getElementById(pair[0]);
     var nav = document.getElementById(pair[1]);
     scroller.addEventListener("scroll", function(){
@@ -2523,7 +2625,7 @@
   });
 
   /* ---------------- tab navigation ---------------- */
-  var tabs = {home: document.getElementById("tabHome"), list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), recontact: document.getElementById("tabRecontact"), cash: document.getElementById("tabCash"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
+  var tabs = {home: document.getElementById("tabHome"), list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), gigs: document.getElementById("tabGigs"), recontact: document.getElementById("tabRecontact"), cash: document.getElementById("tabCash"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
   document.getElementById("tabbar").addEventListener("click", function(e){
     var btn = e.target.closest(".tab");
     if(!btn) return;
@@ -2536,6 +2638,7 @@
     if(name === "home") renderHome();
     if(name === "recontact") renderRecontact();
     if(name === "favorites") renderFavorites();
+    if(name === "gigs") renderAllGigs();
     if(name === "cash") renderCash();
   });
 
@@ -2802,6 +2905,7 @@
     elSheetGroup.innerHTML = customHtml + filtered.map(function(x){
       var o = x.o;
       return '<button class="sheet-option'+(o.destructive?' destructive':'')+'" data-i="'+x.i+'">'+
+        (o.thumb ? '<img class="sheet-thumb" src="'+esc(o.thumb)+'" alt="" loading="lazy">' : '') +
         (o.color ? '<span class="dot" style="background:'+o.color+'"></span>' : '') +
         (o.dato ? dato(o.label) : esc(o.label)) +
         (o.checkmark ? ' <span class="check">✓</span>' : '') +
@@ -3020,10 +3124,11 @@
   }
   function renderAll(){
     updateFilterActiveDot();
-    renderFbCoversRow();
+    renderSocialCoversRow();
     renderHome();
     renderList();
     renderFavorites();
+    renderAllGigs();
     renderRecontact();
     renderCash();
     updateRecontactBadge();
@@ -3124,7 +3229,7 @@
     return (o && o.name) ? o.name : email;
   }
   function renderFilterStatusRow(){
-    var st = statusInfo(filterStatus === "all" ? null : filterStatus);
+    var st = venueStatusInfo(filterStatus === "all" ? null : filterStatus);
     document.getElementById("filterStatusDot").style.background = filterStatus === "all" ? "var(--text-tertiary)" : st.color;
     document.getElementById("filterStatusValue").textContent = filterStatus === "all" ? "Tutti" : st.label;
   }
@@ -3141,7 +3246,7 @@
     var opts = [{label:"Tutti", checkmark: filterStatus==="all", onSelect:function(){
       filterStatus = "all"; renderFilterStatusRow(); renderAll();
     }}];
-    STATUSES.forEach(function(s){
+    VENUE_STATUSES.forEach(function(s){
       opts.push({label:s.label, color:s.color, checkmark: filterStatus===s.key, onSelect:function(){
         filterStatus = s.key; renderFilterStatusRow(); renderAll();
       }});
@@ -3334,7 +3439,12 @@
 
   function venueRowHtml(v, opts){
     var showFav = !opts || opts.showFav !== false;
-    var st = statusInfo(v.status);
+    // Il nome del proprietario si scrive solo dove serve distinguere: in un
+    // elenco che mescola i preferiti di tutta la band, sapere di chi e'
+    // quella riga e' la differenza fra "qualcuno ci sta lavorando" e "ci
+    // devo pensare io". Altrove sarebbe una riga in piu' sempre uguale.
+    var showOwner = !!(opts && opts.showOwner);
+    var st = venueStatusInfo(v.status);
     var subParts = [];
     if(v.type){
       var ico = typeIcon(v.type);
@@ -3367,7 +3477,8 @@
         leadingHtml+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+
-        (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
+        (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+
+        (showOwner && v.owner_email ? '<div class="row-sub">di '+dato(ownerLabel(v.owner_email))+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+
           badgeHtml+
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
@@ -3741,7 +3852,7 @@
     var withCoords = visibili;
     var bounds = [];
     withCoords.forEach(function(v){
-      var st = statusInfo(v.status);
+      var st = venueStatusInfo(v.status);
       var marker = L.marker([v.lat, v.lng], {icon: getMapPinIcon(st.color, typeIcon(v.type))});
       marker.bindPopup(mapPopupHtml(v, st));
       marker.on("popupopen", function(e){
@@ -3820,7 +3931,7 @@
       .concat(senzaPosizione.sort(perNome).map(function(v){ return Object.assign({}, v, {__motivo:"posizione"}); }));
   }
   function mapSearchRowHtml(v){
-    var st = statusInfo(v.status);
+    var st = venueStatusInfo(v.status);
     var tag = v.__motivo === "filtri" ? "nascosto dai filtri"
             : v.__motivo === "posizione" ? "senza posizione" : "";
     return '<div class="msr-row'+(tag ? ' msr-off' : '')+'" data-msr-id="'+v.id+'">'+
@@ -3926,7 +4037,11 @@
      proprietario del palcoscenico, non chi ha messo la stella, che non e'
      scritto da nessuna parte. Senza login la domanda non esiste e le schede
      nemmeno. */
-  var favScope = "all";
+  /* Si apre sui propri (15 settembre 2026): la stella e' della band — la
+     mette uno e la vedono tutti — ma la domanda con cui si entra qui e'
+     "cosa ho segnato io", e i preferiti degli altri sono un secondo momento.
+     "Mostra tutti" resta a un tocco, e li' ogni riga dice di chi e'. */
+  var favScope = "mine";
   var elFavScopeWrap = document.getElementById("favScopeWrap");
   function favScopeUsabile(){ return !!(me && me.email); }
   function renderFavScopeToggle(){
@@ -3977,7 +4092,8 @@
       elFavoritesList.innerHTML = '<div class="empty-state">'+vuoto+'</div>';
       return;
     }
-    elFavoritesList.innerHTML = '<div class="grouped-list">' + sorted.map(function(v){ return venueRowHtml(v); }).join("") + '</div>';
+    elFavoritesList.innerHTML = '<div class="grouped-list">' +
+      sorted.map(function(v){ return venueRowHtml(v, {showOwner: favScope === "all"}); }).join("") + '</div>';
   }
   elFavoritesList.addEventListener("click", function(e){
     var del = e.target.closest("[data-del-id]");
@@ -3986,6 +4102,121 @@
     if(fav){ toggleFavoriteRow(fav.getAttribute("data-fav-id")); return; }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
+  });
+
+  /* ---------------- SERATE tab ----------------
+     Tutte le serate di tutti i palcoscenici, di ogni stagione: e' l'archivio
+     dei tentativi, non una coda di lavoro — per quella c'e' l'Agenda.
+
+     Quelle senza data ci sono come le altre, ed e' il motivo per cui questo
+     elenco esiste: sono la maggioranza (le trattative aperte non hanno un
+     giorno finche' non te lo danno) e fino a ieri non c'era nessun posto in
+     cui vederle tutte insieme. Il segmento "Serate" dell'Agenda tiene solo
+     quelle con una data, perche' li' si lavora a calendario; la scheda del
+     palcoscenico mostra solo le sue.
+
+     Niente endpoint nuovo: le serate arrivano gia' dentro ogni palcoscenico
+     in /api/locations, come per l'Agenda, la Home e la Cassa. Gli archiviati
+     ci sono, con la loro etichetta: quella sera ci hai suonato lo stesso. */
+  var elAllGigs = document.getElementById("allGigsList");
+  var elGigsSub = document.getElementById("gigsSub");
+  var elGigsSearch = document.getElementById("gigsSearchInput");
+  var gigsSearchText = "";
+  var gigsScope = "all";
+
+  function allGigRows(){
+    var out = [];
+    venues.forEach(function(v){
+      venueGigs(v).forEach(function(g){ out.push({v: v, g: g}); });
+    });
+    return out;
+  }
+  function allGigRowHtml(x){
+    var quando = x.g.gig_date
+      ? fmtDateShort(x.g.gig_date)
+      : '<span style="color:var(--text-tertiary);">Data da fissare</span>';
+    var dove = [];
+    if(x.v.city) dove.push(dato(x.v.city));
+    var fee = fmtFee(x.g.fee);
+    if(fee) dove.push(fee);
+    if(x.v.deleted_at) dove.push("archiviato");
+    return '<div class="row" data-open-id="'+x.v.id+'">'+
+      '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
+        '<div class="row-sub">'+quando+'</div>'+
+        (dove.length ? '<div class="row-sub">'+dove.join(" · ")+'</div>' : '')+'</div>'+
+      '<div class="row-trail">'+statusPillHtml(gigStateLabel(x.g), gigStateColors(x.g))+
+      CHEVRON+'</div>'+
+    '</div>';
+  }
+  function renderGigsScopeToggle(){
+    document.querySelectorAll("#gigsScopeToggle .view-toggle-btn").forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-gigscope") === gigsScope);
+    });
+  }
+  /* Raggruppate per anno, e le senza data in cima: sono quelle in ballo
+     adesso, e in fondo a un elenco lungo trecento righe non le vedrebbe
+     nessuno. Dentro l'anno, dalla piu' recente; fra le senza data, in ordine
+     di palcoscenico, che e' l'unica cosa per cui si distinguono. */
+  function renderAllGigs(){
+    var tutte = allGigRows();
+    var righe = tutte;
+    if(gigsScope === "open") righe = righe.filter(function(x){ return x.g.open; });
+    else if(gigsScope === "played") righe = righe.filter(function(x){ return x.g.status === "suonato"; });
+    if(gigsSearchText){
+      var q = gigsSearchText.toLowerCase();
+      righe = righe.filter(function(x){
+        return (((x.v.name || "") + " " + (x.v.city || "")).toLowerCase()).indexOf(q) > -1;
+      });
+    }
+    var filtrato = righe.length !== tutte.length;
+    var suonate = tutte.filter(function(x){ return x.g.status === "suonato"; }).length;
+    elGigsSub.textContent = filtrato
+      ? righe.length + (righe.length === 1 ? " serata" : " serate") + " su " + tutte.length
+      : tutte.length + (tutte.length === 1 ? " serata" : " serate") +
+        (suonate ? " · " + suonate + (suonate === 1 ? " suonata" : " suonate") : "");
+    renderGigsScopeToggle();
+    if(!righe.length){
+      var vuoto = !tutte.length
+        ? '<div class="glyph">🎸</div><h2>Nessuna serata</h2><p>Una serata nasce sulla scheda del palcoscenico, quando decidi di provarci: da quel momento la ritrovi qui, con o senza una data.</p>'
+        : '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Le serate ci sono, ma la ricerca o la scheda scelta le stanno escludendo tutte.</p>';
+      elAllGigs.innerHTML = '<div class="empty-state">'+vuoto+'</div>';
+      return;
+    }
+    var gruppi = {};
+    righe.forEach(function(x){
+      var k = gigYear(x.g) || "";
+      (gruppi[k] = gruppi[k] || []).push(x);
+    });
+    var html = "";
+    Object.keys(gruppi).sort(function(a, b){
+      if(a === "" || b === "") return a === "" ? -1 : 1;
+      return a < b ? 1 : -1;
+    }).forEach(function(k){
+      var gruppo = gruppi[k].sort(k === ""
+        ? function(a, b){ return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it"); }
+        : function(a, b){ return a.g.gig_date < b.g.gig_date ? 1 : -1; });
+      html += '<div class="agenda-group">'+(k === "" ? "Senza data" : esc(k))+
+        '<span class="group-count">'+gruppo.length+'</span></div>'+
+        '<div class="grouped-list">'+gruppo.map(allGigRowHtml).join("")+'</div>';
+    });
+    elAllGigs.innerHTML = html;
+  }
+  elAllGigs.addEventListener("click", function(e){
+    var row = e.target.closest("[data-open-id]");
+    if(row) openDetail(row.getAttribute("data-open-id"));
+  });
+  elGigsSearch.addEventListener("input", function(){
+    gigsSearchText = elGigsSearch.value;
+    renderAllGigs();
+  });
+  wireClearBtn(elGigsSearch, document.getElementById("gigsSearchClearBtn"));
+  document.getElementById("gigsScopeToggle").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-gigscope]");
+    if(!btn) return;
+    var scope = btn.getAttribute("data-gigscope");
+    if(scope === gigsScope) return;
+    gigsScope = scope;
+    renderAllGigs();
   });
 
   /* ---------------- AGENDA tab ----------------
@@ -4018,16 +4249,20 @@
      Chi ha appena suonato resta fuori: "Da contattare" e' un elenco di
      cose da fare, e una serata andata a buon fine non lo e'. Si riparte
      dalla sua riga in Serate, dove lo scorrimento offre "Riproponi" — e da
-     li' il palcoscenico torna "da contattare", quindi ricompare qui. */
-  /* Fuori anche i lead, come in "Da pianificare": un lead e' un indirizzo
-     su cui non hai ancora aperto niente, e l'Agenda e' l'elenco di quello
-     che hai per le mani. Il periodo su un lead resta scritto nella scheda e
-     torna buono da solo appena apri la prima serata — il palcoscenico passa
-     a "Da contattare" e da quel momento compare qui. */
+     li' nasce l'opportunita' dell'anno dopo, quindi ricompare qui. */
+  /* Dentro solo chi ha una serata aperta: l'Agenda e' l'elenco di quello
+     che hai per le mani, e una stagione aperta e' esattamente quello. Ne
+     restano fuori i lead e i prospect, su cui non hai aperto niente, e chi
+     ha appena suonato — quella stagione e' chiusa, e si riparte dalla sua
+     riga in Serate con "Riproponi", che apre la serata nuova e lo rimette
+     qui. Il periodo intanto resta scritto nella scheda e torna buono da
+     solo.
+
+     Prima la domanda si faceva a v.status ("non e' lead, non e' suonato"),
+     che era la copia della serata: adesso si fa alla serata. */
   function venuesToRecontact(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.recontact_period &&
-             v.status !== "suonato" && v.status !== "lead";
+      return !v.deleted_at && v.recontact_period && hasOpenGig(v);
     })
       .map(function(v){ return {v: v, due: recontactDue(v)}; })
       .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
@@ -4066,16 +4301,17 @@
      un periodo, li' chi ce l'ha. Scegliere il periodo e' l'unico gesto che
      serve, e sposta la riga da una parte all'altra.
 
-     Fuori solo i lead: un indirizzo in rubrica su cui non hai ancora deciso
-     niente non e' un arretrato, e sono trecento — ci annegherebbe tutto il
-     resto. */
+     Dentro chi ha una serata aperta, come in "Da contattare": un indirizzo
+     su cui non hai ancora deciso di provarci non e' un arretrato, e sono
+     trecento — ci annegherebbe tutto il resto. Il passo che conta qui e'
+     uno solo: aver aperto la serata. */
   function statusRank(k){
-    var i = STATUSES.findIndex(function(x){ return x.key === k; });
+    var i = VENUE_STATUSES.findIndex(function(x){ return x.key === k; });
     return i < 0 ? 99 : i;
   }
   function venuesToPlan(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.status !== "lead" && !v.recontact_period;
+      return !v.deleted_at && hasOpenGig(v) && !v.recontact_period;
     }).slice().sort(function(a, b){
       var ra = statusRank(a.status), rb = statusRank(b.status);
       if(ra !== rb) return ra - rb;
@@ -4120,7 +4356,7 @@
       if(v.status !== corrente){
         if(corrente !== null) html += '</div>';
         var quanti = righe.filter(function(x){ return x.status === v.status; }).length;
-        html += '<div class="agenda-group">'+esc(statusInfo(v.status).label)+
+        html += '<div class="agenda-group">'+esc(venueStatusInfo(v.status).label)+
           '<span class="group-count">'+quanti+'</span></div><div class="grouped-list">';
         corrente = v.status;
       }
@@ -4191,14 +4427,12 @@
   }
   /* Lo stato di un palcoscenico e' quello che sta su locations: la stessa
      riga che leggono l'elenco palcoscenici e i preferiti, quindi la stessa
-     pastiglia ovunque. Ricalcolarlo qui dalle serate sembrava equivalente e
-     non lo e': quale sia "la serata in corso" fra tre chiuse lo decide il
-     server (vedi current_gig_row e GIG_ORDER in app.py), e rifare quel conto
-     a mano vuol dire vedere "Suonato" in Agenda e "Da contattare" nella
-     lista, sullo stesso posto. Le righe delle serate invece mostrano lo
-     stato della loro serata, che e' un'altra cosa e sta scritta li'. */
+     pastiglia ovunque. Dal 15 settembre 2026 e' una cosa sua (Lead,
+     Prospect, Cliente...) e non piu' la copia della serata, quindi qui non
+     c'e' piu' niente da ricalcolare: le righe delle serate mostrano lo stato
+     della loro serata, che e' un'altra lista e sta scritta li'. */
   function venueStatusPill(v){
-    var st = statusInfo(v.status);
+    var st = venueStatusInfo(v.status);
     return statusPillHtml(st.label, {color: st.color, soft: st.soft});
   }
 
@@ -4317,7 +4551,7 @@
     var nome = v.name || "Senza nome";
     withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
       renderAll();
-      toast("Nuova serata · " + nome + " · da contattare");
+      toast("Nuova serata · " + nome + " · opportunità");
     }).catch(function(err){ toast(err.message); });
   }
   /* Il cumulativo solo da due in su: con uno solo direbbe la stessa cosa del
@@ -4335,7 +4569,7 @@
         }, Promise.resolve());
       }).then(function(){
         renderAll();
-        toast(cands.length + " serate aperte, in stato «da contattare»");
+        toast(cands.length + " serate aperte, in stato «opportunità»");
       }).catch(function(err){ toast(err.message); });
     });
   }
@@ -4516,7 +4750,7 @@
       var noteEl = document.getElementById("conf-note-" + gigId);
       // "Annullata" vuol dire che la serata era fissata e poi e' saltata.
       // Se invece il titolare ha detto di no la serata non finisce qui:
-      // resta aperta a "da contattare" per l'anno prossimo, oppure il posto
+      // resta aperta come opportunita' per l'anno prossimo, oppure il posto
       // si archivia dalla sua riga.
       var payload = {status: yes ? "suonato" : "annullato"};
       if(noteEl) payload.outcome_note = noteEl.value;
@@ -5402,13 +5636,17 @@
   document.getElementById("photoFileInputCamera").addEventListener("change", handlePhotoFileSelected);
   document.getElementById("photoFileInputLibrary").addEventListener("change", handlePhotoFileSelected);
 
-  /* ---------------- copertina dalla pagina Facebook ----------------
+  /* ---------------- copertina dal profilo social ----------------
      Due terzi dei palcoscenici in archivio hanno una pagina Facebook al
      posto del sito, e la sua immagine del profilo e' quasi sempre
      l'insegna del locale: la riga sotto il campo Sito la prende e la mette
-     in copertina. Compare solo se li' dentro c'e' davvero una pagina
-     Facebook — le stesse regole che applica il server, scritte qui per
-     sapere se mostrare la riga. */
+     in copertina.
+
+     Il campo e' uno solo e resta uno solo: se dentro c'e' facebook.com la
+     foto si prende da Facebook, se c'e' instagram.com da Instagram (15
+     settembre 2026). Qui sotto ci sono le stesse regole che applica il
+     server, scritte una seconda volta solo per sapere se mostrare la riga e
+     come chiamarla. */
   function facebookPageId(url){
     if(!url) return null;
     var testo = String(url).trim();
@@ -5432,21 +5670,58 @@
     try { nome = decodeURIComponent(seg[0]); } catch(e){ nome = seg[0]; }
     return /^[A-Za-z0-9._-]{1,100}$/.test(nome) ? nome : null;
   }
-  var elRowFbCover = document.getElementById("rowFbCover");
-  var elFbCoverLabel = document.getElementById("fbCoverLabel");
-  var FB_COVER_LABEL = "Copertina dal profilo Facebook";
-  var fbCoverBusy = false;
-  function renderFbCoverRow(){
-    elRowFbCover.hidden = !facebookPageId(fWebsite.value);
+  /* Il nome utente dentro un link di Instagram, con le stesse regole del
+     server (vedi instagram_username in app.py): un link a un post o a una
+     storia non e' un profilo, e da quello non si sa di chi sia la foto. */
+  var IG_NON_PROFILI = ["p","reel","reels","tv","stories","explore","accounts",
+                        "direct","about","legal","privacy","terms","developer",
+                        "directory","web"];
+  function instagramUser(url){
+    if(!url) return null;
+    var testo = String(url).trim();
+    if(!testo) return null;
+    if(!/^https?:\/\//i.test(testo)) testo = "https://" + testo;
+    var a;
+    try { a = new URL(testo); } catch(e){ return null; }
+    var host = a.hostname.toLowerCase().replace(/^(www|m)\./, "");
+    if(!(host === "instagram.com" || /\.instagram\.com$/.test(host) || host === "instagr.am")) return null;
+    var seg = a.pathname.split("/").filter(function(x){ return x; });
+    if(!seg.length) return null;
+    var nome;
+    try { nome = decodeURIComponent(seg[0]); } catch(e){ nome = seg[0]; }
+    nome = nome.replace(/^@/, "");
+    if(IG_NON_PROFILI.indexOf(nome.toLowerCase()) > -1) return null;
+    return /^[A-Za-z0-9._]{1,30}$/.test(nome) ? nome : null;
   }
-  elRowFbCover.addEventListener("click", function(){
-    if(fbCoverBusy || !currentId) return;
-    if(!facebookPageId(fWebsite.value)) return;
+  /* Un campo solo e un pulsante solo: dove andare a prendere la foto lo dice
+     il link. Facebook ha la precedenza perche' e' quello che ne da' una
+     grande (720x720 contro 150x150), ma nello stesso campo non ci stanno
+     tutti e due, quindi nella pratica decide quello che c'e' scritto. */
+  function socialCoverFonte(url){
+    if(facebookPageId(url)) return "Facebook";
+    if(instagramUser(url)) return "Instagram";
+    return null;
+  }
+
+  var elRowSocialCover = document.getElementById("rowSocialCover");
+  var elSocialCoverLabel = document.getElementById("socialCoverLabel");
+  var socialCoverBusy = false;
+  function socialCoverLabel(fonte){ return "Copertina dal profilo " + (fonte || "Facebook"); }
+  function renderSocialCoverRow(){
+    var fonte = socialCoverFonte(fWebsite.value);
+    elRowSocialCover.hidden = !fonte;
+    if(fonte && !socialCoverBusy) elSocialCoverLabel.textContent = socialCoverLabel(fonte);
+    renderIgSearchRow();
+  }
+  elRowSocialCover.addEventListener("click", function(){
+    if(socialCoverBusy || !currentId) return;
+    var fonte = socialCoverFonte(fWebsite.value);
+    if(!fonte) return;
     var idQuando = currentId;
-    fbCoverBusy = true;
-    elRowFbCover.classList.add("busy");
-    elFbCoverLabel.textContent = "Scarico da Facebook\u2026";
-    api("POST", "/api/locations/" + idQuando + "/photos/facebook", {url: fWebsite.value})
+    socialCoverBusy = true;
+    elRowSocialCover.classList.add("busy");
+    elSocialCoverLabel.textContent = "Scarico da " + fonte + "\u2026";
+    api("POST", "/api/locations/" + idQuando + "/photos/social", {url: fWebsite.value})
       .then(function(updated){
         // Solo le foto, non tutta la scheda: quello che stai scrivendo qui
         // dentro e' una bozza e non va sovrascritto da questa risposta.
@@ -5457,16 +5732,101 @@
           renderList();
           renderFavorites();
         }
-        toast("Copertina presa da Facebook");
+        toast("Copertina presa da " + fonte);
       })
       .catch(function(err){ toast(err.message || "Non sono riuscito a prendere l'immagine"); })
       .then(function(){
-        fbCoverBusy = false;
-        elRowFbCover.classList.remove("busy");
-        elFbCoverLabel.textContent = FB_COVER_LABEL;
+        socialCoverBusy = false;
+        elRowSocialCover.classList.remove("busy");
+        elSocialCoverLabel.textContent = socialCoverLabel(socialCoverFonte(fWebsite.value));
       });
   });
-  fWebsite.addEventListener("input", renderFbCoverRow);
+  fWebsite.addEventListener("input", renderSocialCoverRow);
+
+  /* ---------------- trovare il profilo Instagram ----------------
+     La ricerca sul web dal server non si puo' fare: i motori rispondono a
+     una persona con un browser, non a un programma che chiede dieci volte di
+     fila. Provato il 15 settembre 2026 — DuckDuckGo risponde bene per due o
+     tre ricerche e poi manda la pagina "anomaly" con zero risultati, Bing,
+     Mojeek e Startpage non danno niente di leggibile. Una chiave a pagamento
+     lo risolverebbe, ma e' una cosa da decidere, non da mettere di nascosto.
+
+     Quello che si puo' fare senza dipendere da nessuno e' chiedere a
+     Instagram: i locali su Instagram si chiamano come si chiamano nella
+     realta' — tutto attaccato, coi punti, senza la parola "bar" davanti,
+     a volte con la citta' in coda — e per ognuno di quei nomi la pagina
+     pubblica dice se esiste e com'e' la foto. Su tredici palcoscenici presi
+     a caso ne ha trovati nove.
+
+     L'ultima voce del foglio apre comunque il motore di ricerca sul telefono,
+     con la domanda gia' scritta: li' il web risponde, perche' a chiedere sei
+     tu. E scegliere resta a te: "Beer Station" esiste su Instagram anche a
+     trecento chilometri da qui, e incollare quel link vorrebbe dire scrivere
+     in archivio una cosa falsa senza dirlo a nessuno. */
+  var elRowIgSearch = document.getElementById("rowIgSearch");
+  var elIgSearchLabel = document.getElementById("igSearchLabel");
+  var IG_SEARCH_LABEL = "Cerca il profilo Instagram";
+  var igSearchBusy = false;
+  function renderIgSearchRow(){
+    // Sparisce solo quando il profilo Instagram c'e' gia': con una pagina
+    // Facebook nel campo le due righe stanno insieme, ed e' il caso normale.
+    elRowIgSearch.hidden = !currentId || socialCoverFonte(fWebsite.value) === "Instagram";
+  }
+  function ricercaWebUrl(){
+    var v = currentVenue();
+    var pezzi = [fName.value, fAddress.value, (v && v.city) || "", "instagram"];
+    return "https://www.google.com/search?q=" +
+      encodeURIComponent(pezzi.filter(function(x){ return (x || "").trim(); }).join(" "));
+  }
+  function scriviSito(url){
+    var prima = (fWebsite.value || "").trim();
+    function scrivi(){
+      fWebsite.value = url;
+      venueDirty = true;
+      renderSocialCoverRow();
+      renderIgSearchRow();
+      toast("Link incollato · salva la scheda");
+    }
+    // Sopra un link che c'era gia' non ci si scrive di nascosto: quello e'
+    // un dato che qualcuno ha messo a mano.
+    if(prima && prima !== url) confirmDestructive("Nel campo Sito c'è già un altro link. Sostituirlo?", scrivi);
+    else scrivi();
+  }
+  function mostraProfiliTrovati(trovati){
+    var opzioni = trovati.map(function(p){
+      return {
+        label: (p.nome ? p.nome + " · " : "") + "@" + p.username,
+        dato: true,
+        thumb: p.foto || "",
+        onSelect: function(){ scriviSito(p.url); }
+      };
+    });
+    opzioni.push({label: "Cerca sul web…", onSelect: function(){
+      window.open(ricercaWebUrl(), "_blank", "noopener");
+    }});
+    openSheet({
+      title: trovati.length ? "Profili che potrebbero essere questo" : "Nessun profilo con questo nome",
+      options: opzioni
+    });
+  }
+  elRowIgSearch.addEventListener("click", function(){
+    if(igSearchBusy || !currentId) return;
+    var idQuando = currentId;
+    igSearchBusy = true;
+    elRowIgSearch.classList.add("busy");
+    elIgSearchLabel.textContent = "Cerco su Instagram…";
+    api("POST", "/api/locations/" + idQuando + "/social/instagram", {name: fName.value})
+      .then(function(esito){ mostraProfiliTrovati((esito && esito.trovati) || []); })
+      .catch(function(err){
+        toast(err.message || "Non sono riuscito a cercare");
+        mostraProfiliTrovati([]);
+      })
+      .then(function(){
+        igSearchBusy = false;
+        elRowIgSearch.classList.remove("busy");
+        elIgSearchLabel.textContent = IG_SEARCH_LABEL;
+      });
+  });
 
   function renderQuickActions(v){
     var actions = [];
@@ -5704,18 +6064,45 @@
     });
   });
 
-  /* Lo stato si legge qui e si scrive solo sulla riga della sua serata, dove
-     si vede sempre quale si sta muovendo. Prima era modificabile in due posti
-     per la stessa cosa: comodo, ma su un palcoscenico con tre serate alle
-     spalle non era piu' chiaro quale delle tre stessi cambiando. */
+  /* Le due righe stanno insieme perche' dicono due cose diverse: sopra che
+     rapporto c'e' con quel posto, sotto come sta andando la stagione. Prima
+     erano la stessa cosa scritta due volte — lo stato del palcoscenico era
+     la copia della serata — e infatti la riga di sopra si nascondeva.
+
+     Lo stato del palcoscenico si sceglie qui, ed e' l'unico posto che lo
+     scrive. Quello della serata si legge qui e si scrive sulla riga della
+     sua serata, dove si vede sempre quale si sta muovendo. In archivio la
+     riga di sopra dice "Archiviato" e non si apre: per cambiare stato si
+     ripristina, e il pulsante sta nell'elenco. */
   function renderStatusRow(v){
     var gigs = venueGigs(v);
     var open = gigs.filter(function(g){ return g.open; })[0];
     var g = open || gigs[0] || null;
-    var colors = g ? gigStateColors(g) : {color: statusInfo(v.status).color};
+    var sv = venueStatusInfo(v.status);
+    document.getElementById("venueStatusDot").style.background = sv.color;
+    document.getElementById("venueStatusValue").textContent = sv.label;
+    document.getElementById("venueStatusChevron").hidden = !!v.deleted_at;
+    document.getElementById("rowStatus").hidden = !g;
+    if(!g) return;
+    var colors = gigStateColors(g);
     document.getElementById("statusDot").style.background = colors.color;
-    document.getElementById("statusValue").textContent = g ? gigStateLabel(g) : statusInfo(v.status).label;
+    document.getElementById("statusValue").textContent = gigStateLabel(g);
   }
+  document.getElementById("rowVenueStatus").addEventListener("click", function(){
+    var v = currentVenue(); if(!v) return;
+    if(v.deleted_at){ toast("Questo palcoscenico è in archivio: ripristinalo per cambiargli stato."); return; }
+    openSheet({title:"Stato del palcoscenico", options: MANUAL_VENUE_STATUSES.map(function(sv){
+      return {label:sv.label, color:sv.color, checkmark: v.status === sv.key, onSelect:function(){
+        if(v.status === sv.key) return;
+        patchVenue("status", sv.key).then(function(updated){
+          applyUpdatedVenue(updated);
+          renderStatusRow(updated);
+          renderAll();
+          toast(sv.label);
+        }).catch(function(err){ toast(err.message); });
+      }};
+    })});
+  });
 
   /* ---------------- SERATE nella scheda ---------------- */
   var elGigsList = document.getElementById("gigsList");
@@ -5759,7 +6146,7 @@
 
   function gigPanelHtml(g){
     var d = gigDraft || g;
-    var st = statusInfo(d.status);
+    var st = gigStatusInfo(d.status);
     return '<div class="gig-panel">'+
       '<div class="field-row picker" data-gig-status="'+g.id+'"><label>Stato</label>'+
         '<div class="picker-value"><span class="dot" style="background:'+st.color+'"></span><span>'+esc(st.label)+'</span>'+CHEVRON+'</div></div>'+
@@ -5942,7 +6329,7 @@
     // in fondo a destra, nello stesso posto del pannello di modifica.
     elBtnNewGig.hidden = newGigOpen;
     if(!newGigOpen){ elNewGigFields.innerHTML = ""; return; }
-    var st = statusInfo(newGigDraft.status);
+    var st = gigStatusInfo(newGigDraft.status);
     elNewGigFields.innerHTML =
       '<div class="field-row picker" id="newGigStatus"><label>Stato</label>'+
         '<div class="picker-value"><span class="dot" style="background:'+st.color+'"></span><span>'+esc(st.label)+'</span>'+CHEVRON+'</div></div>'+
@@ -6009,7 +6396,7 @@
   elBtnNewGig.addEventListener("click", function(){
     if(!currentVenue() || newGigOpen) return;
     newGigOpen = true;
-    newGigDraft = {status:"da_contattare", gig_date:"", fee:"", outcome_note:""};
+    newGigDraft = {status:"opportunita", gig_date:"", fee:"", outcome_note:""};
     renderNewGigFields();
   });
 
@@ -6078,7 +6465,7 @@
   });
 
   /* Registrare un'attivita' costa un tocco: il testo lo scrive il server, e
-     se la trattativa era ancora "da contattare" avanza da sola — l'aver
+     se la serata era ancora un'opportunita' avanza da sola — l'aver
      contattato il posto e' esattamente cosa distingue i due stati. */
   /* `modello` c'e' solo quando il messaggio e' partito da un modello: il
      testo della nota lo compone il server, che e' dove stanno le etichette
@@ -6125,7 +6512,7 @@
     venueDirty = false;
     renderPhotosStrip(v);
     renderQuickActions(v);
-    renderFbCoverRow();
+    renderSocialCoverRow();
     renderStatusRow(v);
     renderGigs(v);
     renderArtDirectorRow(v);
@@ -6802,72 +7189,72 @@
      il server non deve ricordarsi niente fra una richiesta e l'altra. Se
      chiudi a meta' non hai rotto nulla — quelle passate sono passate, e
      rientrando il numero e' gia' diminuito. */
-  function fbCoverMancanti(){
+  function socialCoverMancanti(){
     return venues.filter(function(v){
-      return !v.deleted_at && !(v.photos && v.photos.length) && facebookPageId(v.website);
+      return !v.deleted_at && !(v.photos && v.photos.length) && socialCoverFonte(v.website);
     });
   }
-  function renderFbCoversRow(){
-    document.getElementById("fbCoversCount").textContent = fbCoverMancanti().length;
+  function renderSocialCoversRow(){
+    document.getElementById("socialCoversCount").textContent = socialCoverMancanti().length;
   }
-  var elFbCoversScreen = document.getElementById("fbCoversScreen");
-  var elFbBulkBar = document.getElementById("fbBulkBar");
-  var elFbBulkReport = document.getElementById("fbBulkReport");
-  var fbBulkRunning = false;
-  var fbBulkStop = false;
+  var elSocialCoversScreen = document.getElementById("socialCoversScreen");
+  var elBulkCoverBar = document.getElementById("bulkCoverBar");
+  var elBulkCoverReport = document.getElementById("bulkCoverReport");
+  var bulkCoverRunning = false;
+  var bulkCoverStop = false;
 
-  function renderFbCoversScreen(){
-    var mancanti = fbCoverMancanti().length;
+  function renderSocialCoversScreen(){
+    var mancanti = socialCoverMancanti().length;
     var conFoto = venues.filter(function(v){ return !v.deleted_at && v.photos && v.photos.length; }).length;
-    document.getElementById("fbBulkTodo").textContent = mancanti;
-    document.getElementById("fbBulkDone").textContent = conFoto;
-    document.getElementById("rowFbBulkStart").classList.toggle("busy", mancanti === 0);
-    document.getElementById("fbBulkStartWrap").hidden = fbBulkRunning;
+    document.getElementById("bulkCoverTodo").textContent = mancanti;
+    document.getElementById("bulkCoverDone").textContent = conFoto;
+    document.getElementById("rowBulkCoverStart").classList.toggle("busy", mancanti === 0);
+    document.getElementById("bulkCoverStartWrap").hidden = bulkCoverRunning;
   }
-  function openFbCoversScreen(){
-    elFbBulkReport.hidden = true;
-    elFbBulkReport.innerHTML = "";
-    renderFbCoversScreen();
-    elFbCoversScreen.hidden = false;
-    requestAnimationFrame(function(){ elFbCoversScreen.classList.add("in"); });
+  function openSocialCoversScreen(){
+    elBulkCoverReport.hidden = true;
+    elBulkCoverReport.innerHTML = "";
+    renderSocialCoversScreen();
+    elSocialCoversScreen.hidden = false;
+    requestAnimationFrame(function(){ elSocialCoversScreen.classList.add("in"); });
   }
-  function closeFbCoversScreen(){
-    fbBulkStop = true;   /* uscendo si smette: continuare di nascosto non lo capirebbe nessuno */
-    elFbCoversScreen.classList.remove("in");
-    setTimeout(function(){ elFbCoversScreen.hidden = true; }, 320);
+  function closeSocialCoversScreen(){
+    bulkCoverStop = true;   /* uscendo si smette: continuare di nascosto non lo capirebbe nessuno */
+    elSocialCoversScreen.classList.remove("in");
+    setTimeout(function(){ elSocialCoversScreen.hidden = true; }, 320);
   }
-  document.getElementById("rowSettingsFbCovers").addEventListener("click", openFbCoversScreen);
-  document.getElementById("btnFbCoversBack").addEventListener("click", closeFbCoversScreen);
-  document.getElementById("rowFbBulkStop").addEventListener("click", function(){ fbBulkStop = true; });
+  document.getElementById("rowSettingsSocialCovers").addEventListener("click", openSocialCoversScreen);
+  document.getElementById("btnSocialCoversBack").addEventListener("click", closeSocialCoversScreen);
+  document.getElementById("rowBulkCoverStop").addEventListener("click", function(){ bulkCoverStop = true; });
 
-  var FB_BULK_PAUSA = 400;     /* fra una pagina e l'altra: Facebook non va martellato */
-  var FB_BULK_STOP_RETE = 5;   /* errori di rete di fila dopo i quali insistere peggiora */
+  var BULK_COVER_PAUSA = 400;     /* fra una pagina e l'altra: Facebook non va martellato */
+  var BULK_COVER_STOP_RETE = 5;   /* errori di rete di fila dopo i quali insistere peggiora */
 
-  document.getElementById("rowFbBulkStart").addEventListener("click", function(){
-    if(fbBulkRunning) return;
-    var coda = fbCoverMancanti();
+  document.getElementById("rowBulkCoverStart").addEventListener("click", function(){
+    if(bulkCoverRunning) return;
+    var coda = socialCoverMancanti();
     if(!coda.length){ toast("Non manca nessuna copertina"); return; }
-    fbBulkRunning = true;
-    fbBulkStop = false;
+    bulkCoverRunning = true;
+    bulkCoverStop = false;
     var esiti = {fatte:[], senza_foto:[], pagina_sparita:[], altro:[]};
     var fatti = 0, reteDiFila = 0;
-    document.getElementById("fbBulkRunning").hidden = false;
-    elFbBulkReport.hidden = true;
-    elFbBulkReport.innerHTML = "";
-    renderFbCoversScreen();
+    document.getElementById("bulkCoverRunning").hidden = false;
+    elBulkCoverReport.hidden = true;
+    elBulkCoverReport.innerHTML = "";
+    renderSocialCoversScreen();
 
     function avanzamento(v){
-      document.getElementById("fbBulkProgressLabel").textContent = fatti + " di " + coda.length;
-      elFbBulkBar.style.width = Math.round(fatti * 100 / coda.length) + "%";
+      document.getElementById("bulkCoverProgressLabel").textContent = fatti + " di " + coda.length;
+      elBulkCoverBar.style.width = Math.round(fatti * 100 / coda.length) + "%";
       // Il nome resta quello dell'ultima fatta anche fra un passo e l'altro:
       // farlo sparire per mezzo secondo ogni volta e' solo uno sfarfallio.
-      if(v) document.getElementById("fbBulkNow").textContent = v.name || "Senza nome";
+      if(v) document.getElementById("bulkCoverNow").textContent = v.name || "Senza nome";
     }
     function passo(i){
-      if(fbBulkStop || i >= coda.length) return fine();
+      if(bulkCoverStop || i >= coda.length) return fine();
       var v = coda[i];
       avanzamento(v);
-      api("POST", "/api/locations/" + v.id + "/photos/facebook", {url: v.website})
+      api("POST", "/api/locations/" + v.id + "/photos/social", {url: v.website})
         .then(function(updated){
           reteDiFila = 0;
           esiti.fatte.push(v);
@@ -6883,18 +7270,18 @@
             reteDiFila = 0;
             (esiti[code] || esiti.altro).push(code === "senza_foto" || code === "pagina_sparita" ? v : {v:v, msg:err.message});
           }
-          if(reteDiFila >= FB_BULK_STOP_RETE) fbBulkStop = true;
+          if(reteDiFila >= BULK_COVER_STOP_RETE) bulkCoverStop = true;
         })
         .then(function(){
           fatti++;
           avanzamento(null);
-          setTimeout(function(){ passo(i + 1); }, FB_BULK_PAUSA);
+          setTimeout(function(){ passo(i + 1); }, BULK_COVER_PAUSA);
         });
     }
     function fine(){
-      fbBulkRunning = false;
-      document.getElementById("fbBulkRunning").hidden = true;
-      renderList(); renderFavorites(); renderFbCoversRow(); renderFbCoversScreen();
+      bulkCoverRunning = false;
+      document.getElementById("bulkCoverRunning").hidden = true;
+      renderList(); renderFavorites(); renderSocialCoversRow(); renderSocialCoversScreen();
       mostraReport(esiti, fatti, coda.length);
     }
     function elenco(titolo, righe){
@@ -6905,20 +7292,20 @@
     }
     function mostraReport(e, fatti, totale){
       var interrotto = fatti < totale;
-      elFbBulkReport.innerHTML =
+      elBulkCoverReport.innerHTML =
         '<div class="section-header">'+(interrotto ? "FERMATO DOPO "+fatti+" DI "+totale : "FATTO")+'</div>'+
         '<div class="grouped-list">'+
           '<div class="bulk-esito"><b>'+e.fatte.length+'</b><span>copertine messe</span></div>'+
-          '<div class="bulk-esito"><b>'+e.senza_foto.length+'</b><span>pagine senza immagine del profilo</span></div>'+
-          '<div class="bulk-esito"><b>'+e.pagina_sparita.length+'</b><span>pagine che Facebook non trova più</span></div>'+
+          '<div class="bulk-esito"><b>'+e.senza_foto.length+'</b><span>profili senza immagine</span></div>'+
+          '<div class="bulk-esito"><b>'+e.pagina_sparita.length+'</b><span>profili che il social non trova più</span></div>'+
           (e.altro.length ? '<div class="bulk-esito"><b>'+e.altro.length+'</b><span>non riuscite per altri motivi</span></div>' : '')+
         '</div>'+
         // I nomi, non solo i numeri: sono quelli su cui mettere mano a mano,
         // e senza nome resterebbero un conteggio che non si puo' usare.
         elenco("SENZA IMMAGINE DEL PROFILO", e.senza_foto)+
-        elenco("PAGINE NON TROVATE", e.pagina_sparita)+
+        elenco("PROFILI NON TROVATI", e.pagina_sparita)+
         elenco("ALTRI ERRORI", e.altro);
-      elFbBulkReport.hidden = false;
+      elBulkCoverReport.hidden = false;
     }
     passo(0);
   });

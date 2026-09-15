@@ -31,13 +31,19 @@ VENUE_TYPE_MAP = {
     "da verificare": "Da verificare",
 }
 
+# Gli stati di Zoho raccontavano a che punto era il contatto, e finivano
+# dritti sullo stato del palcoscenico finche' quello era la copia della
+# serata. Dal 15 settembre 2026 non lo e' piu': il palcoscenico dice che
+# rapporto c'e' con quel posto, e chi e' stato solo contattato non e' ancora
+# niente di piu' di un prospect. A che punto sia il contatto lo direbbe la
+# serata, che questo import non apre: quello che si sa e' scritto nelle note.
 LEAD_STATUS_MAP = {
     "non contattato": "lead",
-    "inviata mail": "contattato",
-    "inviato whatsapp": "contattato",
-    "inviata sia mail che whatsapp": "contattato",
-    "incontrato": "trattativa",
-    "in attesa di data": "confermato",
+    "inviata mail": "prospect",
+    "inviato whatsapp": "prospect",
+    "inviata sia mail che whatsapp": "prospect",
+    "incontrato": "prospect",
+    "in attesa di data": "prospect",
 }
 
 

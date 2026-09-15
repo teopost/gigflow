@@ -17,6 +17,7 @@ import secrets
 import sqlite3
 import socket
 import threading
+import unicodedata
 import urllib.error
 import urllib.request
 import io
@@ -303,33 +304,85 @@ MAX_REPORT_CHARS = 4000
 # o quel posto non ti interessa piu', e allora si archivia o si elimina. Uno
 # stato che diceva "no" e basta lasciava in rubrica righe morte che non
 # erano ne' l'una ne' l'altra cosa.
-STATUS_VALUES = {
-    "lead", "da_contattare", "contattato", "trattativa",
-    "confermato", "suonato", "annullato",
+#
+# Le due liste non si somigliano piu' (15 settembre 2026). Un palcoscenico e'
+# un posto e il suo stato dice che rapporto c'e' fra la band e quel posto: un
+# nome in rubrica, uno su cui stai puntando, uno dove hai gia' suonato, uno
+# che e' rimasto indietro, uno messo via. Una serata e' il tentativo di
+# suonarci in una stagione, e il suo stato dice come sta andando quel
+# tentativo. Sono due domande diverse e adesso hanno due vocabolari diversi.
+#
+# Prima locations.status era la copia dello stato della serata in corso:
+# l'elenco diceva "Contattato" perche' lo diceva la serata. Quella copia non
+# c'e' piu'. A che punto e' la trattativa lo dice la serata, e lo dice dove
+# la serata si vede.
+LOCATION_STATUS_VALUES = {
+    "lead", "prospect", "cliente", "inattivo", "archiviato",
 }
+
+# Una serata esiste perche' hai deciso di provarci, e il suo punto di
+# partenza e' "opportunita'": c'e' un posto dove si potrebbe suonare e tu hai
+# deciso di provarci, ma non hai ancora alzato la cornetta.
+#
+# I nomi sono cambiati il 15 settembre 2026: "da contattare" si chiamava come
+# il primo segmento dell'Agenda e le due cose si confondevano (li' sono i
+# palcoscenici da richiamare adesso, qui il punto di partenza di un
+# tentativo), e "in trattativa" era l'unico stato con una preposizione
+# davanti. "Interessato" e' entrato in mezzo: hai parlato con qualcuno e ha
+# detto che gli interessa, che non e' ancora trattare una data e un
+# compenso, ma non e' nemmeno solo "l'ho chiamato".
+GIG_STATUS_VALUES = {
+    "opportunita", "contattato", "interessato", "trattativa",
+    "confermato", "rifiutata", "suonato", "annullato",
+}
+
+# "Rifiutata" (15 settembre 2026) e' il no del titolare, e chiude la
+# stagione: quella serata li' non si fa piu'. Sta dopo "confermato" nella
+# lista perche' l'ordine racconta come va una trattativa, e un no puo'
+# arrivare in qualunque momento fino a quel punto.
+#
+# La "a" finale non e' un capriccio: "rifiutato" al maschile e' il vecchio
+# stato del PALCOSCENICO, tolto il 13 settembre, e migrate_drop_rifiutato
+# continua a ripulirlo a ogni avvio. Due parole quasi uguali per due cose
+# diverse sarebbero diventate una sola, e la migrazione avrebbe cancellato
+# ogni serata rifiutata al riavvio dopo.
+REJECTED_STATUS = "rifiutata"
 
 # "Lead" e' come nasce tutto: un posto finito in rubrica da un import o da
 # due righe scritte al volo. Non dice che vada contattato — dice solo che
 # esiste, ed e' l'unica cosa vera di un indirizzo che nessuno ha ancora
-# guardato. Scegliere un lead e decidere di provarci sono lo stesso gesto,
-# ed e' li' che nasce la prima serata: per questo "lead" non e' mai lo
-# stato di una serata, ma solo di un palcoscenico che non ne ha nessuna.
+# guardato.
 LEAD_STATUS = "lead"
 
-# Gli stati di una serata sono tutti gli altri: una serata esiste perche'
-# hai deciso di provarci, e il suo punto di partenza e' "da contattare".
-GIG_STATUS_VALUES = STATUS_VALUES - {LEAD_STATUS}
+# "Cliente" e' l'unico stato che si scrive da solo: la prima serata che
+# diventa "suonato" lo accende, e da li' in poi non si spegne piu' per conto
+# suo. Un posto dove hai suonato resta un posto dove hai suonato, anche se
+# l'anno dopo non ti richiamano — quella e' una cosa che decidi tu.
+CLIENT_STATUS = "cliente"
 
-# Prima di aver alzato la cornetta gli stati sono due e non uno: "lead" e'
-# tutto quello che e' finito in rubrica, "da contattare" quello che hai
-# guardato da vicino e su cui vuoi davvero provarci. Nessuno dei due dice
-# che qualcuno ti abbia risposto, quindi registrare un'attivita' li fa
-# avanzare tutti e due a "contattato".
-PRE_CONTACT_STATUSES = {LEAD_STATUS, "da_contattare"}
+# "Inattivo" non vuol dire "lasciato perdere": vuol dire che con quel posto
+# ci hai provato e non ci hai (ancora) suonato. Ci finiscono anche le
+# trattative in piedi, e non e' una svista: a che punto e' la trattativa lo
+# dice la serata, che sta aperta sulla sua riga.
+INACTIVE_STATUS = "inattivo"
 
-# Gli stessi otto stati, ma applicati alla singola serata invece che al
-# palcoscenico: e' quello che permette di ripartire da zero ogni stagione
-# senza cancellare com'e' andata l'anno prima.
+# "Archiviato" non si sceglie da un elenco: e' la copia leggibile di
+# deleted_at, che resta l'unica verita' su chi sta in archivio. Lo scrive
+# archiviare, e ripristinare lo rimette al posto che gli spetta.
+ARCHIVED_STATUS = "archiviato"
+
+# I quattro che si scelgono a mano dalla scheda.
+MANUAL_LOCATION_STATUSES = LOCATION_STATUS_VALUES - {ARCHIVED_STATUS}
+
+# Prima che qualcuno risponda una serata puo' essere solo un'opportunita':
+# esiste perche' hai deciso di provarci, ma la telefonata non e' ancora
+# andata in porto. Registrare un'attivita' la fa avanzare a "contattato", e
+# se la serata non c'e' ancora la apre gia' li'.
+GIG_PRE_CONTACT_STATUSES = {"opportunita"}
+
+# Gli stati della serata applicati alla singola stagione invece che al
+# palcoscenico: e' quello che permette di ripartire da zero ogni anno senza
+# cancellare com'e' andata quello prima.
 GIG_FIELDS = ["status", "gig_date", "fee", "outcome_note"]
 
 # I due modi in cui una serata finisce davvero: "suonato" ci sei andato,
@@ -337,10 +390,14 @@ GIG_FIELDS = ["status", "gig_date", "fee", "outcome_note"]
 # succede. Dopo uno di questi su quella stagione non c'e' piu' niente da
 # fare: la serata si chiude e la prossima nasce come riga nuova.
 #
-# Un no del titolare non sta qui: non e' la fine di niente, e' solo un anno
-# che non si e' fatto. Quella serata resta aperta a "da contattare" finche'
-# non decidi tu — riprovarci, o togliere il posto dalla rubrica.
-CLOSING_STATUSES = {"suonato", "annullato"}
+# Dal 15 settembre 2026 i modi sono tre: ci si e' aggiunto il no del
+# titolare ("rifiutata"). Prima non stava qui apposta — si diceva che un no
+# non e' la fine di niente, solo un anno che non si e' fatto — ma lasciare
+# aperta una trattativa finita voleva dire tenerla in Agenda a chiedere una
+# telefonata che nessuno avrebbe fatto. Adesso la stagione si chiude e per
+# riprovarci l'anno prossimo c'e' "Riproponi", che apre l'opportunita' nuova
+# senza cancellare il no di quest'anno.
+CLOSING_STATUSES = {"suonato", "annullato", REJECTED_STATUS}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -425,7 +482,7 @@ def init_db():
             capacity INTEGER,
             genre TEXT,
             art_director_id INTEGER REFERENCES art_directors(id) ON DELETE SET NULL,
-            status TEXT NOT NULL DEFAULT 'da_contattare',
+            status TEXT NOT NULL DEFAULT 'lead',
             recontact_period TEXT,
             planning_note TEXT,
             created_at TEXT NOT NULL,
@@ -595,7 +652,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS gigs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
-            status TEXT NOT NULL DEFAULT 'da_contattare',
+            status TEXT NOT NULL DEFAULT 'opportunita',
             gig_date TEXT,
             fee REAL,
             outcome_note TEXT,
@@ -749,26 +806,20 @@ def migrate_schema(conn):
     migrate_drop_season(conn)
     migrate_to_recontact_period(conn)
     migrate_drop_rifiutato(conn)
+    migrate_to_venue_lifecycle(conn)
+    migrate_to_gig_opportunita(conn)
     migrate_photos_cover(conn)
     migrate_venue_type_icon(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
 
-    # Un palcoscenico senza nessuna serata e' un lead, e basta: nessuno ha
-    # ancora deciso di provarci. Questa riga e' la stessa di prima — allora
-    # riparava lo stato appeso dopo l'eliminazione dell'ultima serata — ma
-    # ora dice "lead" invece di "da contattare", e con quel cambio fa anche
-    # la scrematura: tutto quello che era in rubrica senza mai una serata
-    # smette di dichiararsi da contattare. E' idempotente, gira a ogni
-    # avvio, e da qui in poi non ha piu' niente da spostare perche' un
-    # palcoscenico nuovo nasce gia' lead.
-    conn.execute(
-        "UPDATE locations SET status = ?, updated_at = ? "
-        "WHERE status != ? "
-        "AND NOT EXISTS (SELECT 1 FROM gigs g WHERE g.location_id = locations.id)",
-        (LEAD_STATUS, now_iso(), LEAD_STATUS),
-    )
+    # Qui ci stava una riga che rimetteva "lead" ogni palcoscenico senza
+    # serate, a ogni avvio. Aveva senso finche' lo stato era la copia della
+    # serata: senza serata non c'era niente da copiare. Adesso lo stato e'
+    # una cosa che decidi tu, e quella riga cancellerebbe ogni prospect al
+    # riavvio dopo — hai guardato un posto, l'hai segnato, e il giorno dopo
+    # era di nuovo un nome qualsiasi.
 
     # Svuotare il promemoria scriveva stringa vuota invece di NULL: due modi
     # di dire "nessun promemoria" che le query devono distinguere. Qui restano
@@ -844,15 +895,20 @@ def migrate_photos_cover(conn):
 
 
 def migrate_drop_rifiutato(conn):
-    """Toglie lo stato "rifiutato" dalle serate e dai palcoscenici.
+    """Toglie il vecchio stato "rifiutato" dalle serate e dai palcoscenici.
+
+    Attenzione al genere: qui si parla di "rifiutato", che era uno stato del
+    palcoscenico; "rifiutata" con la "a" e' lo stato della serata nato il 15
+    settembre 2026 e non va toccato — vedi REJECTED_STATUS.
 
     Un no del titolare non e' un capolinea: o lo richiami l'anno prossimo, e
-    allora quel posto e' "da contattare", o non ti interessa piu', e allora
+    allora quel posto e' di nuovo un'opportunita', o non ti interessa piu',
+    e allora
     si archivia o si elimina. "Rifiutato" era una terza casella che non
     corrispondeva a nessuna delle due decisioni, e ci restavano dentro righe
     che nessuno guardava piu'.
 
-    Diventano "da contattare" e restano chiuse: la serata dice "non
+    Diventano opportunita' e restano chiuse: la serata dice "non
     conclusa", che e' quello che e' successo davvero, e il palcoscenico
     torna in circolo. Chi va tolto dalla rubrica si archivia a mano, che e'
     una decisione e non un effetto collaterale di un aggiornamento.
@@ -863,13 +919,100 @@ def migrate_drop_rifiutato(conn):
     """
     ts = now_iso()
     conn.execute(
-        "UPDATE gigs SET status = 'da_contattare', updated_at = ? WHERE status = 'rifiutato'",
+        "UPDATE gigs SET status = 'opportunita', updated_at = ? WHERE status = 'rifiutato'",
         (ts,),
+    )
+    # Sulle locations non si scrive piu' niente: il loro "rifiutato" lo
+    # raccoglie migrate_to_venue_lifecycle insieme a tutto il vocabolario
+    # vecchio, e lo porta dove va (inattivo, o archiviato se e' in archivio).
+
+
+# Il vocabolario di prima: otto stati della trattativa che stavano sul
+# palcoscenico perche' erano la copia della sua serata. "rifiutato" e
+# "potenziale" sono passati di qui e non ci sono piu', ma restano in lista:
+# un database fermo a una versione vecchia li ha ancora addosso.
+VECCHI_STATI_PALCOSCENICO = (
+    "lead", "potenziale", "da_contattare", "contattato", "trattativa",
+    "confermato", "suonato", "annullato", "rifiutato",
+)
+
+
+def migrate_to_venue_lifecycle(conn):
+    """Dal vocabolario della trattativa a quello del palcoscenico
+    (15 settembre 2026).
+
+    Quattro regole, in quest'ordine, e l'ordine e' la regola:
+
+      1. chi e' in archivio diventa "archiviato", qualunque cosa fosse: e' lo
+         stato in cui quella riga si trova adesso, e la sua storia resta
+         scritta nelle serate;
+      2. chi ha almeno una serata "suonato" diventa "cliente";
+      3. chi era "lead" resta "lead": nessuno ci ha ancora provato;
+      4. tutti gli altri diventano "inattivo" — ci hai provato e non ci hai
+         (ancora) suonato. Ci finiscono anche le trattative in piedi: a che
+         punto sono lo dice la loro serata, che resta aperta e non si tocca.
+
+    "prospect" non lo scrive nessuno: e' uno stato nuovo e se lo prende chi
+    lo decide a mano.
+
+    Le serate non si toccano: il loro vocabolario e' rimasto quello.
+
+    Idempotente: guarda solo gli stati del vocabolario vecchio, e "lead" e'
+    l'unica parola che i due hanno in comune — la regola 3 la lascia dov'e',
+    quindi ripassare non sposta niente.
+    """
+    segna = ",".join("?" for _ in VECCHI_STATI_PALCOSCENICO)
+    da_fare = conn.execute(
+        f"SELECT COUNT(*) AS n FROM locations WHERE status IN ({segna}) AND status != 'lead'",
+        VECCHI_STATI_PALCOSCENICO,
+    ).fetchone()["n"]
+    if not da_fare:
+        return
+    ts = now_iso()
+    conn.execute(
+        f"UPDATE locations SET status = ?, updated_at = ? "
+        f"WHERE status IN ({segna}) AND deleted_at IS NOT NULL",
+        (ARCHIVED_STATUS, ts) + VECCHI_STATI_PALCOSCENICO,
     )
     conn.execute(
-        "UPDATE locations SET status = 'da_contattare', updated_at = ? WHERE status = 'rifiutato'",
-        (ts,),
+        f"UPDATE locations SET status = ?, updated_at = ? "
+        f"WHERE status IN ({segna}) "
+        f"AND EXISTS (SELECT 1 FROM gigs g WHERE g.location_id = locations.id "
+        f"            AND g.status = 'suonato')",
+        (CLIENT_STATUS, ts) + VECCHI_STATI_PALCOSCENICO,
     )
+    conn.execute(
+        f"UPDATE locations SET status = ?, updated_at = ? "
+        f"WHERE status IN ({segna}) AND status != ?",
+        (INACTIVE_STATUS, ts) + VECCHI_STATI_PALCOSCENICO + (LEAD_STATUS,),
+    )
+    print("  Stati dei palcoscenici: %d righe portate al vocabolario nuovo." % da_fare)
+
+
+def migrate_to_gig_opportunita(conn):
+    """"Da contattare" diventa "opportunita'" (15 settembre 2026).
+
+    Il nome vecchio era identico a quello del primo segmento dell'Agenda, che
+    e' un'altra cosa — li' ci sono i palcoscenici da richiamare adesso, qui
+    il punto di partenza di un tentativo — e a voce le due cose finivano per
+    chiamarsi uguale.
+
+    Cambia solo la parola: la serata resta la stessa, aperta, con la stessa
+    data e lo stesso compenso. "Interessato", che nasce nello stesso giro,
+    non tocca nessuna riga: e' uno stato nuovo e se lo prende chi lo sceglie.
+
+    Idempotente: dopo la prima volta "da_contattare" non esiste piu'.
+    """
+    n = conn.execute(
+        "SELECT COUNT(*) AS n FROM gigs WHERE status = 'da_contattare'"
+    ).fetchone()["n"]
+    if not n:
+        return
+    conn.execute(
+        "UPDATE gigs SET status = 'opportunita', updated_at = ? WHERE status = 'da_contattare'",
+        (now_iso(),),
+    )
+    print("  Stati delle serate: %d \"da contattare\" diventano opportunita'." % n)
 
 
 def migrate_to_recontact_period(conn):
@@ -935,7 +1078,7 @@ def migrate_drop_season(conn):
         CREATE TABLE gigs_senza_stagione (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
-            status TEXT NOT NULL DEFAULT 'da_contattare',
+            status TEXT NOT NULL DEFAULT 'opportunita',
             gig_date TEXT,
             fee REAL,
             outcome_note TEXT,
@@ -2172,21 +2315,56 @@ def current_gig_row(conn, loc_id):
     ).fetchone()
 
 
-def refresh_location_status(conn, loc_id):
-    """locations.status e' una copia: la verita' sta sulla serata in corso.
-    Tenerla aggiornata qui vuol dire che elenchi, filtri e badge continuano a
-    funzionare esattamente come prima, senza sapere niente delle serate.
+def venue_status_from_gigs(conn, loc_id):
+    """Lo stato che spetta a un palcoscenico guardando solo le sue serate:
+    cliente se ci hai suonato almeno una volta, inattivo se ci hai provato,
+    lead se non c'e' mai stato nessun tentativo.
 
-    Senza nessuna serata lo stato torna a "lead": e' un posto in rubrica su
-    cui non e' ancora stata aperta nessuna stagione. Lasciare il valore
-    vecchio mostrerebbe "Confermato" su un palcoscenico che non ha nessuna
-    serata confermata.
+    Non e' la verita' su tutti — prospect lo decidi tu e da qui non esce mai
+    — ma e' quella giusta quando un palcoscenico torna dall'archivio e
+    bisogna rimetterlo da qualche parte.
     """
-    row = current_gig_row(conn, loc_id)
-    conn.execute(
-        "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
-        (row["status"] if row else LEAD_STATUS, now_iso(), loc_id),
-    )
+    row = conn.execute(
+        "SELECT MAX(status = 'suonato') AS suonato, COUNT(*) AS serate "
+        "FROM gigs WHERE location_id = ?",
+        (loc_id,),
+    ).fetchone()
+    if row and row["suonato"]:
+        return CLIENT_STATUS
+    if row and row["serate"]:
+        return INACTIVE_STATUS
+    return LEAD_STATUS
+
+
+def refresh_location_status(conn, loc_id):
+    """Una regola sola, e in una direzione sola: la prima serata suonata fa
+    cliente. Gira dove le serate cambiano — aperte, modificate, eliminate —
+    ed e' l'unico automatismo rimasto sullo stato del palcoscenico.
+
+    Prima qui si copiava lo stato della serata in corso, ed era l'unico modo
+    che l'elenco aveva di dire a che punto fosse la trattativa. Adesso quello
+    lo racconta la serata: il palcoscenico dice un'altra cosa, piu' lenta, e
+    va toccata solo quando succede qualcosa che la cambia davvero.
+
+    Non torna mai indietro da solo: cancellare la serata suonata dell'anno
+    scorso non toglie a quel posto di essere un cliente, e un cliente che
+    quest'anno non ti richiama lo sposti tu, quando lo decidi tu. In
+    archivio non entra: li' lo stato lo tiene deleted_at.
+    """
+    row = conn.execute(
+        "SELECT status FROM locations WHERE id = ?", (loc_id,)
+    ).fetchone()
+    if row is None or row["status"] == ARCHIVED_STATUS or row["status"] == CLIENT_STATUS:
+        return
+    suonato = conn.execute(
+        "SELECT 1 FROM gigs WHERE location_id = ? AND status = 'suonato' LIMIT 1",
+        (loc_id,),
+    ).fetchone()
+    if suonato:
+        conn.execute(
+            "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
+            (CLIENT_STATUS, now_iso(), loc_id),
+        )
 
 
 def insert_gig(conn, loc_id, status, ts=None):
@@ -2222,45 +2400,51 @@ def gig_is_empty(conn, gig):
 
 
 def set_location_status(conn, loc_id, status):
-    """Cambiare lo stato dalla scheda del palcoscenico vuol dire cambiarlo
-    sulla serata in corso: se lo scrivessimo solo su locations, la prima
-    modifica alla serata lo sovrascriverebbe.
+    """Lo stato del palcoscenico e' tornato a essere un campo suo, e questo e'
+    l'unico posto che lo scrive quando lo scegli tu.
 
-    Ma su una serata CHIUSA non si scrive mai da qui. Una stagione conclusa e'
-    storia: rimetterla a "da contattare" per ripartire cancellerebbe il fatto
-    che ci hai suonato, che e' esattamente quello che le serate esistono per
-    non perdere. Se non c'e' niente di aperto si apre la stagione dopo. Per
-    correggere un anno passato si passa dalla sua riga, dove si vede quale.
+    Non tocca nessuna serata. Prima lo faceva: cambiare stato da qui apriva
+    una stagione, la spostava o la chiudeva, perche' lo stato del
+    palcoscenico *era* quello della sua serata. Adesso sono due cose, e
+    aprire un tentativo resta un gesto solo — il pulsante delle serate.
+
+    In archivio non si scrive: un palcoscenico archiviato e' archiviato, e
+    per cambiargli stato va prima ripristinato.
     """
-    row = current_gig_row(conn, loc_id)
-    ts = now_iso()
-    # Se non c'e' niente di aperto qui sotto nasce una serata nuova, che una
-    # data non ce l'ha: confermarla da qui non si puo'.
-    aperta = row if (row is not None and row["closed_at"] is None) else None
-    require_gig_date_if_confirmed(status, aperta["gig_date"] if aperta else None)
-    if status == LEAD_STATUS:
-        # Rimettere lead non e' cambiare etichetta: e' dire che quel
-        # tentativo non c'e' mai stato. Si puo' solo finche' la serata in
-        # corso e' vuota — un tocco sbagliato si annulla, una trattativa
-        # cominciata no. La strada normale per tornare indietro resta
-        # eliminare la serata dalla scheda, che finisce qui sotto lo stesso.
-        if row is not None and row["closed_at"] is None and gig_is_empty(conn, row):
-            conn.execute("UPDATE notes SET gig_id = NULL WHERE gig_id = ?", (row["id"],))
-            conn.execute("DELETE FROM gigs WHERE id = ?", (row["id"],))
-        elif row is not None:
-            raise ApiError(400, "Questa serata è già cominciata: per toglierla eliminala.")
-        refresh_location_status(conn, loc_id)
-        return
-    if row is None or row["closed_at"] is not None:
-        insert_gig(conn, loc_id, status, ts)
-    else:
-        conn.execute(
-            "UPDATE gigs SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?",
-            (status, ts if status in CLOSING_STATUSES else None, ts, row["id"]),
-        )
+    if status not in MANUAL_LOCATION_STATUSES:
+        raise ApiError(400, "Stato non valido")
+    row = conn.execute(
+        "SELECT status FROM locations WHERE id = ?", (loc_id,)
+    ).fetchone()
+    if row is None:
+        raise ApiError(404, "Palcoscenico non trovato")
+    if row["status"] == ARCHIVED_STATUS:
+        raise ApiError(400, "Questo palcoscenico è in archivio: ripristinalo per cambiargli stato.")
     conn.execute(
-        "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?", (status, ts, loc_id)
+        "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
+        (status, now_iso(), loc_id),
     )
+
+
+def advance_gig_on_activity(conn, loc_id, ts=None):
+    """Un'attivita' registrata fa avanzare la SERATA, non il palcoscenico:
+    aver chiamato non cambia che rapporto hai con quel posto, cambia a che
+    punto e' il tentativo di quest'anno.
+
+    Se la serata non c'e' — o l'ultima e' chiusa — ne apre una gia' a
+    "contattato": lavorare un posto vuol dire aver cominciato, e la nota
+    appena scritta e' la prova. Torna l'id della serata che ha toccato, che
+    serve per attaccarci la nota.
+    """
+    ts = ts or now_iso()
+    gig = current_gig_row(conn, loc_id)
+    if gig is None or gig["closed_at"] is not None:
+        return insert_gig(conn, loc_id, "contattato", ts)
+    conn.execute(
+        "UPDATE gigs SET status = 'contattato', updated_at = ? WHERE id = ?",
+        (ts, gig["id"]),
+    )
+    return gig["id"]
 
 
 def clean_gig_payload(body, partial):
@@ -2272,7 +2456,7 @@ def clean_gig_payload(body, partial):
         if field == "status":
             if value and value not in GIG_STATUS_VALUES:
                 raise ApiError(400, "Stato non valido")
-            value = value or "da_contattare"
+            value = value or "opportunita"
         elif field == "gig_date":
             value = (value or "").strip() or None
             if value and not GIG_DATE_RE.match(value):
@@ -2297,7 +2481,7 @@ def require_location(conn, ws, loc_id):
 def create_gig(conn, ws, loc_id, body):
     require_location(conn, ws, loc_id)
     data = clean_gig_payload(body or {}, partial=False)
-    data.setdefault("status", "da_contattare")
+    data.setdefault("status", "opportunita")
     require_gig_date_if_confirmed(data["status"], data.get("gig_date"))
     ts = now_iso()
     # Ricominciare chiude il tentativo rimasto in sospeso: di aperta ce n'e'
@@ -2404,9 +2588,9 @@ def delete_gig(conn, ws, gig_id):
 # scritto su gigs.fee, ed e' li' che si guarda; una copia in cassa avrebbe
 # voluto dire riallinearla a ogni modifica della serata, a ogni cambio di
 # stato, quando il palcoscenico viene rinominato (la descrizione contiene il
-# suo nome) e quando la serata viene cancellata. locations.status e' gia' una
-# copia e ha gia' fatto il suo danno: non se ne aggiunge una seconda, e sui
-# soldi meno che mai.
+# suo nome) e quando la serata viene cancellata. locations.status e' stata
+# una copia per mesi e ha gia' fatto il suo danno — tanto che non lo e' piu':
+# non se ne aggiunge una seconda, e sui soldi meno che mai.
 #
 # Cosa si perde a non copiarle, detto chiaro: il compenso ha sempre la data
 # della serata (non si puo' segnare "incassato il mese dopo") e non si puo'
@@ -2758,7 +2942,10 @@ def clean_location_payload(body, partial):
         elif field == "capacity" or field == "art_director_id":
             value = to_number_or_none(value, int)
         elif field == "status":
-            if value and value not in STATUS_VALUES:
+            # "Archiviato" non arriva mai da un payload: lo scrive
+            # archiviare, e chi prova a metterlo a mano sta cercando di dire
+            # un'altra cosa (probabilmente "inattivo").
+            if value and value not in MANUAL_LOCATION_STATUSES:
                 raise ApiError(400, "Stato non valido")
             value = value or LEAD_STATUS
         elif field == "favorite":
@@ -2789,13 +2976,11 @@ def create_location(conn, ws, body, owner_email=None):
     cur = conn.execute(
         f"INSERT INTO locations ({','.join(fields)}) VALUES ({placeholders})", values
     )
-    # Un palcoscenico nuovo e' un lead: esiste, e basta. La serata nasce
-    # quando decidi di provarci — aprirla qui vorrebbe dire contare come
-    # tentativo ogni indirizzo trascritto, e a fine stagione il numero dei
-    # tentativi sarebbe una bugia. Chi invece arriva gia' con uno stato di
-    # trattativa la serata ce l'ha subito: li' un tentativo c'e' davvero.
-    if data["status"] != LEAD_STATUS:
-        insert_gig(conn, cur.lastrowid, data["status"], ts)
+    # Un palcoscenico nuovo e' un lead: esiste, e basta. Nessuno stato apre
+    # piu' una serata — la serata nasce dal suo pulsante, quando decidi di
+    # provarci. Aprirla qui vorrebbe dire contare come tentativo ogni
+    # indirizzo trascritto, e a fine stagione il numero dei tentativi sarebbe
+    # una bugia.
     conn.commit()
     return fetch_location(conn, ws, cur.lastrowid)
 
@@ -2807,9 +2992,9 @@ def update_location(conn, ws, loc_id, body):
     if not existing:
         raise ApiError(404, "Palcoscenico non trovato")
     data = clean_location_payload(body, partial=True)
-    # Lo stato non e' un campo del palcoscenico ma della sua serata in corso:
-    # chi lo manda qui (la scheda, l'app installata di una versione vecchia)
-    # continua a funzionare, ma finisce nel posto giusto.
+    # Lo stato e' tornato a essere un campo del palcoscenico, ma passa
+    # comunque di la': set_location_status e' l'unico punto che lo scrive, e
+    # sa dire di no a chi e' in archivio.
     status = data.pop("status", None)
     if data:
         data["updated_at"] = now_iso()
@@ -2824,11 +3009,15 @@ def update_location(conn, ws, loc_id, body):
 
 
 def delete_location(conn, ws, loc_id):
+    """Archiviare scrive due cose che dicono la stessa: deleted_at, che e'
+    quella vera — decide chi si vede e chi no — e lo stato, che la rende
+    leggibile in elenco e nei filtri senza che ogni vista debba sapere del
+    campo. Restano allineate perche' passano tutte e due solo da qui."""
     ts = now_iso()
     cur = conn.execute(
-        "UPDATE locations SET deleted_at = ?, updated_at = ? "
+        "UPDATE locations SET deleted_at = ?, status = ?, updated_at = ? "
         "WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL",
-        (ts, ts, loc_id, ws),
+        (ts, ARCHIVED_STATUS, ts, loc_id, ws),
     )
     conn.commit()
     if cur.rowcount == 0:
@@ -2836,11 +3025,16 @@ def delete_location(conn, ws, loc_id):
 
 
 def restore_location(conn, ws, loc_id):
+    """Tornando dall'archivio lo stato lo rimettono le serate: cliente se ci
+    hai suonato, inattivo se ci hai provato, lead se non e' mai cominciato
+    niente. Di com'era prima di essere archiviato non resta traccia — un
+    prospect messo via e ripreso torna lead, e va rimesso a mano: e' il
+    prezzo di non tenere una seconda colonna solo per l'archivio."""
     ts = now_iso()
     cur = conn.execute(
-        "UPDATE locations SET deleted_at = NULL, updated_at = ? "
+        "UPDATE locations SET deleted_at = NULL, status = ?, updated_at = ? "
         "WHERE id = ? AND workspace_id = ? AND deleted_at IS NOT NULL",
-        (ts, loc_id, ws),
+        (venue_status_from_gigs(conn, loc_id), ts, loc_id, ws),
     )
     conn.commit()
     if cur.rowcount == 0:
@@ -2909,23 +3103,17 @@ def add_note(conn, ws, loc_id, body):
         (loc_id, gig["id"] if gig else None, kind, text, ts),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
-    # Aver contattato il posto e' esattamente cosa distingue i due stati di
-    # partenza ("lead", "da contattare") da "contattato": avanzarlo qui
-    # evita di dover cambiare lo stato a mano ogni volta. Da "contattato" in
-    # poi non si tocca piu' niente: dove sia arrivata la trattativa lo sa solo
-    # chi la sta portando avanti.
+    # Aver contattato il posto e' esattamente cosa distingue "da contattare"
+    # da "contattato": avanzare la serata qui evita di doverlo fare a mano
+    # ogni volta. Da "contattato" in poi non si tocca piu' niente: dove sia
+    # arrivata la trattativa lo sa solo chi la sta portando avanti.
     #
-    # Senza nessuna serata l'attivita' ne apre una per la stagione corrente
-    # (ci pensa set_location_status): lavorare un posto vuol dire aver
-    # cominciato, e la nota appena scritta e' la prova.
-    if kind != "nota" and (gig is None or gig["status"] in PRE_CONTACT_STATUSES):
-        set_location_status(conn, loc_id, "contattato")
-        if gig is None:
-            nuova = current_gig_row(conn, loc_id)
-            if nuova is not None:
-                conn.execute(
-                    "UPDATE notes SET gig_id = ? WHERE id = ?", (nuova["id"], nota_id)
-                )
+    # Lo stato del palcoscenico non si muove: una telefonata non fa di un
+    # lead un cliente. Quello lo fa una serata suonata, e nessun'altra cosa.
+    if kind != "nota" and (gig is None or gig["status"] in GIG_PRE_CONTACT_STATUSES):
+        nuova_id = advance_gig_on_activity(conn, loc_id, ts)
+        if gig is None and nuova_id is not None:
+            conn.execute("UPDATE notes SET gig_id = ? WHERE id = ?", (nuova_id, nota_id))
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 
@@ -3007,6 +3195,44 @@ def salva_foto(conn, loc_id, raw, ext, copertina=False):
 # is_silhouette: e' l'avatar grigio di chi non ha mai messo una foto, e
 # metterlo come copertina sarebbe peggio che non avere niente.
 FB_PICTURE_URL = "https://graph.facebook.com/%s/picture?redirect=false&width=720&height=720"
+
+# Instagram non ha un endpoint pubblico come quello di Facebook: la foto del
+# profilo sta nei meta tag della pagina, e quei tag Instagram li manda solo a
+# chi si presenta come un robot — e' lo stesso meccanismo con cui WhatsApp o
+# Telegram mostrano l'anteprima quando incolli un indirizzo. A un browser
+# normale risponde con un guscio vuoto: provato il 15 settembre 2026, nessun
+# og:image e nessun link all'immagine.
+#
+# Ci presentiamo col nostro nome. Fingersi il crawler di Facebook o di Google
+# darebbe qualcosa in piu' — provati tutti e due lo stesso giorno: solo a
+# Googlebot Instagram manda anche il JSON con profile_pic_url, che e' 150x150
+# invece dei 100x100 dell'og:image — ma dire di essere qualcun altro per
+# cinquanta pixel non e' un buon affare, e il giorno che Instagram stringe
+# sui crawler finti si romperebbe di nascosto.
+#
+# Piu' di cosi' non si puo' avere senza entrare con un account: gli indirizzi
+# del CDN sono firmati e chiedere una misura diversa risponde 403 (provate
+# 320, 640, 1080). Per il confronto: da una pagina Facebook arriva 720x720.
+# Bastano per la copertina in elenco (48 punti) e per la miniatura nella
+# striscia (88); a schermo intero si vede che e' piccola.
+IG_PROFILE_URL = "https://www.instagram.com/%s/"
+IG_CRAWLER_UA = "GigFlowBot/1.0 (anteprima del profilo; +https://gigflow.local)"
+IG_HOSTS = ("instagram.com", "instagr.am")
+IG_USER_OK = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+# Pezzi di indirizzo che sembrano un nome utente e non lo sono: un link a un
+# post o a una storia non dice di chi e' il profilo.
+IG_NON_PROFILI = {
+    "p", "reel", "reels", "tv", "stories", "explore", "accounts", "direct",
+    "about", "legal", "privacy", "terms", "developer", "directory", "web",
+}
+IG_PIC_RE = re.compile(r'"profile_pic_url"\s*:\s*"([^"]+)"')
+IG_OG_TITLE_RE = re.compile(r'<meta[^>]+property="og:title"[^>]+content="([^"]+)"')
+# Quanti nomi utente provare prima di arrendersi, e quanto aspettarne uno.
+# Sono richieste in fila: sei per dodici secondi e' il peggio che puo'
+# succedere a chi tocca il pulsante, e non succede quasi mai.
+IG_MAX_CANDIDATI = 6
+IG_CERCA_TIMEOUT = 12
+IG_OG_RE = re.compile(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"')
 FB_HOSTS = ("facebook.com", "fb.com", "fb.me")
 FB_ID_OK = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 # Il nome vecchio stile delle pagine: "Bar-Belverde-170145990444191". Come
@@ -3053,6 +3279,174 @@ def facebook_page_id(url):
     return nome
 
 
+def instagram_username(url):
+    """Il nome utente dentro un link di Instagram, da qualunque forma in cui
+    e' stato incollato: con o senza https, www o m., con lo /?igsh=... che il
+    telefono attacca alla condivisione, con o senza barra finale. Un link a
+    un post (/p/...) o a una storia non e' un profilo: da quelli non si sa di
+    chi sia la foto, e tornano None come tutto quello che non e' Instagram."""
+    if not url:
+        return None
+    testo = url.strip()
+    if not re.match(r"^https?://", testo, re.I):
+        testo = "https://" + testo
+    try:
+        parti = urlparse(testo)
+    except ValueError:
+        return None
+    host = (parti.netloc or "").lower().split(":")[0]
+    for prefisso in ("www.", "m."):
+        if host.startswith(prefisso):
+            host = host[len(prefisso):]
+    if not (host in IG_HOSTS or any(host.endswith("." + h) for h in IG_HOSTS)):
+        return None
+    segmenti = [x for x in (parti.path or "").split("/") if x]
+    if not segmenti:
+        return None
+    nome = unquote(segmenti[0]).lstrip("@")
+    if nome.lower() in IG_NON_PROFILI or not IG_USER_OK.match(nome):
+        return None
+    return nome
+
+
+def _instagram_profilo(username, timeout=15):
+    """Quello che la pagina pubblica dice di un profilo: la foto e il nome
+    visualizzato. None se il profilo non esiste.
+
+    Instagram risponde 200 anche per un nome utente che non esiste, con una
+    pagina che non contiene niente: i due casi non si distinguono dal codice
+    HTTP, si distinguono da quello che manca dentro. E' anche il modo in cui
+    si controlla se un nome indovinato esiste davvero (vedi instagram_cerca).
+    """
+    req = urllib.request.Request(
+        IG_PROFILE_URL % quote(username, safe=""),
+        headers={"User-Agent": IG_CRAWLER_UA},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        pagina = resp.read(1200000).decode("utf-8", "ignore")
+    foto = None
+    trovato = IG_PIC_RE.search(pagina)
+    if trovato:
+        try:
+            foto = json.loads('"' + trovato.group(1) + '"')
+        except ValueError:
+            foto = None
+    if not foto:
+        trovato = IG_OG_RE.search(pagina)
+        if trovato:
+            foto = trovato.group(1).replace("&amp;", "&")
+    if not foto:
+        return None
+    nome = ""
+    trovato = IG_OG_TITLE_RE.search(pagina)
+    if trovato:
+        # "Nome del locale (@nomeutente) \u2022 Instagram photos and videos"
+        nome = html.unescape(trovato.group(1)).split("(@")[0].strip(" \u2022").strip()
+    return {"username": username, "url": IG_PROFILE_URL % username, "nome": nome, "foto": foto}
+
+
+def _instagram_pic_url(username):
+    dati = _instagram_profilo(username)
+    return dati["foto"] if dati else None
+
+
+# Le parole che stanno davanti al nome vero e che su Instagram spesso non ci
+# sono: "Bar Capriccio" e' @capriccio55, non @barcapriccio.
+IG_PREFISSI_LOCALE = (
+    "bar", "pub", "ristorante", "osteria", "circolo", "locale", "cafe",
+    "caffe", "birreria", "taverna", "trattoria", "bagno", "disco", "club",
+    "hotel", "pizzeria", "agriturismo",
+)
+# Articoli e congiunzioni: un nome utente quasi mai se li porta dietro.
+IG_PAROLE_CORTE = ("il", "lo", "la", "i", "gli", "le", "e", "di", "del",
+                   "della", "dei", "al", "allo", "alla", "a", "da", "the")
+
+
+def instagram_candidati(nome, citta=None):
+    """I nomi utente plausibili per un locale che si chiama cosi'.
+
+    Non e' una ricerca sul web: e' il modo in cui i locali si chiamano su
+    Instagram — tutto attaccato, coi punti, con gli underscore, senza la
+    parola "bar" davanti, a volte con la citta' in coda. Si provano in
+    quest'ordine e si tengono quelli che esistono davvero.
+
+    Sul web la ricerca vera non si puo' fare da qui: i motori rispondono a
+    una persona con un browser, non a un server che chiede dieci volte di
+    fila (provato il 15 settembre 2026: DuckDuckGo blocca dopo tre query,
+    Bing e gli altri non danno niente di leggibile). Quella strada resta al
+    telefono, col pulsante "Cerca sul web" che apre il motore gia' scritto.
+    """
+    parole = _parole_semplici(nome)
+    if not parole:
+        return []
+    senza_corte = [p for p in parole if p not in IG_PAROLE_CORTE] or parole
+    proposte = [
+        "".join(parole),
+        "".join(senza_corte),
+        ".".join(parole),
+        "_".join(parole),
+    ]
+    if parole[0] in IG_PREFISSI_LOCALE and len(parole) > 1:
+        proposte.append("".join(parole[1:]))
+    citta_parole = _parole_semplici(citta)
+    if citta_parole:
+        proposte.append("".join(parole) + citta_parole[0])
+        proposte.append("".join(parole) + "_" + citta_parole[0])
+    fuori, visti = [], set()
+    for x in proposte:
+        x = x.strip("._")
+        if 2 <= len(x) <= 30 and x not in visti and IG_USER_OK.match(x):
+            visti.add(x)
+            fuori.append(x)
+    return fuori[:IG_MAX_CANDIDATI]
+
+
+def _parole_semplici(testo):
+    """Il testo ridotto a parole di sole lettere e numeri, senza accenti:
+    "Jack's Caf\u00e8&Pizza" -> ["jack", "s", "cafe", "pizza"]."""
+    senza_accenti = unicodedata.normalize("NFKD", testo or "")
+    senza_accenti = senza_accenti.encode("ascii", "ignore").decode("ascii").lower()
+    return [p for p in re.split(r"[^a-z0-9]+", senza_accenti) if p]
+
+
+def instagram_cerca(conn, ws, loc_id, body=None):
+    """Cerca il profilo Instagram di un palcoscenico provando i nomi utente
+    che gli somigliano, e torna quelli che esistono davvero.
+
+    Nome e citta' arrivano dalla scheda aperta, come per la copertina: quello
+    che hai davanti puo' essere diverso da quello che e' gia' salvato.
+
+    Non sceglie al posto tuo. Un nome generico — "Beer Station", "Aloha" —
+    esiste su Instagram anche a trecento chilometri da li', e incollare quel
+    link nel campo vorrebbe dire scrivere una cosa falsa in archivio senza
+    dirlo a nessuno. Qui si torna un elenco con nome e foto, e a scegliere e'
+    chi conosce il locale.
+    """
+    row = conn.execute(
+        "SELECT name, city FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+    body = body or {}
+    nome = (body.get("name") or row["name"] or "").strip()
+    citta = (body.get("city") or row["city"] or "").strip()
+    if not nome:
+        raise ApiError(400, "Senza nome non c'e' niente da cercare", "senza_nome")
+
+    trovati, errori = [], 0
+    for username in instagram_candidati(nome, citta):
+        try:
+            dati = _instagram_profilo(username, timeout=IG_CERCA_TIMEOUT)
+        except Exception:
+            errori += 1
+            if errori >= 3:
+                raise ApiError(502, "Instagram non risponde, riprova fra poco", "rete")
+            continue
+        if dati:
+            trovati.append(dati)
+    return {"trovati": trovati}
+
+
 def _facebook_json(page_id):
     req = urllib.request.Request(
         FB_PICTURE_URL % quote(page_id, safe=""),
@@ -3062,26 +3456,12 @@ def _facebook_json(page_id):
         return json.load(resp)
 
 
-def facebook_cover(conn, ws, loc_id, body=None):
-    """Prende l'immagine del profilo della pagina Facebook e la mette come
-    copertina del palcoscenico. Resta una foto come le altre: si cancella
-    dalla striscia, e la copertina si puo' rimettere su un'altra con la
-    stella.
-
-    Il link arriva dalla scheda aperta, non dal database: la scheda e' una
-    bozza finche' non si salva, e chiedere questa immagine per un indirizzo
-    diverso da quello che hai davanti sarebbe difficile da spiegare. Se non
-    arriva niente si ripiega su quello salvato."""
-    row = conn.execute(
-        "SELECT website FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
-    ).fetchone()
-    if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
-
-    page_id = facebook_page_id((body or {}).get("url") or row["website"])
-    if not page_id:
-        raise ApiError(400, "Nel campo Sito non c'e' una pagina Facebook", "non_facebook")
-
+def _facebook_pic_url(page_id):
+    """L'indirizzo della foto del profilo di una pagina Facebook, o None se
+    Facebook non la da'. Succede per i link nella forma profile.php?id=...:
+    l'endpoint pubblico risponde 200 ma con la sagoma grigia (provato il 15
+    settembre 2026 su 17 palcoscenici, tutti e 17 silhouette; con i link che
+    hanno il nome della pagina, 11 su 12 foto vera)."""
     # Il nome vecchio stile va provato in due modi: com'e' scritto, e poi
     # col solo numero in fondo, che e' l'id sopravvissuto al cambio di nome.
     tentativi = [page_id]
@@ -3105,16 +3485,71 @@ def facebook_cover(conn, ws, loc_id, body=None):
 
     dati = (esito or {}).get("data") or {}
     if dati.get("is_silhouette"):
-        raise ApiError(404, "Questa pagina non ha un'immagine del profilo", "senza_foto")
-    foto_url = dati.get("url")
-    if not foto_url:
-        raise ApiError(502, "Facebook non ha dato nessuna immagine")
+        return None
+    return dati.get("url")
 
-    # L'indirizzo arriva da Facebook, ma finisce in una richiesta che parte
-    # da questo server: si scarica solo da dove ci si aspetta.
+
+def social_cover(conn, ws, loc_id, body=None):
+    """Prende l'immagine del profilo dal social che sta nel campo Sito e la
+    mette come copertina del palcoscenico. Resta una foto come le altre: si
+    cancella dalla striscia, e la copertina si puo' rimettere su un'altra con
+    la stella.
+
+    Il link e' uno solo e decide lui dove andare a prendere la foto: se
+    dentro c'e' facebook.com si passa dal Graph, se c'e' instagram.com dai
+    meta tag della pagina pubblica. Un campo solo, un pulsante solo, e chi lo
+    usa non deve sapere che sotto ci sono due strade diverse.
+
+    Il link arriva dalla scheda aperta, non dal database: la scheda e' una
+    bozza finche' non si salva, e chiedere questa immagine per un indirizzo
+    diverso da quello che hai davanti sarebbe difficile da spiegare. Se non
+    arriva niente si ripiega su quello salvato."""
+    row = conn.execute(
+        "SELECT website FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palcoscenico non trovato")
+
+    url = (body or {}).get("url") or row["website"]
+    page_id = facebook_page_id(url)
+    ig_user = None if page_id else instagram_username(url)
+    if not page_id and not ig_user:
+        raise ApiError(
+            400,
+            "Nel campo Sito non c'e' una pagina Facebook o un profilo Instagram",
+            "non_social",
+        )
+
+    if page_id:
+        foto_url = _facebook_pic_url(page_id)
+        if not foto_url:
+            raise ApiError(404, "Questa pagina non ha un'immagine del profilo", "senza_foto")
+    else:
+        try:
+            foto_url = _instagram_pic_url(ig_user)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                raise ApiError(404, "Instagram non trova questo profilo", "pagina_sparita")
+            raise ApiError(502, "Instagram non risponde, riprova fra poco", "rete")
+        except Exception:
+            raise ApiError(502, "Instagram non risponde, riprova fra poco", "rete")
+        if not foto_url:
+            # Instagram risponde 200 anche per un profilo che non esiste: la
+            # pagina c'e', dentro non c'e' niente. I due casi — sparito e
+            # senza foto — da fuori non si distinguono, e dirlo cosi' e' piu'
+            # onesto che indovinare.
+            raise ApiError(
+                404,
+                "Instagram non ha dato nessuna immagine: forse il profilo non esiste piu'",
+                "senza_foto",
+            )
+
+    # L'indirizzo arriva dal social, ma finisce in una richiesta che parte da
+    # questo server: si scarica solo da dove ci si aspetta.
     host = (urlparse(foto_url).netloc or "").lower().split(":")[0]
-    if not (host.endswith(".fbcdn.net") or host.endswith(".facebook.com")):
-        raise ApiError(502, "Facebook ha risposto con un indirizzo inatteso")
+    if not (host.endswith(".fbcdn.net") or host.endswith(".facebook.com")
+            or host.endswith(".cdninstagram.com") or host.endswith(".instagram.com")):
+        raise ApiError(502, "Il social ha risposto con un indirizzo inatteso")
 
     try:
         req = urllib.request.Request(foto_url, headers={"User-Agent": "GigFlow"})
@@ -3126,7 +3561,7 @@ def facebook_cover(conn, ws, loc_id, body=None):
 
     ext = CONTENT_TYPE_PHOTO_EXT.get(ctype)
     if not ext or not raw:
-        raise ApiError(502, "Facebook ha risposto con qualcosa che non e' un'immagine")
+        raise ApiError(502, "Il social ha risposto con qualcosa che non e' un'immagine")
     if len(raw) > MAX_PHOTO_BYTES:
         raise ApiError(400, "Immagine troppo grande (massimo 8 MB)")
 
@@ -4135,8 +4570,12 @@ def _h_add_photo(conn, match, query, body, ctx):
     return 201, add_photo(conn, require_ws(ctx), int(match.group(1)), body)
 
 
-def _h_facebook_cover(conn, match, query, body, ctx):
-    return 200, facebook_cover(conn, require_ws(ctx), int(match.group(1)), body)
+def _h_instagram_cerca(conn, match, query, body, ctx):
+    return 200, instagram_cerca(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_social_cover(conn, match, query, body, ctx):
+    return 200, social_cover(conn, require_ws(ctx), int(match.group(1)), body)
 
 
 def _h_set_photo_cover(conn, match, query, body, ctx):
@@ -4441,7 +4880,12 @@ ROUTES = [
     ("PUT", re.compile(r"^/api/cash/(\d+)$"), _h_update_cash),
     ("DELETE", re.compile(r"^/api/cash/(\d+)$"), _h_delete_cash),
     ("POST", re.compile(r"^/api/locations/(\d+)/photos$"), _h_add_photo),
-    ("POST", re.compile(r"^/api/locations/(\d+)/photos/facebook$"), _h_facebook_cover),
+    ("POST", re.compile(r"^/api/locations/(\d+)/photos/social$"), _h_social_cover),
+    ("POST", re.compile(r"^/api/locations/(\d+)/social/instagram$"), _h_instagram_cerca),
+    # Il nome vecchio, da quando la foto si poteva prendere solo da Facebook:
+    # risponde ancora, e fa la stessa identica cosa. Serve alle app installate
+    # con una versione precedente, che chiamano ancora questo indirizzo.
+    ("POST", re.compile(r"^/api/locations/(\d+)/photos/facebook$"), _h_social_cover),
     ("PUT", re.compile(r"^/api/photos/(\d+)/cover$"), _h_set_photo_cover),
     ("DELETE", re.compile(r"^/api/photos/(\d+)$"), _h_delete_photo),
     ("GET", re.compile(r"^/api/art_directors$"), _h_list_art_directors),
