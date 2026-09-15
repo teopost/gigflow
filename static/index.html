@@ -2947,18 +2947,21 @@
      leggere. */
   /* ---------------- cosa vedere in Home ----------------
      I riquadri che si possono spegnere, nell'ordine in cui stanno nella
-     pagina. Quelli che non sono in questo elenco non si spengono: le
-     mattonelle delle serate e dei contatti sono l'unica cosa che la Home
-     deve a chiunque la apra, e "Serate suonate per anno" e "Incasso per
-     anno" sono i due grafici da cui nasce tutto il resto.
+     pagina. Fuori dall'elenco restano le mattonelle delle serate suonate,
+     di quelle in calendario e dei contatti da fare: sono le tre domande a
+     cui la Home risponde a chiunque la apra, e una Home che si puo'
+     svuotare del tutto e' una schermata bianca con un ingranaggio.
 
      La chiave finisce nel profilo dell'utente e non piu' nel browser: chi
      spegne "Dove vanno i soldi" non vuole vederlo nemmeno dal computer.
      Assente vuol dire acceso, quindi chi non ha mai toccato niente vede
      tutto e la colonna resta vuota finche' non serve. */
   var HOME_RIQUADRI = [
+    {key:"incassi_tiles", label:"Incassi",              sub:"Le due mattonelle: media a serata e incassati nell'anno"},
     {key:"cassa_tiles",  label:"Cassa e budget",        sub:"Le due mattonelle: i soldi che ci sono e come finirà"},
     {key:"province",     label:"Province",              sub:"In quali province hai suonato, anno per anno"},
+    {key:"serate_anno",  label:"Serate suonate per anno", sub:"Quante ne hai fatte, stagione per stagione"},
+    {key:"quando_suoni", label:"Quando suoni",          sub:"In che mesi dell'anno cadono le serate"},
     {key:"costi_anno",   label:"Costi per anno",        sub:"Quanto è uscito, stagione per stagione"},
     {key:"netto_anno",   label:"Netto per anno",        sub:"Incassato meno speso, stagione per stagione"},
     {key:"dove_soldi",   label:"Dove vanno i soldi",    sub:"I costi dell'anno divisi per categoria"},
@@ -3171,9 +3174,11 @@
       tileHtml(String(prossime.length), prossime.length === 1 ? "serata in calendario" : "serate in calendario",
         prossime.length ? ("la prima il " + fmtDateShort(prossime[0].gig_date)) : "nessuna confermata",
         false, false, "recontact:gigs") +
-      tileHtml(conFee.length ? fmtEuro(incasso / conFee.length) : "—", "media a serata") +
-      tileHtml(fmtEuro(incasso), "incassati nel " + anno,
-        conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "") +
+      (vedoInHome("incassi_tiles")
+        ? tileHtml(conFee.length ? fmtEuro(incasso / conFee.length) : "—", "media a serata") +
+          tileHtml(fmtEuro(incasso), "incassati nel " + anno,
+            conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "")
+        : "") +
       /* Budget e cassa non sono numeri della stagione: sono tutto quello che
          e' entrato meno tutto quello che e' uscito, da sempre. Per questo le
          loro etichette non portano l'anno, mentre quelle sopra si', e per
@@ -3204,8 +3209,10 @@
       : "";
     if(vedoInHome("province")) html += provinceTableHtml(played);
 
-    html += '<div class="section-header">SERATE SUONATE PER ANNO</div><div class="chart-card">'+
-      barsHtml(perAnno, function(n){ return String(n); }) + nota + '</div>';
+    if(vedoInHome("serate_anno")){
+      html += '<div class="section-header">SERATE SUONATE PER ANNO</div><div class="chart-card">'+
+        barsHtml(perAnno, function(n){ return String(n); }) + nota + '</div>';
+    }
 
     var senzaCompensi = perIncasso.every(function(p){ return p.value === 0; });
     html += '<div class="section-header">INCASSO PER ANNO</div><div class="chart-card">'+
@@ -3214,26 +3221,28 @@
         ? '<div class="chart-note">Nessun compenso segnato: scrivilo nella serata e l\'incasso compare qui.</div>'
         : nota) + '</div>';
 
-    var mesi = [0,0,0,0,0,0,0,0,0,0,0,0], conData = 0;
-    quest.forEach(function(x){
-      if(!x.g.gig_date) return;
-      conData++;
-      var m = Number(x.g.gig_date.slice(5, 7)) - 1;
-      if(m >= 0 && m < 12) mesi[m]++;
-    });
-    var maxMese = Math.max.apply(null, mesi);
-    html += '<div class="section-header">QUANDO SUONI · '+esc(anno)+'</div><div class="chart-card">'+
-      '<div class="months">'+ mesi.map(function(n){
-        // I mesi vuoti restano come tacca grigia: senza, non si capisce
-        // quali colonne stai guardando.
-        var h = (n && maxMese) ? Math.max(4, Math.round(n / maxMese * 52)) : 2;
-        return '<div class="month">'+(n ? '<div class="month-val">'+n+'</div>' : '')+
-          '<div class="month-bar'+(n ? '' : ' empty')+'" style="height:'+h+'px"></div></div>';
-      }).join("") +'</div>'+
-      '<div class="month-labels">'+ MESI_INIZIALI.map(function(m){ return '<span>'+m+'</span>'; }).join("") +'</div>'+
-      (conData < quest.length
-        ? '<div class="chart-note">'+(quest.length - conData)+' senza data non compaiono in questo grafico.</div>' : '')+
-      '</div>';
+    if(vedoInHome("quando_suoni")){
+      var mesi = [0,0,0,0,0,0,0,0,0,0,0,0], conData = 0;
+      quest.forEach(function(x){
+        if(!x.g.gig_date) return;
+        conData++;
+        var m = Number(x.g.gig_date.slice(5, 7)) - 1;
+        if(m >= 0 && m < 12) mesi[m]++;
+      });
+      var maxMese = Math.max.apply(null, mesi);
+      html += '<div class="section-header">QUANDO SUONI · '+esc(anno)+'</div><div class="chart-card">'+
+        '<div class="months">'+ mesi.map(function(n){
+          // I mesi vuoti restano come tacca grigia: senza, non si capisce
+          // quali colonne stai guardando.
+          var h = (n && maxMese) ? Math.max(4, Math.round(n / maxMese * 52)) : 2;
+          return '<div class="month">'+(n ? '<div class="month-val">'+n+'</div>' : '')+
+            '<div class="month-bar'+(n ? '' : ' empty')+'" style="height:'+h+'px"></div></div>';
+        }).join("") +'</div>'+
+        '<div class="month-labels">'+ MESI_INIZIALI.map(function(m){ return '<span>'+m+'</span>'; }).join("") +'</div>'+
+        (conData < quest.length
+          ? '<div class="chart-note">'+(quest.length - conData)+' senza data non compaiono in questo grafico.</div>' : '')+
+        '</div>';
+    }
 
     html += cashHomeChartsHtml(anno);
 
