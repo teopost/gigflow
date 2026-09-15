@@ -1544,6 +1544,30 @@
     </div>
   </section>
 
+  <!-- ============ PUSHED: MODIFICA CATEGORIA DI SPESA ============
+       La stessa schermata che rinomina una categoria del palcoscenico o un
+       valore di lista: il nome sta in un campo, si corregge e si salva.
+       Prima di qui si apriva un foglio di scelta con zero voci da scegliere
+       e la casella di ricerca usata come campo di scrittura: il nome vecchio
+       stava nel titolo e non si poteva correggere, si poteva solo riscriverlo
+       da capo. -->
+  <section class="screen pushed" id="costCatEditScreen" hidden>
+    <header class="navbar">
+      <div class="navbar-row">
+        <button class="nav-btn" id="btnCostCatEditBack">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Categorie
+        </button>
+        <span class="inline-title">Categoria di spesa</span>
+        <button class="nav-btn primary" id="btnCostCatEditSave">Salva</button>
+      </div>
+    </header>
+    <div class="screen-scroll">
+      <div class="d-title-name"><input id="costCatEditName" placeholder="Nome categoria" /></div>
+      <div class="section-footer" id="costCatEditUsage"></div>
+    </div>
+  </section>
+
   <!-- ============ PUSHED: MODIFICA VALORE DI LISTA ============ -->
   <section class="screen pushed" id="venueListEditScreen" hidden>
     <header class="navbar">
@@ -8511,33 +8535,57 @@
       return;
     }
     var row = e.target.closest("[data-costcat]");
-    if(!row) return;
-    var cid = row.getAttribute("data-costcat");
-    var cat = costCategories.filter(function(c){ return String(c.id) === String(cid); })[0];
+    if(row) openCostCatEditScreen(row.getAttribute("data-costcat"));
+  });
+
+  /* Rinominare e' una schermata con dentro il nome, come per le categorie
+     del palcoscenico e per i valori di lista. Prima era un foglio di scelta
+     senza niente da scegliere: il nome vecchio faceva da titolo, la casella
+     di ricerca da campo di scrittura, e per cambiare una lettera bisognava
+     riscrivere tutto. */
+  var elCostCatEditScreen = document.getElementById("costCatEditScreen");
+  var currentCostCatEditId = null;
+  function openCostCatEditScreen(id){
+    var cat = costCategories.filter(function(c){ return String(c.id) === String(id); })[0];
     if(!cat) return;
-    openSheet({
-      title: cat.name, titleDato: true,
-      searchable: true, searchPlaceholder: "Nuovo nome della categoria…",
-      freeText: true,
-      onFreeText: function(nuovo){
-        nuovo = (nuovo || "").trim();
-        if(!nuovo) return;
-        api("PUT", "/api/cash/categories/" + cid, {name:nuovo}).then(function(updated){
-          var i = costCategories.findIndex(function(c){ return c.id === updated.id; });
-          if(i > -1) costCategories[i] = updated;
-          costCategories.sort(function(a, b){ return a.name.localeCompare(b.name); });
-          // Il rinomina ha toccato i movimenti sul server: qui si ricaricano
-          // solo se ne ha davvero cambiato qualcuno.
-          return updated.affected_entries ? loadCash().then(function(){ return updated; }) : updated;
-        }).then(function(updated){
-          renderCostCatItems();
-          toast(updated.affected_entries
-            ? ("Categoria rinominata (" + updated.affected_entries + " movimenti aggiornati)")
-            : "Categoria rinominata");
-        }).catch(function(err){ toast(err.message); });
-      },
-      options: []
-    });
+    currentCostCatEditId = cat.id;
+    var input = document.getElementById("costCatEditName");
+    input.value = cat.name;
+    var n = costCatUsage(cat.name);
+    document.getElementById("costCatEditUsage").textContent = n
+      ? ("Usata da " + n + (n === 1 ? " movimento. Rinominandola si aggiorna anche lui." : " movimenti. Rinominandola si aggiornano anche loro."))
+      : "Non ancora usata da nessun movimento.";
+    elCostCatEditScreen.hidden = false;
+    requestAnimationFrame(function(){ elCostCatEditScreen.classList.add("in"); });
+    setTimeout(function(){ input.focus(); }, 260);
+  }
+  function closeCostCatEditScreen(){
+    elCostCatEditScreen.classList.remove("in");
+    setTimeout(function(){ elCostCatEditScreen.hidden = true; }, 320);
+    currentCostCatEditId = null;
+  }
+  document.getElementById("btnCostCatEditBack").addEventListener("click", closeCostCatEditScreen);
+  document.getElementById("btnCostCatEditSave").addEventListener("click", function(){
+    if(currentCostCatEditId == null) return;
+    var nome = document.getElementById("costCatEditName").value.trim();
+    if(!nome){ toast("Il nome è obbligatorio"); return; }
+    var id = currentCostCatEditId;
+    withButtonBusy(this, function(){
+      return api("PUT", "/api/cash/categories/" + id, {name:nome}).then(function(updated){
+        var i = costCategories.findIndex(function(c){ return c.id === updated.id; });
+        if(i > -1) costCategories[i] = updated;
+        costCategories.sort(function(a, b){ return a.name.localeCompare(b.name); });
+        // Il rinomina ha toccato i movimenti sul server: qui si ricaricano
+        // solo se ne ha davvero cambiato qualcuno.
+        return updated.affected_entries ? loadCash().then(function(){ return updated; }) : updated;
+      });
+    }).then(function(updated){
+      renderCostCatItems();
+      toast(updated.affected_entries
+        ? ("Categoria rinominata (" + updated.affected_entries + " movimenti aggiornati)")
+        : "Categoria rinominata");
+      closeCostCatEditScreen();
+    }).catch(function(err){ toast(err.message); });
   });
 
   /* ---------------- Impostazioni: Le mie bands ---------------- */
