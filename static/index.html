@@ -556,6 +556,16 @@
   .home-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0 16px;}
   .tile{background:var(--bg-elevated);border-radius:10px;padding:13px 14px;min-width:0;}
   .tile.wide{grid-column:1 / -1;}
+  /* Le mattonelle che portano da qualche parte lo dicono con la freccia
+     nell'angolo, la stessa che chiude le righe degli elenchi: e' il segno
+     che in questa app vuol dire "si apre". Le altre restano numeri e basta,
+     e non c'e' modo di scoprirlo toccandole. */
+  .tile.tocca{position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .tile.tocca:active{opacity:.6;}
+  .tile.tocca .row-chevron{position:absolute;top:13px;right:12px;color:var(--text-tertiary);}
+  /* La freccia sta sopra al numero, che e' largo quanto la mattonella: senza
+     questo spazio un importo lungo le finisce sotto. */
+  .tile.tocca .tile-value{padding-right:16px;}
   .tile-value{font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   /* Sotto zero il numero si vede subito: e' l'unica cosa in quella schermata
      che chiede di fare qualcosa. */
@@ -2756,10 +2766,10 @@
 
   /* ---------------- tab navigation ---------------- */
   var tabs = {home: document.getElementById("tabHome"), list: document.getElementById("tabList"), favorites: document.getElementById("tabFavorites"), gigs: document.getElementById("tabGigs"), recontact: document.getElementById("tabRecontact"), cash: document.getElementById("tabCash"), bands: document.getElementById("tabBands"), settings: document.getElementById("tabSettings")};
-  document.getElementById("tabbar").addEventListener("click", function(e){
-    var btn = e.target.closest(".tab");
-    if(!btn) return;
-    var name = btn.getAttribute("data-tab");
+  /* Aprire un tab e' una funzione e non solo il gesto sulla tabbar: dalla
+     Home le mattonelle portano in Agenda, e devono passare di qui o
+     resterebbero due modi diversi di cambiare schermata. */
+  function apriTab(name){
     Object.keys(tabs).forEach(function(k){
       tabs[k].hidden = k !== name;
     });
@@ -2770,6 +2780,10 @@
     if(name === "favorites") renderFavorites();
     if(name === "gigs") renderAllGigs();
     if(name === "cash") renderCash();
+  }
+  document.getElementById("tabbar").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab");
+    if(btn) apriTab(btn.getAttribute("data-tab"));
   });
 
   /* ---------------- Home: come sta andando la stagione ----------------
@@ -2854,11 +2868,16 @@
         '<div class="chart-val">'+esc(fmt(p.value))+'</div></div>';
     }).join("");
   }
-  function tileHtml(value, label, sub, wide, rosso){
-    return '<div class="tile'+(wide ? " wide" : "")+'">'+
+  /* "vai" e' dove porta la mattonella, nella forma "tab:segmento" — per ora
+     solo l'Agenda ha dei segmenti. Chi non ce l'ha resta un numero da
+     leggere. */
+  function tileHtml(value, label, sub, wide, rosso, vai){
+    return '<div class="tile'+(wide ? " wide" : "")+(vai ? " tocca" : "")+'"'+
+      (vai ? ' data-vai="'+vai+'" role="button" tabindex="0"' : '')+'>'+
       '<div class="tile-value'+(rosso ? " negativo" : "")+'">'+esc(value)+'</div>'+
       '<div class="tile-label">'+esc(label)+'</div>'+
       (sub ? '<div class="tile-sub">'+esc(sub)+'</div>' : '')+
+      (vai ? CHEVRON : "")+
     '</div>';
   }
   /* In cima alla Home c'e' il nome della band con cui stai lavorando:
@@ -2872,6 +2891,29 @@
     if(me && me.active_workspace && me.active_workspace.name) return me.active_workspace.name;
     return "Home";
   }
+  /* Le mattonelle che portano da qualche parte. Il listener sta sul
+     contenitore e non sulle mattonelle: renderHome() riscrive tutto il suo
+     innerHTML a ogni giro, e i listener attaccati dentro sparirebbero con
+     quello che li teneva su.
+
+     Con role="button" e tabindex la mattonella si apre anche da tastiera,
+     e Invio e barra spaziatrice fanno la stessa cosa del dito. */
+  function vaiDaHome(el){
+    var pezzi = (el.getAttribute("data-vai") || "").split(":");
+    if(!pezzi[0]) return;
+    apriTab(pezzi[0]);
+    if(pezzi[1]) setAgendaView(pezzi[1]);
+  }
+  document.getElementById("homeContent").addEventListener("click", function(e){
+    var t = e.target.closest("[data-vai]");
+    if(t) vaiDaHome(t);
+  });
+  document.getElementById("homeContent").addEventListener("keydown", function(e){
+    if(e.key !== "Enter" && e.key !== " ") return;
+    var t = e.target.closest("[data-vai]");
+    if(t){ e.preventDefault(); vaiDaHome(t); }
+  });
+
   function renderHomeTitle(){
     var nome = activeBandName();
     setDato("homeTitle", nome);
@@ -2901,21 +2943,29 @@
     var daFare = venuesToRecontact().filter(function(x){ return daysUntil(x.due.date) <= 7; }).length;
     var cassa = cashTotals(cashRows());
 
+    /* Le due mattonelle delle serate stanno in cima e in fila: quante ne
+       hai fatte e quante ne hai davanti sono la stessa domanda guardata
+       dalle due parti, e tutte e due portano in Agenda › Serate, che e'
+       l'elenco in cui quelle serate stanno. L'incasso e' sceso accanto al
+       budget, dove i soldi si leggono insieme. */
     var html = '<div class="home-tiles">'+
-      tileHtml(String(quest.length), (quest.length === 1 ? "serata suonata" : "serate suonate") + " nel " + anno) +
-      tileHtml(fmtEuro(incasso), "incassati nel " + anno,
-        conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "") +
+      tileHtml(String(quest.length), (quest.length === 1 ? "serata suonata" : "serate suonate") + " nel " + anno,
+        "", false, false, "recontact:gigs") +
+      tileHtml(String(prossime.length), prossime.length === 1 ? "serata in calendario" : "serate in calendario",
+        prossime.length ? ("la prima il " + fmtDateShort(prossime[0].gig_date)) : "nessuna confermata",
+        false, false, "recontact:gigs") +
       tileHtml(conFee.length ? fmtEuro(incasso / conFee.length) : "—", "media a serata") +
       /* Il saldo di cassa non e' un numero della stagione: e' tutto
          quello che e' entrato meno tutto quello che e' uscito, da sempre.
-         Sta qui in mezzo ai numeri dell'anno apposta — l'incasso di una
+         Sta qui in mezzo ai numeri dei soldi apposta — l'incasso di una
          stagione da solo non dice quanto e' rimasto — e per questo la sua
          etichetta non porta l'anno, mentre quelle intorno si'. */
       tileHtml(fmtEuroCent(cassa.saldo), "cassa", "incassato meno speso", false, cassa.saldo < 0) +
       tileHtml(fmtEuroCent(cassa.budget), "budget", sospesoText(cassa), false, cassa.budget < 0) +
-      tileHtml(String(prossime.length), prossime.length === 1 ? "serata in calendario" : "serate in calendario",
-        prossime.length ? ("la prima il " + fmtDateShort(prossime[0].gig_date)) : "nessuna confermata") +
-      tileHtml(String(daFare), "da contattare entro una settimana", daFare ? "li trovi in Agenda" : "", true) +
+      tileHtml(fmtEuro(incasso), "incassati nel " + anno,
+        conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "") +
+      tileHtml(String(daFare), "da contattare entro una settimana",
+        daFare ? "promemoria arretrati e dei prossimi 7 giorni" : "", true, false, "recontact:recontact") +
     '</div>';
 
     if(!played.length){
@@ -4521,10 +4571,8 @@
      vuole ricominciare da capo ogni volta che passa in Serate e torna. */
   var trimestreAgenda = trimestreDelMese(new Date().getMonth() + 1);
 
-  document.getElementById("agendaToggle").addEventListener("click", function(e){
-    var btn = e.target.closest("[data-agenda]");
-    if(!btn) return;
-    agendaView = btn.getAttribute("data-agenda");
+  function setAgendaView(v){
+    agendaView = v;
     document.querySelectorAll("#agendaToggle .view-toggle-btn").forEach(function(b){
       b.classList.toggle("active", b.getAttribute("data-agenda") === agendaView);
     });
@@ -4533,6 +4581,10 @@
     document.getElementById("agendaPaneGigs").hidden = agendaView !== "gigs";
     renderRecontact();
     document.getElementById("scrollRecontact").scrollTop = 0;
+  }
+  document.getElementById("agendaToggle").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-agenda]");
+    if(btn) setAgendaView(btn.getAttribute("data-agenda"));
   });
 
   /* Ogni riga si porta dietro quando tocca: la data non e' scritta da
