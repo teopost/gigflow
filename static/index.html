@@ -5458,9 +5458,15 @@
         }), fmtEuro)+'</div>';
     }
 
-    var perCat = {}, totCosti = 0;
+    var perCat = {}, totCosti = 0, nSospesi = 0, totSospesi = 0;
     cashOfYear(anno).forEach(function(m){
-      if(!isCosto(m) || !m.paid) return;
+      if(!isCosto(m)) return;
+      /* Anche qui contano solo i costi pagati, come nelle barre qui sopra e
+         come nella tessera "cassa". Quelli ancora da pagare pero' vanno
+         detti: uno che ha appena messo la categoria a una provvigione da
+         pagare la cerca qui dentro, non la trova, e l'unica spiegazione
+         possibile diventa "la categoria non ha funzionato". */
+      if(!m.paid){ nSospesi++; totSospesi += cashAmount(m); return; }
       var k = m.category || "Senza categoria";
       perCat[k] = (perCat[k] || 0) + cashAmount(m);
       totCosti += cashAmount(m);
@@ -5469,7 +5475,13 @@
       var voci = Object.keys(perCat).sort(function(a, b){ return perCat[b] - perCat[a]; })
         .map(function(k){ return {key:k, value:perCat[k]}; });
       html += '<div class="section-header">DOVE VANNO I SOLDI · '+esc(anno)+'</div><div class="chart-card">'+
-        barsHtml(voci, fmtEuro)+'</div>';
+        barsHtml(voci, fmtEuro)+
+        (nSospesi
+          ? '<div class="chart-note">Qui ci sono i costi pagati. Fuori ' +
+            (nSospesi === 1 ? "un costo ancora da pagare" : nSospesi + " costi ancora da pagare") +
+            ' (' + esc(fmtEuro(totSospesi)) + '): compaiono quando li segni pagati in Cassa.</div>'
+          : "")+
+        '</div>';
     }
     return html;
   }
