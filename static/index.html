@@ -799,16 +799,29 @@
   </section>
 
   <!-- ============ TAB: SERATE ============
-       L'elenco completo: ogni tentativo di ogni palcoscenico, di ogni
-       stagione, con la data o senza. E' l'unico posto dove ci sono tutte —
-       il segmento "Serate" dell'Agenda tiene solo quelle con una data,
-       perche' li' si lavora a calendario, e la scheda ne mostra solo le sue.
+       Ogni tentativo di ogni palcoscenico, di ogni stagione, con la data o
+       senza. E' l'unico posto dove ci sono tutte — il segmento "Serate"
+       dell'Agenda tiene solo quelle con una data, perche' li' si lavora a
+       calendario, e la scheda ne mostra solo le sue.
+
+       Tre schede, e la prima e' quella da lavorare: Aperte (la trattativa e'
+       ancora in mano a qualcuno), Concluse (com'e' finita), Tutte in fondo
+       perche' e' l'archivio, non il lavoro di oggi.
 
        Sta fra Preferiti e Agenda perche' e' un archivio da sfogliare, come i
        Preferiti, e non un elenco di cose da fare come l'Agenda. -->
   <section class="screen tab-screen" id="tabGigs" data-tab="gigs" hidden>
     <header class="navbar" id="navGigs">
-      <div class="navbar-row"><span class="inline-title">Serate</span></div>
+      <div class="navbar-row">
+        <span class="nav-btn nav-btn-spacer"></span>
+        <span class="inline-title">Serate</span>
+        <div class="navbar-trailing">
+          <button class="nav-btn" id="btnGigsFilter" aria-label="Filtri" title="Filtri">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 4 21 4 14 12.5 14 19.5 10 21.5 10 12.5"/></svg>
+            <span class="filter-dot" id="gigsFilterDot" hidden></span>
+          </button>
+        </div>
+      </div>
       <div class="large-title-wrap">
         <h1 class="large-title">Serate</h1>
         <div class="subtitle-count" id="gigsSub">0 serate</div>
@@ -822,9 +835,9 @@
       </div>
       <div class="view-toggle-wrap">
         <div class="view-toggle tre" id="gigsScopeToggle">
-          <button class="view-toggle-btn active" data-gigscope="all">Tutte</button>
-          <button class="view-toggle-btn" data-gigscope="open">Aperte</button>
-          <button class="view-toggle-btn" data-gigscope="played">Suonate</button>
+          <button class="view-toggle-btn active" data-gigscope="aperte">Aperte</button>
+          <button class="view-toggle-btn" data-gigscope="concluse">Concluse</button>
+          <button class="view-toggle-btn" data-gigscope="tutte">Tutte</button>
         </div>
       </div>
     </header>
@@ -4131,7 +4144,27 @@
   var elGigsSub = document.getElementById("gigsSub");
   var elGigsSearch = document.getElementById("gigsSearchInput");
   var gigsSearchText = "";
-  var gigsScope = "all";
+  var gigsScope = "aperte";
+  var gigsStatusFilter = [];
+
+  /* Le quattro che dicono com'e' andata a finire: o si suona (confermato,
+     suonato) o non si suona (rifiutata, annullato). Le altre quattro sono
+     ancora in mano a qualcuno.
+
+     "Confermato" sta fra le concluse anche se la serata deve ancora essere
+     suonata, e non e' una svista: quello che questo elenco guarda e' la
+     trattativa, e una serata confermata non ha piu' niente da trattare. In
+     calendario ci pensa l'Agenda. */
+  var GIG_CONCLUSE = ["confermato", "rifiutata", "suonato", "annullato"];
+  function isGigConclusa(k){ return GIG_CONCLUSE.indexOf(k) > -1; }
+  /* Gli stati che ha senso filtrare qui dentro: quelli della scheda aperta.
+     Offrire "Suonato" mentre guardi le aperte vuol dire offrire un elenco
+     vuoto. */
+  function gigsScopeStatuses(){
+    return GIG_STATUSES.filter(function(s){
+      return gigsScope === "tutte" || isGigConclusa(s.key) === (gigsScope === "concluse");
+    });
+  }
 
   function allGigRows(){
     var out = [];
@@ -4140,19 +4173,36 @@
     });
     return out;
   }
+  /* Le serate dei palcoscenici archiviati stanno solo in "Tutte": un posto
+     messo via non e' lavoro in corso, e in mezzo alle concluse sarebbe
+     rumore. In archivio ci finiscono anche stagioni vere, e quelle vanno
+     ritrovate: per questo restano, ma in fondo. */
+  function gigsInScope(){
+    return allGigRows().filter(function(x){
+      if(gigsScope === "tutte") return true;
+      if(x.v.deleted_at) return false;
+      return isGigConclusa(x.g.status) === (gigsScope === "concluse");
+    });
+  }
+  /* Due stati per riga, e sono due cose diverse: la pastiglia a destra dice
+     a che punto e' questa serata, quella piccola sotto il nome dice che
+     rapporto c'e' col palcoscenico. "Trattativa su un Lead" e "Trattativa su
+     un Cliente" non sono la stessa telefonata. */
   function allGigRowHtml(x){
     var quando = x.g.gig_date
       ? fmtDateShort(x.g.gig_date)
       : '<span style="color:var(--text-tertiary);">Data da fissare</span>';
+    var sv = venueStatusInfo(x.v.status);
     var dove = [];
     if(x.v.city) dove.push(dato(x.v.city));
     var fee = fmtFee(x.g.fee);
     if(fee) dove.push(fee);
-    if(x.v.deleted_at) dove.push("archiviato");
     return '<div class="row" data-open-id="'+x.v.id+'">'+
       '<div class="row-main"><div class="row-title">'+dato(x.v.name||"Senza nome")+'</div>'+
         '<div class="row-sub">'+quando+'</div>'+
-        (dove.length ? '<div class="row-sub">'+dove.join(" · ")+'</div>' : '')+'</div>'+
+        '<div class="row-sub">'+statusPillHtml(sv.label, {color: sv.color, soft: sv.soft})+
+          (dove.length ? ' ' + dove.join(" · ") : '')+'</div>'+
+      '</div>'+
       '<div class="row-trail">'+statusPillHtml(gigStateLabel(x.g), gigStateColors(x.g))+
       CHEVRON+'</div>'+
     '</div>';
@@ -4161,33 +4211,41 @@
     document.querySelectorAll("#gigsScopeToggle .view-toggle-btn").forEach(function(b){
       b.classList.toggle("active", b.getAttribute("data-gigscope") === gigsScope);
     });
+    document.getElementById("gigsFilterDot").hidden = !gigsStatusFilter.length;
   }
   /* Raggruppate per anno, e le senza data in cima: sono quelle in ballo
      adesso, e in fondo a un elenco lungo trecento righe non le vedrebbe
      nessuno. Dentro l'anno, dalla piu' recente; fra le senza data, in ordine
      di palcoscenico, che e' l'unica cosa per cui si distinguono. */
   function renderAllGigs(){
-    var tutte = allGigRows();
-    var righe = tutte;
-    if(gigsScope === "open") righe = righe.filter(function(x){ return x.g.open; });
-    else if(gigsScope === "played") righe = righe.filter(function(x){ return x.g.status === "suonato"; });
+    var ambito = gigsInScope();
+    var righe = ambito;
+    if(gigsStatusFilter.length){
+      righe = righe.filter(function(x){ return gigsStatusFilter.indexOf(x.g.status) > -1; });
+    }
     if(gigsSearchText){
       var q = gigsSearchText.toLowerCase();
       righe = righe.filter(function(x){
         return (((x.v.name || "") + " " + (x.v.city || "")).toLowerCase()).indexOf(q) > -1;
       });
     }
-    var filtrato = righe.length !== tutte.length;
-    var suonate = tutte.filter(function(x){ return x.g.status === "suonato"; }).length;
-    elGigsSub.textContent = filtrato
-      ? righe.length + (righe.length === 1 ? " serata" : " serate") + " su " + tutte.length
-      : tutte.length + (tutte.length === 1 ? " serata" : " serate") +
-        (suonate ? " · " + suonate + (suonate === 1 ? " suonata" : " suonate") : "");
+    var parola = righe.length === 1 ? " serata" : " serate";
+    elGigsSub.textContent = righe.length === ambito.length
+      ? righe.length + parola
+      : righe.length + parola + " su " + ambito.length;
     renderGigsScopeToggle();
     if(!righe.length){
-      var vuoto = !tutte.length
-        ? '<div class="glyph">🎸</div><h2>Nessuna serata</h2><p>Una serata nasce sulla scheda del palcoscenico, quando decidi di provarci: da quel momento la ritrovi qui, con o senza una data.</p>'
-        : '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Le serate ci sono, ma la ricerca o la scheda scelta le stanno escludendo tutte.</p>';
+      var vuoto;
+      if(!allGigRows().length){
+        vuoto = '<div class="glyph">🎸</div><h2>Nessuna serata</h2>'+
+          '<p>Una serata nasce sulla scheda del palcoscenico, quando decidi di provarci: da quel momento la ritrovi qui, con o senza una data.</p>';
+      } else if(!ambito.length){
+        vuoto = gigsScope === "aperte"
+          ? '<div class="glyph">✅</div><h2>Niente in ballo</h2><p>Nessuna trattativa aperta: le serate che hai sono tutte concluse. Le trovi nella scheda accanto.</p>'
+          : '<div class="glyph">🎸</div><h2>Niente di concluso</h2><p>Nessuna serata è ancora arrivata a un esito: quelle che hai sono tutte in ballo.</p>';
+      } else {
+        vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Le serate ci sono, ma la ricerca o il filtro le stanno escludendo tutte.</p>';
+      }
       elAllGigs.innerHTML = '<div class="empty-state">'+vuoto+'</div>';
       return;
     }
@@ -4210,6 +4268,24 @@
     });
     elAllGigs.innerHTML = html;
   }
+  /* Il filtro offre gli stati della scheda aperta, e cambiando scheda si
+     azzera: un filtro che sopravvive a un cambio di elenco e' un elenco
+     vuoto senza sapere perche'. */
+  document.getElementById("btnGigsFilter").addEventListener("click", function(){
+    var scelti = gigsStatusFilter.slice();
+    openSheet({
+      title: "Filtra per stato",
+      multiSelect: true,
+      options: gigsScopeStatuses().map(function(sv){
+        return {label: sv.label, color: sv.color, checkmark: scelti.indexOf(sv.key) > -1,
+          onToggle: function(acceso){
+            if(acceso) scelti.push(sv.key);
+            else scelti = scelti.filter(function(k){ return k !== sv.key; });
+          }};
+      }),
+      onDone: function(){ gigsStatusFilter = scelti; renderAllGigs(); }
+    });
+  });
   elAllGigs.addEventListener("click", function(e){
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
@@ -4225,6 +4301,7 @@
     var scope = btn.getAttribute("data-gigscope");
     if(scope === gigsScope) return;
     gigsScope = scope;
+    gigsStatusFilter = [];
     renderAllGigs();
   });
 
