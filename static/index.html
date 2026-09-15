@@ -194,17 +194,22 @@
   /* Dodici pastiglie in fila che scorrono: ci stanno tutte senza mandare a
      capo niente, e sono bersagli grandi da toccare. Il numero accanto al
      nome e' quello che l'elenco di un mese solo non puo' dire — dove c'e'
-     da lavorare negli altri undici. */
-  .month-bar{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
-  .month-bar::-webkit-scrollbar{display:none;}
+     da lavorare negli altri undici.
+
+     Si chiamano "mese-" e non "month-": .month-bar esiste gia' piu' sotto
+     ed e' una barra del grafico della Home, cremisi e piena. Arrivando
+     dopo nel foglio vinceva lei, e la barra dei mesi era un rettangolo
+     rosso. */
+  .mese-bar{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .mese-bar::-webkit-scrollbar{display:none;}
   /* display:flex batte [hidden]: senza questa la barra dei mesi resterebbe
      su anche negli altri due segmenti dell'Agenda. */
-  .month-bar[hidden]{display:none;}
-  .month-chip{flex:none;display:flex;align-items:baseline;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 13px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
-  .month-chip .cnt{font-size:12px;font-variant-numeric:tabular-nums;color:var(--text-tertiary);}
-  .month-chip.vuoto{color:var(--text-tertiary);}
-  .month-chip.active{background:var(--tint);color:#fff;}
-  .month-chip.active .cnt{color:rgba(255,255,255,.75);}
+  .mese-bar[hidden]{display:none;}
+  .mese-chip{flex:none;display:flex;align-items:baseline;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 13px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .mese-chip .cnt{font-size:12px;font-variant-numeric:tabular-nums;color:var(--text-tertiary);}
+  .mese-chip.vuoto{color:var(--text-tertiary);}
+  .mese-chip.active{background:var(--tint);color:#fff;}
+  .mese-chip.active .cnt{color:rgba(255,255,255,.75);}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
   /* Il colore del segnalino e' quello dello stato, lo stesso della pastiglia
@@ -582,6 +587,11 @@
      righe colorate dentro — il rosso li' dentro ce l'ha gia' il conto dei
      giorni, e due rossi sovrapposti non gridano il doppio. */
   .agenda-group.late,.agenda-group.late .group-count{color:var(--red);}
+  /* L'elenco del mese non ha intestazione (il mese lo dice la pastiglia
+     accesa qui sopra), quindi l'aria che gli starebbe sopra se la prende da
+     solo: dal riquadro degli scaduti, o dalla riga che dice cosa stai
+     guardando. E' la stessa dell'intestazione di un gruppo, 20 + 6. */
+  .grouped-list.staccato{margin-top:26px;}
   .grouped-list.late{border-left:3px solid var(--red);}
   .year-head{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center;}
   .year-head .row-chevron{color:var(--text-tertiary);transition:transform .2s;}
@@ -906,7 +916,7 @@
           <button class="view-toggle-btn" data-agenda="gigs">Serate</button>
         </div>
       </div>
-      <div class="month-bar" id="recontactMonthBar"></div>
+      <div class="mese-bar" id="recontactMonthBar"></div>
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact">
@@ -4681,7 +4691,7 @@
     elMonthBar.innerHTML = MESI.map(function(nome, i){
       var m = i + 1;
       var n = tutti.filter(function(x){ return x.mese === m; }).length;
-      return '<button type="button" class="month-chip'+(m === meseAgenda ? " active" : "")+
+      return '<button type="button" class="mese-chip'+(m === meseAgenda ? " active" : "")+
         (n ? "" : " vuoto")+'" data-mese="'+m+'"'+(m === meseAgenda ? ' aria-current="true"' : '')+'>'+
         esc(nome)+(n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
     }).join("");
@@ -4692,7 +4702,7 @@
      schermo. Si scrive scrollLeft e non scrollIntoView apposta: quello
      scorrerebbe anche la pagina, e la pagina sta dov'e'. */
   function centraMese(){
-    var chip = elMonthBar.querySelector(".month-chip.active");
+    var chip = elMonthBar.querySelector(".mese-chip.active");
     if(!chip || !elMonthBar.clientWidth) return;
     elMonthBar.scrollLeft = Math.max(0, chip.offsetLeft - (elMonthBar.clientWidth - chip.offsetWidth) / 2);
   }
@@ -4805,8 +4815,12 @@
     '</div>';
   }
   /* Un mese alla volta, quello scelto nella barra qui sopra, e dentro due
-     blocchi: gli scaduti in un riquadro loro, in cima, e il mese in ordine
-     di giorno.
+     blocchi: gli scaduti in un riquadro loro, in cima, e il resto del mese
+     in ordine di giorno.
+
+     Il secondo blocco non ha intestazione: direbbe "settembre" dieci
+     centimetri sotto la pastiglia "settembre" accesa, e un titolo che
+     ripete quello che hai appena toccato e' rumore.
 
      Perche' gli scaduti a parte. Sono gia' primi comunque — la data che si
      portano dietro e' quella dell'occorrenza mancata — ma sotto
@@ -4841,8 +4855,7 @@
         scaduti.map(recontactRowHtml).join("")+'</div>';
     }
     if(resto.length){
-      html += '<div class="agenda-group">'+esc(mese)+'<span class="group-count">'+resto.length+
-        '</span></div><div class="grouped-list">'+
+      html += '<div class="grouped-list staccato">'+
         resto.map(recontactRowHtml).join("")+'</div>';
     }
     elRecontactList.innerHTML = html;
