@@ -184,6 +184,15 @@
 
   /* ---------- toggle Elenco/Mappa ---------- */
   .view-toggle-wrap{padding:6px 16px 10px;}
+  /* Le domande pronte sopra l'elenco. Scorrono di lato perche' su un
+     telefono tre non ci stanno in riga, e la prima e' quella che si usa di
+     piu'. Il numero e' quanti ne trova quella domanda, sempre, anche quando
+     l'elenco sotto e' stretto da un'altra ricerca. */
+  .quick-strip{display:flex;gap:7px;padding:0 16px 10px;overflow-x:auto;scrollbar-width:none;}
+  .quick-strip::-webkit-scrollbar{display:none;}
+  .quick-chip{flex:none;display:flex;align-items:center;gap:6px;border:none;border-radius:999px;background:var(--fill);color:var(--text);font-size:13px;font-weight:600;font-family:inherit;padding:7px 12px;cursor:pointer;white-space:nowrap;}
+  .quick-chip.on{background:var(--tint);color:#fff;}
+  .quick-chip .n{font-variant-numeric:tabular-nums;font-weight:700;opacity:.6;}
   .view-toggle{display:flex;background:var(--fill);border-radius:999px;padding:3px;gap:2px;}
   .view-toggle-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:none;background:none;border-radius:999px;padding:9px 4px;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:inherit;}
   .view-toggle-btn.active{background:var(--bg-elevated);color:var(--tint);box-shadow:0 1px 3px rgba(0,0,0,.12);}
@@ -733,6 +742,7 @@
         </div>
         <div class="map-search-results" id="mapSearchResults" hidden></div>
       </div>
+      <div class="quick-strip" id="quickFilters"></div>
       <div class="view-toggle-wrap">
         <div class="view-toggle" id="viewToggle">
           <button class="view-toggle-btn active" data-view="list">
@@ -2471,6 +2481,35 @@
     openSheet({title:"Il giorno", options: opts});
   }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
+  /* Le attivita' vere sono quelle registrate col tocco: una visita, una
+     telefonata, un messaggio, una mail. Le note scritte a mano non sono
+     contatti, e le righe arrivate dall'import hanno tutte la stessa data —
+     contarle vorrebbe dire dire che hai sentito tutti la settimana scorsa. */
+  function venueActivities(v){
+    return ((v && v.notes) || []).filter(function(n){ return n.kind && n.kind !== "nota"; });
+  }
+  function lastActivity(v, verso){
+    var ultima = null;
+    venueActivities(v).forEach(function(n){
+      if(verso && n.direction !== verso) return;
+      if(!ultima || n.created_at > ultima) ultima = n.created_at;
+    });
+    return ultima;
+  }
+  function giorniDa(iso){ return iso ? -daysUntil(String(iso).slice(0, 10)) : null; }
+  /* Da quanto non lo senti, detto come lo diresti a voce. Sopra i due mesi
+     i giorni non dicono piu' niente: "ultimo contatto 213 giorni fa" si
+     legge due volte, "7 mesi fa" una. */
+  function ultimoContattoLabel(v){
+    var g = giorniDa(lastActivity(v));
+    if(g === null) return "mai contattato";
+    if(g <= 0) return "sentito oggi";
+    if(g === 1) return "sentito ieri";
+    if(g < 60) return "ultimo contatto " + g + " giorni fa";
+    var mesi = Math.round(g / 30.4);
+    if(mesi < 24) return "ultimo contatto " + mesi + " mesi fa";
+    return "ultimo contatto " + Math.floor(mesi / 12) + " anni fa";
+  }
   /* La serata in corso, se c'e'. Da quando lo stato del palcoscenico ha
      smesso di copiarla, e' l'unico posto dove sta scritto a che punto sei
      quest'anno: chi prima leggeva v.status per saperlo, adesso legge qui. */
@@ -3188,9 +3227,34 @@
     });
   }
 
+  /* Tre domande che si fanno ogni settimana e che a filtri non si potevano
+     fare: chi non ho mai chiamato, chi ho chiamato senza risposta, chi non
+     sento piu' da un pezzo. Sono un filtro come gli altri — valgono per
+     l'elenco e per la mappa insieme — e se ne accende uno alla volta.
+
+     "Senza risposta" e' l'unica che ha bisogno del verso dell'attivita': gli
+     abbiamo scritto, non ci hanno risposto, e non c'e' nemmeno una serata
+     aperta a dire che qualcosa si e' mosso. */
+  var QUICK_FILTERS = [
+    {key:"mai", label:"Lead mai contattati", test: function(v){
+      return v.status === "lead" && !venueActivities(v).length;
+    }},
+    {key:"muto", label:"Senza risposta", test: function(v){
+      return !!venueActivities(v).length && !lastActivity(v, "loro") && !hasOpenGig(v);
+    }},
+    {key:"vecchi", label:"Muti da 6 mesi", test: function(v){
+      var g = giorniDa(lastActivity(v));
+      return g !== null && g > 180;
+    }}
+  ];
+  var quickFilter = "";
+  function quickFilterTest(key){
+    var q = QUICK_FILTERS.filter(function(x){ return x.key === key; })[0];
+    return q ? q.test : null;
+  }
   function filtriVuoti(){
     return {status:"all", type:"all", category:"all", owner:"all", regione:"all", provincia:"all",
-            nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
+            nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name", quick:""};
   }
   function snapshotFiltri(){
     var liste = {};
@@ -3198,7 +3262,7 @@
     return {status:filterStatus, type:filterType, category:filterCategory, owner:filterOwner,
             regione:filterRegione, provincia:filterProvincia,
             nearMe:nearMeEnabled, nearMeKm:nearMeRadiusKm, nearMeCoords:nearMeCoords,
-            liste:liste, sortBy:sortBy};
+            liste:liste, sortBy:sortBy, quick:quickFilter};
   }
   function applicaFiltri(snap){
     filterStatus = snap.status; filterType = snap.type; filterCategory = snap.category; filterOwner = snap.owner;
@@ -3206,6 +3270,7 @@
     nearMeEnabled = snap.nearMe; nearMeRadiusKm = snap.nearMeKm; nearMeCoords = snap.nearMeCoords;
     VENUE_LISTS.forEach(function(L){ L.filter = snap.liste[L.key] || "all"; });
     sortBy = snap.sortBy;
+    quickFilter = snap.quick || "";
   }
   function filtriDi(scope){
     if(!filterScopes[scope]) filterScopes[scope] = filtriVuoti();
@@ -3215,7 +3280,7 @@
     if(!snap) return false;
     var liste = snap.liste || {};
     return snap.status !== "all" || snap.type !== "all" || snap.category !== "all" || snap.owner !== "all"
-        || snap.regione !== "all" || snap.provincia !== "all" || snap.nearMe
+        || snap.regione !== "all" || snap.provincia !== "all" || snap.nearMe || !!snap.quick
         || Object.keys(liste).some(function(k){ return liste[k] !== "all"; });
   }
   /* Il passaggio di consegne fra le due schermate: quella che lasci si
@@ -3452,6 +3517,10 @@
     if(!venueMatchesVenueLists(v)) return false;
     if(!venueMatchesGeo(v)) return false;
     if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
+    if(quickFilter){
+      var prova = quickFilterTest(quickFilter);
+      if(prova && !prova(v)) return false;
+    }
     if(nearMeEnabled && nearMeCoords){
       if(v.lat == null || v.lng == null) return false;
       var dist = haversineKm(nearMeCoords.lat, nearMeCoords.lng, v.lat, v.lng);
@@ -3472,6 +3541,10 @@
     // quella riga e' la differenza fra "qualcuno ci sta lavorando" e "ci
     // devo pensare io". Altrove sarebbe una riga in piu' sempre uguale.
     var showOwner = !!(opts && opts.showOwner);
+    // Da quanto non lo senti: sta nell'elenco dei palcoscenici, che e' dove
+    // si decide chi chiamare. Altrove sarebbe una riga in piu' da leggere
+    // per una domanda che non ti stai facendo.
+    var showLastContact = !!(opts && opts.showLastContact);
     var st = venueStatusInfo(v.status);
     var subParts = [];
     if(v.type){
@@ -3506,7 +3579,8 @@
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
         (subParts.length ? '<div class="row-sub">'+subParts.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+
-        (showOwner && v.owner_email ? '<div class="row-sub">di '+dato(ownerLabel(v.owner_email))+'</div>' : '')+'</div>'+
+        (showOwner && v.owner_email ? '<div class="row-sub">di '+dato(ownerLabel(v.owner_email))+'</div>' : '')+
+        (showLastContact ? '<div class="row-sub" style="color:var(--text-tertiary);">'+esc(ultimoContattoLabel(v))+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+
           badgeHtml+
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
@@ -3592,7 +3666,27 @@
   document.getElementById("btnSort").addEventListener("click", openSortSheet);
   document.getElementById("btnSortFav").addEventListener("click", openSortSheet);
 
+  var elQuickFilters = document.getElementById("quickFilters");
+  function renderQuickFilters(){
+    var candidati = venues.filter(function(v){ return !v.deleted_at; });
+    elQuickFilters.innerHTML = QUICK_FILTERS.map(function(q){
+      var n = candidati.filter(q.test).length;
+      return '<button type="button" class="quick-chip'+(quickFilter === q.key ? ' on' : '')+
+        '" data-quick="'+q.key+'">'+esc(q.label)+'<span class="n">'+n+'</span></button>';
+    }).join("");
+  }
+  elQuickFilters.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-quick]");
+    if(!btn) return;
+    var key = btn.getAttribute("data-quick");
+    // Un secondo tocco sulla stessa la spegne: e' una domanda, non una
+    // modalita' in cui restare chiusi dentro.
+    quickFilter = (quickFilter === key) ? "" : key;
+    renderList();
+    updateFilterActiveDot();
+  });
   function renderList(){
+    renderQuickFilters();
     var filtered = venues.filter(function(v){ return matchesFilter(v) && matchesSearch(v); });
     // Prima di ogni uscita: l'elenco vuoto esce subito qui sotto, e la
     // mappa non deve restare con i segnalini di prima.
@@ -3600,7 +3694,7 @@
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
     var sorted = filtered.slice().sort(venueSorter());
     if(sorted.length === 0){
-      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !searchText;
+      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !searchText && !quickFilter;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
           ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
@@ -3608,7 +3702,8 @@
         '</div>';
       return;
     }
-    elList.innerHTML = '<div class="grouped-list">' + sorted.map(function(v){ return venueRowHtml(v, {showFav:false}); }).join("") + '</div>';
+    elList.innerHTML = '<div class="grouped-list">' +
+      sorted.map(function(v){ return venueRowHtml(v, {showFav:false, showLastContact:true}); }).join("") + '</div>';
   }
   elList.addEventListener("click", function(e){
     var purge = e.target.closest("[data-purge-id]");
