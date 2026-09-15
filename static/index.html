@@ -190,22 +190,23 @@
   /* Tre segmenti su uno schermo da telefono: un punto in meno e meno aria ai
      lati, altrimenti "Da pianificare" va a capo dentro il suo bottone. */
   .view-toggle.tre .view-toggle-btn{font-size:13px;padding:9px 2px;}
-  /* ---------- i mesi, in Agenda ---------- */
-  /* Dodici pastiglie in fila che scorrono: ci stanno tutte senza mandare a
-     capo niente, e sono bersagli grandi da toccare. Il numero accanto al
-     nome e' quello che l'elenco di un mese solo non puo' dire — dove c'e'
-     da lavorare negli altri undici.
+  /* ---------- i trimestri, in Agenda ---------- */
+  /* Quattro pastiglie che si dividono la larghezza: ci stanno tutte senza
+     scorrere, e sono bersagli larghi un quarto di schermo. Dodici mesi
+     erano una barra da far scorrere per arrivare a dicembre, e il selettore
+     costava piu' della lista.
+
+     Il numero e' quello che l'elenco di un trimestre solo non puo' dire:
+     dove c'e' da lavorare negli altri tre.
 
      Si chiamano "mese-" e non "month-": .month-bar esiste gia' piu' sotto
      ed e' una barra del grafico della Home, cremisi e piena. Arrivando
-     dopo nel foglio vinceva lei, e la barra dei mesi era un rettangolo
-     rosso. */
-  .mese-bar{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
-  .mese-bar::-webkit-scrollbar{display:none;}
-  /* display:flex batte [hidden]: senza questa la barra dei mesi resterebbe
-     su anche negli altri due segmenti dell'Agenda. */
+     dopo nel foglio vinceva lei, e la barra era un rettangolo rosso. */
+  .mese-bar{display:flex;gap:6px;padding:0 16px 10px;}
+  /* display:flex batte [hidden]: senza questa la barra resterebbe su anche
+     negli altri due segmenti dell'Agenda. */
   .mese-bar[hidden]{display:none;}
-  .mese-chip{flex:none;display:flex;align-items:baseline;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 13px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .mese-chip{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:center;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 6px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
   .mese-chip .cnt{font-size:12px;font-variant-numeric:tabular-nums;color:var(--text-tertiary);}
   .mese-chip.vuoto{color:var(--text-tertiary);}
   .mese-chip.active{background:var(--tint);color:#fff;}
@@ -578,10 +579,6 @@
   .month-labels span{flex:1;text-align:center;font-size:10.5px;color:var(--text-tertiary);}
   .agenda-group{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
   .group-count{font-weight:600;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
-  /* L'elenco del mese non ha intestazione (il mese lo dice la pastiglia
-     accesa qui sopra), quindi l'aria che gli starebbe sopra se la prende da
-     solo, staccandosi dalla riga che dice cosa stai guardando. */
-  .grouped-list.staccato{margin-top:14px;}
   .year-head{cursor:pointer;-webkit-user-select:none;user-select:none;align-items:center;}
   .year-head .row-chevron{color:var(--text-tertiary);transition:transform .2s;}
   .year-head.open .row-chevron{transform:rotate(90deg);}
@@ -905,11 +902,11 @@
           <button class="view-toggle-btn" data-agenda="gigs">Serate</button>
         </div>
       </div>
-      <div class="mese-bar" id="recontactMonthBar"></div>
+      <div class="mese-bar" id="recontactQuarterBar"></div>
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact">
-        <div class="scope-note">Solo i palcoscenici da richiamare nel mese scelto qui sopra, serata aperta o no, in ordine di giorno. Fuori gli archiviati e chi non ha un promemoria: se ha una serata aperta lo trovi in «Da pianificare».</div>
+        <div class="scope-note">Solo i palcoscenici da richiamare nel trimestre scelto qui sopra, serata aperta o no, mese per mese e in ordine di giorno. Fuori gli archiviati e chi non ha un promemoria: quelli stanno in «Da pianificare».</div>
           <div id="recontactList"></div>
       </div>
       <div id="agendaPanePlan" hidden>
@@ -2769,7 +2766,7 @@
     document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.getAttribute("data-tab")===name); });
     if(name === "list" || name === "favorites") usaFiltriDi(name);
     if(name === "home") renderHome();
-    if(name === "recontact"){ meseDaCentrare = true; renderRecontact(); }
+    if(name === "recontact") renderRecontact();
     if(name === "favorites") renderFavorites();
     if(name === "gigs") renderAllGigs();
     if(name === "cash") renderCash();
@@ -4500,17 +4497,29 @@
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
   var elPlanList = document.getElementById("planList");
-  var elMonthBar = document.getElementById("recontactMonthBar");
+  var elTrimestreBar = document.getElementById("recontactQuarterBar");
   var agendaView = "recontact";
-  /* Il mese che stai guardando. Si parte da quello di oggi — aprendo
+  /* I quattro trimestri, con dentro i loro mesi. Non e' una divisione
+     dell'anno che c'entri con la musica — nessuno programma "il secondo
+     trimestre" — ma sono quattro bersagli invece di dodici, e dentro
+     l'elenco i mesi ci sono lo stesso, uno sotto l'altro. */
+  var TRIMESTRI = [[1,2,3], [4,5,6], [7,8,9], [10,11,12]];
+  function trimestreDelMese(m){ return Math.floor((m - 1) / 3) + 1; }
+  /* "gen-mar", non "1º trimestre": i mesi sono quello che stai cercando, e
+     su una pastiglia larga un quarto di schermo ci stanno. */
+  function trimestreLabel(t){
+    var mm = TRIMESTRI[t - 1];
+    return MESI[mm[0] - 1].slice(0, 3) + "–" + MESI[mm[2] - 1].slice(0, 3);
+  }
+  function trimestreFrase(t){
+    var mm = TRIMESTRI[t - 1];
+    return "da " + MESI[mm[0] - 1] + " a " + MESI[mm[2] - 1];
+  }
+  /* Il trimestre che stai guardando. Si parte da quello di oggi — aprendo
      l'agenda la domanda e' chi chiamare adesso, non a gennaio — e la scelta
-     resta finche' l'app e' aperta: uno che sta programmando novembre non
+     resta finche' l'app e' aperta: uno che sta programmando l'estate non
      vuole ricominciare da capo ogni volta che passa in Serate e torna. */
-  var meseAgenda = new Date().getMonth() + 1;
-  /* La barra si porta il mese scelto in mezzo solo quando entri: a giugno
-     ci vai toccandolo, e una pastiglia che scappa da sotto il dito mentre
-     la tocchi e' l'unica cosa che non deve fare. */
-  var meseDaCentrare = true;
+  var trimestreAgenda = trimestreDelMese(new Date().getMonth() + 1);
 
   document.getElementById("agendaToggle").addEventListener("click", function(e){
     var btn = e.target.closest("[data-agenda]");
@@ -4522,7 +4531,6 @@
     document.getElementById("agendaPaneRecontact").hidden = agendaView !== "recontact";
     document.getElementById("agendaPanePlan").hidden = agendaView !== "plan";
     document.getElementById("agendaPaneGigs").hidden = agendaView !== "gigs";
-    if(agendaView === "recontact") meseDaCentrare = true;
     renderRecontact();
     document.getElementById("scrollRecontact").scrollTop = 0;
   });
@@ -4555,15 +4563,17 @@
       })
       .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
   }
-  /* Quelli del mese scelto, in ordine di giorno: dentro a un mese la
-     domanda e' quando, e "tutto il mese" (giorno 0) viene prima del giorno
-     1. A parita' di giorno, alfabetico. */
+  /* Quelli di un mese, in ordine di giorno: "tutto il mese" (giorno 0)
+     viene prima del giorno 1, e a parita' di giorno e' alfabetico. */
   function recontactInMonth(m){
     return venuesToRecontact().filter(function(x){ return x.mese === m; })
       .sort(function(a, b){
         if(a.giorno !== b.giorno) return a.giorno - b.giorno;
         return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
       });
+  }
+  function quantiNelTrimestre(t){
+    return TRIMESTRI[t - 1].reduce(function(n, m){ return n + recontactInMonth(m).length; }, 0);
   }
   /* Tutte le serate con una data, archiviati compresi. Il segmento Serate
      non e' un elenco di cose da fare — quelli sono gli altri due, e li' gli
@@ -4685,44 +4695,30 @@
 
      E' un selettore e non delle schede: dodici schede non ci stanno su un
      telefono, e questa barra scorre. */
-  function renderMonthBar(){
-    var tutti = venuesToRecontact();
-    elMonthBar.innerHTML = MESI.map(function(nome, i){
-      var m = i + 1;
-      var n = tutti.filter(function(x){ return x.mese === m; }).length;
-      return '<button type="button" class="mese-chip'+(m === meseAgenda ? " active" : "")+
-        (n ? "" : " vuoto")+'" data-mese="'+m+'"'+(m === meseAgenda ? ' aria-current="true"' : '')+'>'+
-        esc(nome)+(n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
+  /* Quattro pastiglie e basta: non c'e' niente da scorrere e niente da
+     centrare. La barra dei dodici mesi si portava il mese scelto in mezzo, e
+     toccandone un altro la pastiglia scappava da sotto il dito. */
+  function renderTrimestreBar(){
+    elTrimestreBar.innerHTML = TRIMESTRI.map(function(mm, i){
+      var t = i + 1, n = quantiNelTrimestre(t), attivo = t === trimestreAgenda;
+      return '<button type="button" class="mese-chip'+(attivo ? " active" : "")+
+        (n ? "" : " vuoto")+'" data-trimestre="'+t+'"'+(attivo ? ' aria-current="true"' : '')+'>'+
+        esc(trimestreLabel(t))+(n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
     }).join("");
-    centraMese();
   }
-  /* Il mese scelto va portato in mezzo alla barra, altrimenti aprendo
-     l'agenda a settembre si vede gennaio e il mese attivo e' fuori dallo
-     schermo. Si scrive scrollLeft e non scrollIntoView apposta: quello
-     scorrerebbe anche la pagina, e la pagina sta dov'e'. */
-  function centraMese(){
-    if(!meseDaCentrare) return;
-    var chip = elMonthBar.querySelector(".mese-chip.active");
-    /* Entrando la prima volta l'Agenda e' ancora nascosta e la barra non ha
-       larghezza: non si centra niente e il compito resta in piedi, cosi' lo
-       fa il primo render con il tab davvero aperto. */
-    if(!chip || !elMonthBar.clientWidth) return;
-    elMonthBar.scrollLeft = Math.max(0, chip.offsetLeft - (elMonthBar.clientWidth - chip.offsetWidth) / 2);
-    meseDaCentrare = false;
-  }
-  elMonthBar.addEventListener("click", function(e){
-    var btn = e.target.closest("[data-mese]");
+  elTrimestreBar.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-trimestre]");
     if(!btn) return;
-    var m = Number(btn.getAttribute("data-mese"));
-    if(m === meseAgenda) return;
-    meseAgenda = m;
+    var t = Number(btn.getAttribute("data-trimestre"));
+    if(t === trimestreAgenda) return;
+    trimestreAgenda = t;
     renderRecontact();
     document.getElementById("scrollRecontact").scrollTop = 0;
   });
 
   function renderRecontact(){
-    elMonthBar.hidden = agendaView !== "recontact";
-    renderMonthBar();
+    elTrimestreBar.hidden = agendaView !== "recontact";
+    renderTrimestreBar();
     renderRecontactList();
     renderPlanList();
     renderAgendaGigs();
@@ -4733,9 +4729,9 @@
       var p = venuesToPlan().length;
       elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza periodo" : " palcoscenici senza periodo");
     } else {
-      var w = recontactInMonth(meseAgenda).length;
-      elRecontactSub.textContent = w + (w===1 ? " palcoscenico" : " palcoscenici") +
-        " a " + MESI[meseAgenda - 1];
+      var w = quantiNelTrimestre(trimestreAgenda);
+      elRecontactSub.textContent = w + (w===1 ? " palcoscenico " : " palcoscenici ") +
+        trimestreFrase(trimestreAgenda);
     }
   }
 
@@ -4798,31 +4794,39 @@
       '</div>'+
     '</div>';
   }
-  /* Un mese alla volta, quello scelto nella barra qui sopra: un elenco
-     solo, in ordine di giorno, senza intestazione. Il mese lo dice la
-     pastiglia accesa due centimetri piu' su, e un titolo che ripete quello
-     che hai appena toccato e' rumore.
+  /* Un trimestre alla volta, quello scelto nella barra qui sopra, rotto per
+     mese: il trimestre e' il modo di arrivarci in quattro tocchi invece che
+     in dodici, ma quello che si programma resta il mese, e senza le
+     intestazioni novanta giorni di righe sarebbero un elenco piatto.
 
-     Fino al 15 settembre 2026 qui c'erano due blocchi e il primo era
-     "Scaduti", col bordo rosso. In un elenco che va a calendario non ha
-     senso: aprendo maggio a settembre sono scaduti tutti, e un riquadro
-     rosso che contiene tutta la pagina non avvisa di niente. Chi guarda
-     maggio sta guardando maggio. */
+     Un mese senza nessuno non scrive l'intestazione: un titolo con zero
+     righe sotto e' una domanda a cui nessuno ha chiesto risposta.
+
+     Fino al 15 settembre 2026 qui c'era anche un blocco "Scaduti" col bordo
+     rosso. In un elenco che si sceglie a calendario non ha senso: aprendo
+     il trimestre di maggio a settembre sono scaduti tutti, e un riquadro
+     rosso che contiene tutta la pagina non avvisa di niente. */
   function renderRecontactList(){
-    var mese = MESI[meseAgenda - 1];
-    var righe = recontactInMonth(meseAgenda);
-    if(!righe.length){
+    var mesi = TRIMESTRI[trimestreAgenda - 1].map(function(m){
+      return {mese: m, righe: recontactInMonth(m)};
+    });
+    var quanti = mesi.reduce(function(n, g){ return n + g.righe.length; }, 0);
+    if(!quanti){
       elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div>'+
         (venuesToRecontact().length
-          ? '<h2>Niente a '+esc(mese)+'</h2>'+
-            '<p>Nessun palcoscenico da richiamare in questo mese. I numeri sulle pastiglie dicono dove sono gli altri.</p>'
+          ? '<h2>Niente '+esc(trimestreFrase(trimestreAgenda))+'</h2>'+
+            '<p>Nessun palcoscenico da richiamare in questi tre mesi. I numeri sulle pastiglie dicono dove sono gli altri.</p>'
           : '<h2>Niente da contattare</h2>'+
             '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p>')+
         '</div>';
       return;
     }
-    elRecontactList.innerHTML = '<div class="grouped-list staccato">'+
-      righe.map(recontactRowHtml).join("")+'</div>';
+    elRecontactList.innerHTML = mesi.filter(function(g){ return g.righe.length; })
+      .map(function(g){
+        return '<div class="agenda-group">'+esc(MESI[g.mese - 1])+
+          '<span class="group-count">'+g.righe.length+'</span></div>'+
+          '<div class="grouped-list">'+g.righe.map(recontactRowHtml).join("")+'</div>';
+      }).join("");
   }
   elRecontactList.addEventListener("click", function(e){
     var purge = e.target.closest("[data-purge-id]");
