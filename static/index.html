@@ -2925,6 +2925,11 @@
   function vaiDaHome(el){
     var pezzi = (el.getAttribute("data-vai") || "").split(":");
     if(!pezzi[0]) return;
+    /* La mattonella dice il numero del trimestre di oggi, quindi l'Agenda si
+       apre su quello — anche se nella sessione ne avevi scelto un altro.
+       Altrimenti il numero che hai toccato e l'elenco che ti si apre
+       parlerebbero di tre mesi diversi. */
+    if(pezzi[1] === "recontact") trimestreAgenda = trimestreDelMese(new Date().getMonth() + 1);
     apriTab(pezzi[0]);
     if(pezzi[1]) setAgendaView(pezzi[1]);
   }
@@ -2954,8 +2959,15 @@
     document.getElementById("homeSub").textContent = "Stagione " + anno;
     renderHomeTitle();
 
-    // Le stesse due cose che conta l'Agenda, cosi' i numeri non litigano:
-    // le confermate col calendario davanti e chi va richiamato a giorni.
+    /* Le stesse due cose che conta l'Agenda, cosi' i numeri non litigano:
+       le confermate col calendario davanti e chi va richiamato.
+
+       Il secondo e' il trimestre di oggi, lo stesso insieme che si vede
+       aprendo "Da contattare": prima erano i promemoria dei sette giorni
+       successivi, arretrati compresi, e quel numero non si ritrovava da
+       nessuna parte — toccavi la mattonella, l'Agenda si apriva sul
+       trimestre e i conti erano due. Una mattonella che porta a una
+       schermata deve dire il numero di quella schermata. */
     var oggi = todayStr(), prossime = [];
     venues.forEach(function(v){
       if(v.deleted_at) return;
@@ -2964,7 +2976,8 @@
       });
     });
     prossime.sort(function(a, b){ return a.gig_date < b.gig_date ? -1 : 1; });
-    var daFare = venuesToRecontact().filter(function(x){ return daysUntil(x.due.date) <= 7; }).length;
+    var trimOggi = trimestreDelMese(Number(oggi.slice(5, 7)));
+    var daFare = quantiNelTrimestre(trimOggi);
     var cassa = cashTotals(cashRows());
 
     /* Le due mattonelle delle serate stanno in cima e in fila: quante ne
@@ -2988,8 +3001,8 @@
       tileHtml(fmtEuroCent(cassa.budget), "budget", sospesoText(cassa), false, cassa.budget < 0) +
       tileHtml(fmtEuro(incasso), "incassati nel " + anno,
         conFee.length < quest.length ? ("compenso segnato su " + conFee.length + " di " + quest.length) : "") +
-      tileHtml(String(daFare), "da contattare entro una settimana",
-        daFare ? "promemoria arretrati e dei prossimi 7 giorni" : "", true, false, "recontact:recontact") +
+      tileHtml(String(daFare), "da contattare nel trimestre",
+        trimestreFrase(trimOggi), true, false, "recontact:recontact") +
     '</div>';
 
     if(!played.length){
