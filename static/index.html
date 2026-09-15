@@ -580,6 +580,23 @@
   .chart-fill{height:100%;background:var(--tint);border-radius:3px;}
   .chart-val{flex:none;min-width:54px;text-align:right;font-size:13px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
   .chart-note{font-size:12.5px;color:var(--text-secondary);line-height:1.45;margin-top:12px;}
+  /* Le province: una riga per provincia, una colonna per anno. Qui le barre
+     non servono — la domanda e' il confronto fra le colonne, e due numeri
+     incolonnati si confrontano meglio di due barre lunghe uguali. Se gli
+     anni diventano tanti la tabella scorre per conto suo, invece di
+     stringere i numeri finche' non si leggono piu'. */
+  .prov-wrap{overflow-x:auto;scrollbar-width:none;}
+  .prov-wrap::-webkit-scrollbar{display:none;}
+  .prov-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .prov-table th{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--text-tertiary);text-align:right;padding:0 0 7px 14px;white-space:nowrap;}
+  .prov-table th:first-child{text-align:left;padding-left:0;}
+  .prov-table td{padding:7px 0 7px 14px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-secondary);white-space:nowrap;border-top:.5px solid var(--separator);}
+  .prov-table td:first-child{text-align:left;padding-left:0;color:var(--text);white-space:normal;}
+  .prov-table td.tot{color:var(--text);font-weight:600;}
+  /* Lo zero c'e' ma non si legge come un numero: quella provincia
+     quell'anno non l'hai suonata, e la riga deve far vedere dov'e' la roba. */
+  .prov-table td.zero{color:var(--text-tertiary);}
+  .prov-table tr.totale td{color:var(--text);font-weight:600;}
   .months{display:flex;align-items:flex-end;gap:3px;height:76px;}
   .month{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;}
   .month-val{font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:3px;font-variant-numeric:tabular-nums;}
@@ -2895,6 +2912,60 @@
   /* "vai" e' dove porta la mattonella, nella forma "tab:segmento" — per ora
      solo l'Agenda ha dei segmenti. Chi non ce l'ha resta un numero da
      leggere. */
+  /* Dove abbiamo suonato, anno per anno. La provincia non e' un campo: si
+     ricava dalla citta' del palcoscenico, che e' scritta "Comune (PR)", e
+     ci pensa venueProvincia() — lo stesso conto che sta dietro al filtro
+     Provincia, quindi i due posti dicono lo stesso numero.
+
+     Le colonne sono gli anni, dal piu' recente; le righe le province, dalla
+     piu' suonata. In fondo il totale per anno, che sono le stesse cifre
+     delle barre qui sotto: se non tornassero, una delle due sarebbe da
+     buttare.
+
+     Una citta' senza la sigla e senza corrispondenza fra i comuni non ha
+     provincia, e finisce in una riga sua invece di sparire: un totale che
+     non torna coi numeri di sopra e' peggio di una riga scomoda. */
+  function provinceTableHtml(played){
+    var anni = {}, perProv = {}, totProv = {}, totAnno = {};
+    played.forEach(function(x){
+      var y = gigYear(x.g) || "—";
+      var p = venueProvincia(x.v) || "Senza provincia";
+      anni[y] = true;
+      perProv[p] = perProv[p] || {};
+      perProv[p][y] = (perProv[p][y] || 0) + 1;
+      totProv[p] = (totProv[p] || 0) + 1;
+      totAnno[y] = (totAnno[y] || 0) + 1;
+    });
+    var yy = Object.keys(anni).sort().reverse();
+    var pp = Object.keys(totProv).sort(function(a, b){
+      return totProv[b] - totProv[a] || a.localeCompare(b, "it");
+    });
+    if(!pp.length) return "";
+    function celle(get){
+      return yy.map(function(y){
+        var n = get(y);
+        return '<td'+(n ? "" : ' class="zero"')+'>'+n+'</td>';
+      }).join("");
+    }
+    var righe = pp.map(function(p){
+      return '<tr><td>'+dato(p)+'</td>'+
+        celle(function(y){ return perProv[p][y] || 0; })+
+        '<td class="tot">'+totProv[p]+'</td></tr>';
+    }).join("");
+    var totale = '<tr class="totale"><td>tutte</td>'+
+      celle(function(y){ return totAnno[y] || 0; })+
+      '<td class="tot">'+played.length+'</td></tr>';
+    var quante = pp.filter(function(p){ return p !== "Senza provincia"; }).length;
+    return '<div class="section-header">PROVINCE IN CUI ABBIAMO SUONATO</div><div class="chart-card">'+
+      '<div class="prov-wrap"><table class="prov-table"><thead><tr><th>Provincia</th>'+
+      yy.map(function(y){ return '<th>'+esc(y)+'</th>'; }).join("")+'<th>tot</th></tr></thead>'+
+      '<tbody>'+righe+totale+'</tbody></table></div>'+
+      '<div class="chart-note">'+
+        (quante === 1 ? "Una sola provincia finora." : quante + " province finora.") +
+        ' La provincia arriva dalla città del palcoscenico, scritta come «Comune (PR)».'+
+      '</div></div>';
+  }
+
   function tileHtml(value, label, sub, wide, rosso, vai){
     return '<div class="tile'+(wide ? " wide" : "")+(vai ? " tocca" : "")+'"'+
       (vai ? ' data-vai="'+vai+'" role="button" tabindex="0"' : '')+'>'+
@@ -3017,6 +3088,8 @@
     var nota = perAnno.length < 2
       ? '<div class="chart-note">Hai una stagione sola: il confronto con gli anni precedenti si forma da sé, appena ci saranno le serate del '+(Number(anno)+1)+'.</div>'
       : "";
+    html += provinceTableHtml(played);
+
     html += '<div class="section-header">SERATE SUONATE PER ANNO</div><div class="chart-card">'+
       barsHtml(perAnno, function(n){ return String(n); }) + nota + '</div>';
 
