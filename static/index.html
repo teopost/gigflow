@@ -3847,6 +3847,23 @@
     }
     return v.lat + "," + v.lng;
   }
+  /* Il pulsante 📍 della scheda apriva "?q=44.09,12.39": dall'altra parte
+     arrivavano due numeri, e la destinazione non aveva nome. "Portami qui"
+     sulla mappa invece manda il posto scritto per esteso ed e' per quello
+     che li' il nome si legge. Adesso fanno la stessa cosa, con la stessa
+     regola: quando c'e' l'indirizzo si manda quello, se no le coordinate,
+     che saranno mute ma sono giuste.
+
+     E il pulsante compare anche a chi ha l'indirizzo ma non ha ancora il
+     punto sulla mappa: sono centoventisette palcoscenici, e per aprirli in
+     Maps le coordinate non servono. */
+  function mapsHref(v){
+    return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(directionsDest(v));
+  }
+  function haPosizione(v){
+    var c = v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "";
+    return c || !!((v.address || "").trim() && (v.city || "").trim());
+  }
   function directionsHref(v){
     var dest = encodeURIComponent(directionsDest(v));
     return isAppleDevice()
@@ -6096,7 +6113,7 @@
     if(v.phone) actions.push({icon:"💬", label:"WhatsApp", waAction:true});
     if(v.email) actions.push({icon:"✉️", label:"Email", mailAction:true});
     if(v.website) actions.push({icon:"🔗", label:"Sito", href:/^https?:\/\//i.test(v.website)?v.website:("https://"+v.website)});
-    if(v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "") actions.push({icon:"📍", label:"Mappa", href:"https://www.google.com/maps?q="+v.lat+","+v.lng});
+    if(haPosizione(v)) actions.push({icon:"📍", label:"Mappa", href: mapsHref(v)});
     quickActions.innerHTML = actions.map(function(a){
       // WhatsApp ed Email non sono link diretti: prima chiedono quale modello
       // usare, e il link lo costruisce la scelta.
