@@ -6436,7 +6436,15 @@
         renderAll();
       }
       if(esito.esito === "fatto"){
-        toast(esito.precisione === "preciso" ? "Posizione trovata" : "Trovata solo la città: punto al centro");
+        if(esito.precisione === "preciso"){
+          toast("Posizione trovata");
+        } else if(esito.precisione === "centro incerto"){
+          // Un centro citta' e una citta' che puo' essere piu' d'una: il
+          // punto e' salvato ma va guardato, e per sistemarlo basta la sigla.
+          toast("Solo il centro, e «" + ((prima && prima.city) || "") + "» non è una città sola: aggiungi la provincia, tipo «(RN)», e riprova");
+        } else {
+          toast("Trovata solo la città: punto al centro");
+        }
       } else if(esito.esito === "senza_indirizzo"){
         toast("Serve almeno la città per cercare");
       } else if(esito.esito === "non_trovato"){

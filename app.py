@@ -3318,16 +3318,34 @@ def delete_note(conn, ws, note_id):
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 GEO_USER_AGENT = "PalcosceniciCRM/1.0 (gestionale locale per band, uso personale)"
 GEO_RATE_LIMIT_SECONDS = 1.1
-# Oltre questa distanza dal centro della citta' dichiarata, il risultato
-# "preciso" e' sospetto: di solito e' un omonimo dall'altra parte d'Italia.
+# San Marino insieme all'Italia: per questa band e' dietro l'angolo, e con
+# il solo "it" i suoi locali non potevano proprio essere trovati.
+GEO_COUNTRY_CODES = "it,sm"
+# Quante risposte farsi dare: la prima non e' sempre quella della citta'
+# giusta, e scegliere fra cinque costa come chiederne una.
+GEO_RISPOSTE = 5
+# Il freno di riserva: quando nessuna risposta nomina la citta' dichiarata,
+# oltre questa distanza dal centro e' quasi sempre un omonimo altrove.
 GEO_MAX_DRIFT_KM = 30
+# I pezzi di indirizzo dove puo' comparire il nome della citta' dichiarata:
+# il comune e i suoi pezzi interni, perche' spesso quella che chiamiamo citta'
+# e' una frazione ("Lido di Spina", "Igea Marina"). La provincia ("county")
+# sta fuori apposta: e' larga quanto mezza regione, e "via delle Industrie,
+# Cremona" finiva a Bagnolo Cremasco, a 40 km, con il timbro di Cremona.
+GEO_CAMPI_CITTA = (
+    "city", "town", "village", "municipality",
+    "hamlet", "suburb", "city_district", "neighbourhood",
+)
+# Le risposte che valgono come "centro citta'": una strada o un negozio no.
+GEO_TIPI_CITTA = ("city", "town", "village", "municipality", "administrative")
 CITY_PROVINCE_RE = re.compile(r"^(.*?)\s*\(([A-Za-z]{2,3})\)\s*$")
 _geo_lock = threading.Lock()
 _geo_ultima = [0.0]
+_geo_comuni = [None]
 
 
 def geo_normalize_city(city):
-    """"Cesena (FC)" -> ("Cesena", "FC"). La provimcia fra parentesi e' come
+    """"Cesena (FC)" -> ("Cesena", "FC"). La provincia fra parentesi e' come
     la scrive l'elenco dei comuni, e a Nominatim va data separata."""
     city = (city or "").strip()
     trovato = CITY_PROVINCE_RE.match(city)
@@ -3336,23 +3354,96 @@ def geo_normalize_city(city):
     return city, None
 
 
+def geo_comuni_index():
+    """L'elenco dei comuni italiani come lo vede la scheda, ma indicizzato
+    per nome ridotto a parole: serve a capire che "Bellaria" e' scritto per
+    intero "Bellaria-Igea Marina"."""
+    if _geo_comuni[0] is None:
+        elenco = []
+        try:
+            with open(os.path.join(STATIC_DIR, "comuni.json"), encoding="utf-8") as f:
+                for c in json.load(f):
+                    parole = _parole_semplici(c.get("nome"))
+                    if parole:
+                        elenco.append((" ".join(parole), c["nome"], c.get("sigla")))
+        except Exception:
+            elenco = []
+        _geo_comuni[0] = elenco
+    return _geo_comuni[0]
+
+
+def geo_comune(citta):
+    """Da "Bellaria" a ("Bellaria-Igea Marina", "RN"), quando l'elenco dei
+    comuni non lascia dubbi.
+
+    Torna None se il nome non e' di un comune (una frazione come "Lido di
+    Spina", un castello di San Marino) o se e' l'inizio di piu' comuni
+    ("Misano" sono due, una in Romagna e una in Bergamasca): tirare a
+    indovinare fra due province lontane e' come sbagliarle entrambe."""
+    chiave = " ".join(_parole_semplici(citta))
+    if not chiave:
+        return None
+    elenco = geo_comuni_index()
+    esatti = [c for c in elenco if c[0] == chiave]
+    if len(esatti) == 1:
+        return esatti[0][1], esatti[0][2]
+    if esatti:
+        return None
+    inizia = [c for c in elenco if c[0].startswith(chiave + " ") or c[0].startswith(chiave + "-")]
+    if len(inizia) == 1:
+        return inizia[0][1], inizia[0][2]
+    return None
+
+
+def geo_citta_incerta(city):
+    """Vero quando la citta', scritta cosi' com'e', non identifica un comune
+    solo: "Misano" sono due (Adriatico e di Gera d'Adda), "Dogana" non e' un
+    comune italiano. Con un indirizzo non importa — lo si trova lo stesso —
+    ma quando resta solo il centro citta' il punto e' una moneta lanciata, e
+    conviene dirlo invece di salvarlo in silenzio."""
+    citta, provincia = geo_normalize_city(city)
+    if not citta or provincia:
+        return False
+    chiave = " ".join(_parole_semplici(citta))
+    if not chiave:
+        return False
+    quanti = [c for c in geo_comuni_index()
+              if c[0] == chiave or c[0].startswith(chiave + " ") or c[0].startswith(chiave + "-")]
+    # Zero non vuol dire incerto: "Domagnano" e "Lido di Spina" non sono
+    # comuni italiani ma sono un posto solo. Incerto e' quando sono due.
+    return len(quanti) > 1
+
+
 def geo_candidates(name, address, city):
     """Le domande da fare, dalla piu' precisa alla piu' vaga: il nome del
     locale (che su OpenStreetMap a volte c'e' gia'), poi l'indirizzo, poi la
-    sola citta'. L'ultima torna anche a parte, che serve per la convalida."""
+    sola citta'. Torna anche la domanda della sola citta' e i nomi con cui
+    la citta' puo' comparire nella risposta, che servono per la convalida.
+
+    "Italia" in coda si scrive solo quando la citta' e' davvero un comune
+    italiano: senza quella parola i locali di San Marino non si trovavano,
+    con quella parola le frazioni si trovano lo stesso."""
     citta, provincia = geo_normalize_city(city)
+    nomi = [citta] if citta else []
+    if citta and not provincia:
+        comune = geo_comune(citta)
+        if comune:
+            citta, provincia = comune[0], comune[1]
+            nomi.append(citta)
     dove = f"{citta}, {provincia}" if provincia else citta
+    if dove and provincia:
+        dove = f"{dove}, Italia"
     name = (name or "").strip()
     address = (address or "").strip()
 
     domande = []
     if name and dove:
-        domande.append(f"{name}, {dove}, Italia")
+        domande.append(f"{name}, {dove}")
     if address and dove:
-        domande.append(f"{address}, {dove}, Italia")
+        domande.append(f"{address}, {dove}")
     elif address:
         domande.append(f"{address}, Italia")
-    domanda_citta = f"{dove}, Italia" if dove else None
+    domanda_citta = dove or None
     if domanda_citta:
         domande.append(domanda_citta)
 
@@ -3361,14 +3452,15 @@ def geo_candidates(name, address, city):
         if d not in viste:
             viste.add(d)
             ordinate.append(d)
-    return ordinate, domanda_citta
+    return ordinate, domanda_citta, nomi
 
 
 def geo_lookup(query):
-    """Una domanda a Nominatim, non piu' di una al secondo. None se non sa."""
+    """Una domanda a Nominatim, non piu' di una al secondo. Torna le prime
+    risposte cosi' come sono: chi chiama sceglie la sua."""
     params = urlencode({
-        "q": query, "format": "json", "limit": 1,
-        "countrycodes": "it", "addressdetails": 1,
+        "q": query, "format": "json", "limit": GEO_RISPOSTE,
+        "countrycodes": GEO_COUNTRY_CODES, "addressdetails": 1,
     })
     req = urllib.request.Request(
         f"{NOMINATIM_URL}?{params}", headers={"User-Agent": GEO_USER_AGENT}
@@ -3382,9 +3474,35 @@ def geo_lookup(query):
                 dati = json.load(resp)
         finally:
             _geo_ultima[0] = time.monotonic()
-    if not dati:
-        return None
-    return float(dati[0]["lat"]), float(dati[0]["lon"])
+    return dati or []
+
+
+def geo_punto(risposta):
+    return float(risposta["lat"]), float(risposta["lon"])
+
+
+def geo_dice_la_citta(risposta, nomi):
+    """Vero se il punto trovato sta davvero nella citta' dichiarata.
+
+    Questa e' la prova che conta, ed e' piu' onesta della distanza: se
+    Nominatim rimanda indietro "Bellaria-Igea Marina" fra i pezzi
+    dell'indirizzo, quel punto e' di quella Bellaria li', per quanti
+    chilometri ci siano dal posto che avevamo scambiato per il centro.
+    Il nome dichiarato vale anche come inizio di quello completo, perche'
+    la gente scrive "Bellaria" e il comune si chiama "Bellaria-Igea Marina"."""
+    if not nomi:
+        return False
+    dettagli = risposta.get("address") or {}
+    pezzi = [dettagli.get(k) for k in GEO_CAMPI_CITTA]
+    pezzi = [" ".join(_parole_semplici(p)) for p in pezzi if p]
+    for nome in nomi:
+        chiave = " ".join(_parole_semplici(nome))
+        if not chiave:
+            continue
+        for pezzo in pezzi:
+            if pezzo == chiave or pezzo.startswith(chiave + " "):
+                return True
+    return False
 
 
 def geo_distanza_km(lat1, lon1, lat2, lon2):
@@ -3396,29 +3514,66 @@ def geo_distanza_km(lat1, lon1, lat2, lon2):
     return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def geo_best(domande, domanda_citta, cache=None):
-    """Prova le domande in ordine e scarta il risultato preciso che cade
-    troppo lontano dal centro citta'. Torna (lat, lng, quanto e' preciso)."""
-    cache = cache if cache is not None else {}
-    punto_citta = None
-    if domanda_citta:
-        if domanda_citta not in cache:
-            cache[domanda_citta] = geo_lookup(domanda_citta)
-        punto_citta = cache[domanda_citta]
+def geo_centro(risposte, nomi):
+    """Il centro citta' fra le risposte alla domanda della sola citta', e se
+    quel nome e' di un posto solo. Torna (punto, incerto).
 
+    Si preferisce una risposta che sia un comune e che porti il nome giusto:
+    la prima della lista, a volte, e' una frazione omonima in un'altra
+    regione — ed e' proprio da li' che nasceva il guaio. E se fra le altre
+    risposte c'e' un altro posto con lo stesso nome dall'altra parte della
+    penisola ("Dogana" sono cinque), la scelta e' un sorteggio: si dice."""
+    col_nome = [r for r in risposte if geo_dice_la_citta(r, nomi)] or list(risposte)
+    comuni = [r for r in col_nome if r.get("addresstype") in GEO_TIPI_CITTA] or col_nome
+    if not comuni:
+        return None, False
+    punto = geo_punto(comuni[0])
+    incerto = any(
+        geo_distanza_km(punto[0], punto[1], *geo_punto(r)) > GEO_MAX_DRIFT_KM
+        for r in comuni[1:]
+    )
+    return punto, incerto
+
+
+def geo_best(domande, domanda_citta, nomi=(), cache=None):
+    """Prova le domande in ordine e torna (lat, lng, quanto e' preciso).
+
+    Prima si cerca fra le risposte una che nomini la citta' dichiarata; solo
+    se nessuna la nomina si ripiega sulla distanza dal centro, che resta il
+    freno contro gli omonimi lontani."""
+    cache = cache if cache is not None else {}
+
+    def chiedi(domanda):
+        if domanda not in cache:
+            cache[domanda] = geo_lookup(domanda)
+        return cache[domanda]
+
+    punto_citta, citta_incerta = (
+        geo_centro(chiedi(domanda_citta), nomi) if domanda_citta else (None, False)
+    )
+
+    ripiego = None
     for domanda in domande:
         if domanda == domanda_citta:
             continue
-        if domanda not in cache:
-            cache[domanda] = geo_lookup(domanda)
-        punto = cache[domanda]
-        if not punto:
-            continue
-        if punto_citta and geo_distanza_km(punto[0], punto[1], *punto_citta) > GEO_MAX_DRIFT_KM:
-            continue
-        return punto[0], punto[1], "preciso"
+        # Una domanda precisa a cui Nominatim risponde con il comune non ha
+        # trovato il locale: ha ripiegato da solo sulla citta'. Quel punto lo
+        # prendiamo dopo, per quello che e', invece di spacciarlo per preciso.
+        risposte = [r for r in chiedi(domanda)
+                    if r.get("addresstype") not in GEO_TIPI_CITTA]
+        for r in risposte:
+            if geo_dice_la_citta(r, nomi):
+                return geo_punto(r) + ("preciso",)
+        if ripiego is None and punto_citta:
+            for r in risposte:
+                p = geo_punto(r)
+                if geo_distanza_km(p[0], p[1], *punto_citta) <= GEO_MAX_DRIFT_KM:
+                    ripiego = p
+                    break
+    if ripiego:
+        return ripiego + ("preciso",)
     if punto_citta:
-        return punto_citta[0], punto_citta[1], "centro citta'"
+        return punto_citta[0], punto_citta[1], "centro incerto" if citta_incerta else "centro citta'"
     return None
 
 
@@ -3445,24 +3600,28 @@ def geocode_location(conn, ws, loc_id, body=None):
         valore = body.get(campo)
         return valore.strip() if isinstance(valore, str) and valore.strip() else row[campo]
 
-    domande, domanda_citta = geo_candidates(
+    domande, domanda_citta, nomi = geo_candidates(
         dalla_scheda("name"), dalla_scheda("address"), dalla_scheda("city")
     )
     if not domande:
         return {"esito": "senza_indirizzo", "location": fetch_location(conn, ws, loc_id)}
     try:
-        punto = geo_best(domande, domanda_citta)
+        punto = geo_best(domande, domanda_citta, nomi)
     except Exception:
         raise ApiError(502, "La mappa non risponde, riprova fra poco", "rete")
     if not punto:
         return {"esito": "non_trovato", "location": fetch_location(conn, ws, loc_id)}
+
+    precisione = punto[2]
+    if precisione != "preciso" and geo_citta_incerta(dalla_scheda("city")):
+        precisione = "centro incerto"
 
     conn.execute(
         "UPDATE locations SET lat = ?, lng = ?, updated_at = ? WHERE id = ?",
         (punto[0], punto[1], now_iso(), loc_id),
     )
     conn.commit()
-    return {"esito": "fatto", "precisione": punto[2], "location": fetch_location(conn, ws, loc_id)}
+    return {"esito": "fatto", "precisione": precisione, "location": fetch_location(conn, ws, loc_id)}
 
 
 DATA_URL_RE = re.compile(r"^data:image/(\w+);base64,(.+)$", re.S)
