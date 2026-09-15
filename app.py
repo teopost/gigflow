@@ -434,6 +434,24 @@ NOTE_KIND_LABELS = {
     "email": "Email inviata",
 }
 
+# Chi si e' mosso (15 settembre 2026). "Telefonata" da sola non dice se hai
+# chiamato tu o se ti hanno risposto loro, e sono due cose molto diverse:
+# senza questa parola non si puo' chiedere all'app chi non ha mai risposto.
+#
+# Vale solo per le attivita' registrate col tocco: una nota scritta a mano
+# non e' un contatto, e resta senza verso.
+NOTE_DIRECTIONS = {"noi", "loro"}
+NOTE_DIRECTION_DEFAULT = "noi"
+# Le stesse quattro cose dette dall'altra parte. "Passato dal locale" non ha
+# un contrario sensato — se vengono loro e' un'altra storia — ma un'etichetta
+# ce la vuole lo stesso.
+NOTE_KIND_LABELS_IN = {
+    "visita": "Sono passati loro",
+    "chiamata": "Ci hanno chiamato",
+    "messaggio": "Messaggio ricevuto",
+    "email": "Email ricevuta",
+}
+
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -495,6 +513,8 @@ def init_db():
             text TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
+        -- kind, gig_id e direction arrivano da migrate_schema: la tabella e'
+        -- nata prima di loro e si aggiunge una colonna per volta.
 
         CREATE TABLE IF NOT EXISTS bands (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -771,6 +791,16 @@ def migrate_schema(conn):
         # Senza REFERENCES: la nota resta appesa al palcoscenico anche se la
         # serata viene cancellata, il legame col ciclo e' un in piu'.
         conn.execute("ALTER TABLE notes ADD COLUMN gig_id INTEGER")
+    if "direction" not in note_cols:
+        conn.execute("ALTER TABLE notes ADD COLUMN direction TEXT")
+        # Tutto quello che c'e' gia' l'abbiamo fatto noi: le etichette di
+        # prima lo dicono da sole ("Email inviata", "Messaggio inviato",
+        # "Passato dal locale"). Le note scritte a mano restano senza verso.
+        conn.execute(
+            "UPDATE notes SET direction = ? WHERE direction IS NULL "
+            "AND kind IS NOT NULL AND kind != 'nota'",
+            (NOTE_DIRECTION_DEFAULT,),
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notes_gig ON notes(gig_id)")
 
     profile_cols = {row["name"] for row in conn.execute("PRAGMA table_info(user_profiles)").fetchall()}
@@ -3081,12 +3111,22 @@ def add_note(conn, ws, loc_id, body):
     kind = (body.get("kind") or "nota").strip() or "nota"
     if kind not in NOTE_KINDS:
         raise ApiError(400, "Tipo di attività non valido")
+    # Il verso lo porta l'app; se non lo dice — una versione installata
+    # vecchia — vale quello di sempre: l'abbiamo fatta noi.
+    direction = (body.get("direction") or "").strip() or None
+    if direction and direction not in NOTE_DIRECTIONS:
+        raise ApiError(400, "Verso dell’attività non valido")
+    if kind == "nota":
+        direction = None
+    elif direction is None:
+        direction = NOTE_DIRECTION_DEFAULT
     text = (body.get("text") or "").strip()
     if not text:
         # I pulsanti rapidi registrano l'attivita' con un tocco solo: il testo
         # lo mette l'app, altrimenti registrare una telefonata costerebbe
         # quanto scriverne una nota.
-        text = NOTE_KIND_LABELS.get(kind, "")
+        etichette = NOTE_KIND_LABELS_IN if direction == "loro" else NOTE_KIND_LABELS
+        text = etichette.get(kind, "")
         # E se quel messaggio veniva da un modello, quale. Due mesi dopo
         # "Email inviata" non dice se avevi mandato il primo contatto o il
         # sollecito, ed e' esattamente la cosa che serve sapere prima di
@@ -3106,8 +3146,9 @@ def add_note(conn, ws, loc_id, body):
     gig = current_gig_row(conn, loc_id)
     aperta = gig if (gig is not None and gig["closed_at"] is None) else None
     nota_id = conn.execute(
-        "INSERT INTO notes (location_id, gig_id, kind, text, created_at) VALUES (?, ?, ?, ?, ?)",
-        (loc_id, aperta["id"] if aperta else None, kind, text, ts),
+        "INSERT INTO notes (location_id, gig_id, kind, direction, text, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (loc_id, aperta["id"] if aperta else None, kind, direction, text, ts),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
     # Aver contattato il posto e' esattamente cosa distingue "opportunita'"

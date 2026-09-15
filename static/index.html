@@ -508,6 +508,11 @@
   .act-strip{display:flex;gap:8px;padding:11px 16px;background:var(--bg-elevated);overflow-x:auto;scrollbar-width:none;}
   .act-strip::-webkit-scrollbar{display:none;}
   .act-chip{flex:none;display:flex;align-items:center;gap:6px;border:none;border-radius:999px;background:var(--fill);color:var(--text);font-size:14px;font-weight:600;font-family:inherit;padding:8px 13px;cursor:pointer;white-space:nowrap;}
+  /* Chi si e' mosso: sta sopra i quattro modi, ed e' acceso uno dei due.
+     "Noi" e' acceso in partenza perche' e' il caso di quasi sempre. */
+  .act-chip.on{background:var(--tint);color:#fff;}
+  .act-strip + .act-strip{border-top:.5px solid var(--separator);}
+  .note-dir{font-weight:600;}
   .act-chip:active{opacity:.55;}
 
   /* ---------- avvisi dell'agenda ---------- */
@@ -2112,6 +2117,10 @@
 
       <div class="section-header">ATTIVITÀ</div>
       <div class="grouped-list">
+        <div class="act-strip" id="actDirStrip">
+          <button type="button" class="act-chip on" data-dir="noi">↑ Noi</button>
+          <button type="button" class="act-chip" data-dir="loro">↓ Loro</button>
+        </div>
         <div class="act-strip" id="actStrip">
           <button type="button" class="act-chip" data-act="visita">🚗 Visita</button>
           <button type="button" class="act-chip" data-act="chiamata">📞 Chiamato</button>
@@ -2119,7 +2128,7 @@
           <button type="button" class="act-chip" data-act="email">✉️ Email</button>
         </div>
       </div>
-      <div class="section-footer">Un tocco la registra con la data di oggi. Resta un’attività del palcoscenico: da qui non nasce nessuna serata. Se una serata è aperta ed è ancora «Opportunità», passa a «Contattato». Lo stato del palcoscenico non si muove: una telefonata non fa di un lead un cliente.</div>
+      <div class="section-footer">Prima chi si è mosso, poi come. <strong>Noi</strong> è quello di quasi sempre; <strong>Loro</strong> è quando ti rispondono o ti cercano, ed è la differenza che ti fa sapere chi non ti ha mai risposto. Un tocco la registra con la data di oggi. Resta un’attività del palcoscenico: da qui non nasce nessuna serata. Se una serata è aperta ed è ancora «Opportunità», passa a «Contattato».</div>
 
       <div class="section-header">STORICO CONTATTI</div>
       <div class="grouped-list" id="notesList"></div>
@@ -6445,8 +6454,13 @@
     notesList.innerHTML = notes.map(function(n){
       var k = NOTE_KIND_META[n.kind];
       var meta = (k ? k.icon + " " + k.label + " · " : "") + fmtDateTime(n.created_at);
+      // Le attivita' vecchie non hanno un verso: erano tutte nostre, ma non
+      // e' scritto da nessuna parte e non lo si inventa qui.
+      var dir = n.direction === "loro"
+        ? '<span class="note-dir" style="color:var(--green);">↓ Loro</span> · '
+        : (n.direction === "noi" ? '<span class="note-dir" style="color:var(--tint);">↑ Noi</span> · ' : "");
       return '<div class="swipe-row"><div class="row-content"><div class="note-row">'+
-        '<div class="note-meta">'+esc(meta)+'</div><div class="note-text">'+dato(n.text)+'</div>'+
+        '<div class="note-meta">'+dir+esc(meta)+'</div><div class="note-text">'+dato(n.text)+'</div>'+
         '</div></div><div class="row-actions"><button data-del-note="'+n.id+'">Elimina</button></div></div>';
     }).join("");
   }
@@ -6473,10 +6487,25 @@
   /* `modello` c'e' solo quando il messaggio e' partito da un modello: il
      testo della nota lo compone il server, che e' dove stanno le etichette
      delle attivita' (vedi NOTE_KIND_LABELS in app.py). */
-  function logActivity(kind, modello){
+  /* Il verso lo tiene la striscia qui sopra, ma solo per il tocco: una mail
+     o un messaggio partiti dall'app li abbiamo mandati noi comunque, e una
+     telefonata fatta dal pulsante Chiama pure. */
+  var actDirection = "noi";
+  function renderActDirStrip(){
+    document.querySelectorAll("#actDirStrip [data-dir]").forEach(function(b){
+      b.classList.toggle("on", b.getAttribute("data-dir") === actDirection);
+    });
+  }
+  document.getElementById("actDirStrip").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-dir]");
+    if(!btn) return;
+    actDirection = btn.getAttribute("data-dir");
+    renderActDirStrip();
+  });
+  function logActivity(kind, modello, verso){
     if(!currentId) return;
     var meta = NOTE_KIND_META[kind];
-    var body = {kind: kind};
+    var body = {kind: kind, direction: verso || "noi"};
     if(modello) body.template = modello;
     api("POST", "/api/locations/" + currentId + "/notes", body).then(function(updated){
       applyUpdatedVenue(updated);
@@ -6484,13 +6513,14 @@
       renderStatusRow(updated);
       renderGigs(updated);
       renderAll();
-      toast("Attività registrata: " + (meta ? meta.label : kind));
+      toast((body.direction === "loro" ? "Loro · " : "") +
+            "Attività registrata: " + (meta ? meta.label : kind));
     }).catch(function(err){ toast(err.message); });
   }
   document.getElementById("actStrip").addEventListener("click", function(e){
     var btn = e.target.closest("[data-act]");
     if(!btn) return;
-    logActivity(btn.getAttribute("data-act"));
+    logActivity(btn.getAttribute("data-act"), null, actDirection);
   });
 
   function fillVenueForm(v){
@@ -6516,6 +6546,10 @@
     renderPhotosStrip(v);
     renderQuickActions(v);
     renderSocialCoverRow();
+    // Il verso torna su "Noi" a ogni scheda aperta: e' il caso di quasi
+    // sempre, e restare su "Loro" da un palcoscenico all'altro vorrebbe dire
+    // segnare la telefonata di domani dalla parte sbagliata.
+    actDirection = "noi"; renderActDirStrip();
     renderStatusRow(v);
     renderGigs(v);
     renderArtDirectorRow(v);
