@@ -2916,8 +2916,21 @@
   [["scrollHome","navHome"],["scrollList","navList"],["scrollFavorites","navFavorites"],["scrollGigs","navGigs"],["scrollRecontact","navRecontact"],["scrollBands","navBands"],["scrollSettings","navSettings"]].forEach(function(pair){
     var scroller = document.getElementById(pair[0]);
     var nav = document.getElementById(pair[1]);
+    var titolone = nav.querySelector(".large-title-wrap");
     scroller.addEventListener("scroll", function(){
-      nav.classList.toggle("scrolled", scroller.scrollTop > 8);
+      if(nav.classList.contains("scrolled")){
+        if(scroller.scrollTop <= 0) nav.classList.remove("scrolled");
+        return;
+      }
+      /* Collassando, il titolone sparisce e l'elenco guadagna la sua altezza:
+         se da scorrere ce n'era meno di tanto, il browser riporta subito
+         tutto in cima, la barra si riapre, e a ogni tocco si vede sfarfallare
+         (l'Agenda di un trimestre con poche righe fa esattamente questo).
+         Quando non c'e' abbastanza corsa, meglio non collassare affatto. */
+      var guadagno = titolone ? titolone.offsetHeight : 0;
+      if(scroller.scrollTop > 8 && scroller.scrollHeight - scroller.clientHeight > guadagno + 8){
+        nav.classList.add("scrolled");
+      }
     });
   });
 
