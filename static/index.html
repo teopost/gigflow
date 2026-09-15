@@ -316,6 +316,10 @@
   .section-header{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.03em;color:var(--text-secondary);padding:20px 16px 6px;}
   .section-header:first-child{padding-top:8px;}
   .section-footer{font-size:13px;color:var(--text-secondary);padding:6px 16px 4px;line-height:1.4;}
+  /* Sotto le schede: cosa c'e' in quell'elenco, detto in una riga. Sta
+     dentro allo scorrimento e non nell'intestazione, cosi' se ne va appena
+     scorri — serve la prima volta che apri la scheda, non sempre. */
+  .scope-note{font-size:12.5px;color:var(--text-tertiary);padding:10px 16px 0;line-height:1.4;}
   .grouped-list{margin:0 16px;background:var(--bg-elevated);border-radius:10px;overflow:hidden;}
 
   /* swipeable rows (scroll-snap technique = native momentum, no custom JS drag) */
@@ -4257,6 +4261,14 @@
      trattativa, e una serata confermata non ha piu' niente da trattare. In
      calendario ci pensa l'Agenda. */
   var GIG_CHIUSE = ["confermato", "rifiutata", "suonato", "annullato"];
+  /* Una riga sotto le schede che dice cosa stai guardando. Le parole sono
+     gli stati veri, non un riassunto: chi legge deve poter ritrovare nelle
+     pastiglie delle righe quello che c'e' scritto qui. */
+  var GIG_SCOPE_NOTE = {
+    aperte: "Le trattative ancora in ballo: Opportunità, Contattato, Interessato, Trattativa. Fuori i palcoscenici archiviati.",
+    chiuse: "Le serate arrivate a un esito: Confermato, Rifiutata, Suonato, Annullato. Una confermata sta qui perché non c’è più niente da trattare, anche se deve ancora essere suonata. Fuori i palcoscenici archiviati.",
+    tutte: "Tutte le serate di tutti i palcoscenici, di ogni stagione, con la data o senza — comprese quelle dei palcoscenici archiviati."
+  };
   function isGigChiusa(k){ return GIG_CHIUSE.indexOf(k) > -1; }
   /* Gli stati che ha senso filtrare qui dentro: quelli della scheda aperta.
      Offrire "Suonato" mentre guardi le aperte vuol dire offrire un elenco
@@ -4351,7 +4363,8 @@
       } else {
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Le serate ci sono, ma la ricerca o il filtro le stanno escludendo tutte.</p>';
       }
-      elAllGigs.innerHTML = '<div class="empty-state">'+vuoto+'</div>';
+      elAllGigs.innerHTML = '<div class="scope-note">'+esc(GIG_SCOPE_NOTE[gigsScope] || "")+'</div>'+
+        '<div class="empty-state">'+vuoto+'</div>';
       return;
     }
     var gruppi = {};
@@ -4359,7 +4372,7 @@
       var k = gigYear(x.g) || "";
       (gruppi[k] = gruppi[k] || []).push(x);
     });
-    var html = "";
+    var html = '<div class="scope-note">'+esc(GIG_SCOPE_NOTE[gigsScope] || "")+'</div>';
     Object.keys(gruppi).sort(function(a, b){
       if(a === "" || b === "") return a === "" ? -1 : 1;
       return a < b ? 1 : -1;
