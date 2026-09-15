@@ -6588,6 +6588,55 @@
     openSheet({title:"Referente booking", options:opts});
   });
 
+  /* Lo storico si puo' correggere: si tocca una riga e si apre sotto, come
+     per le serate. Serve soprattutto per la data — le cose si segnano quando
+     uno se ne ricorda, non quando succedono: la telefonata di venerdi' la
+     scrivi il lunedi', e se resta datata lunedi' tutti i conti su "da quanto
+     non lo sentiamo" dicono una cosa falsa.
+
+     Il testo si scrive a mano: quello che mette l'app con un tocco ("Email
+     inviata") e' un punto di partenza, non un verbale. */
+  var expandedNoteId = null;
+  var noteDraft = null;
+
+  function noteKindLabel(kind){
+    var k = NOTE_KIND_META[kind];
+    return k ? k.icon + " " + k.label : "📝 Nota";
+  }
+  function notePanelHtml(n){
+    var d = noteDraft || {kind:n.kind || "nota", direction:n.direction || "", date:(n.created_at||"").slice(0,10), text:n.text || ""};
+    var nota = d.kind === "nota" || !d.kind;
+    return '<div class="gig-panel">'+
+      '<div class="field-row picker" id="rowNoteKind"><label>Tipo</label>'+
+        '<div class="picker-value"><span>'+esc(noteKindLabel(d.kind))+'</span>'+CHEVRON+'</div></div>'+
+      (nota ? '' :
+        '<div class="act-strip" id="noteDirStrip">'+
+          '<button type="button" class="act-chip'+(d.direction !== "loro" ? ' on' : '')+'" data-note-dir="noi">\u2191 Noi</button>'+
+          '<button type="button" class="act-chip'+(d.direction === "loro" ? ' on' : '')+'" data-note-dir="loro">\u2193 Loro</button>'+
+        '</div>')+
+      '<div class="field-row"><label>Data</label>'+
+        '<input type="date" id="noteDate" value="'+esc(d.date)+'"></div>'+
+      '<div class="field-row stacked"><label>Cosa è successo</label>'+
+        '<textarea rows="2" id="noteText" placeholder="es. richiamare lunedì, chiedere di Luca">'+esc(d.text)+'</textarea></div>'+
+      '<div class="add-note-row" style="justify-content:flex-end;gap:18px;">'+
+        '<button type="button" id="btnNoteCancel" style="color:var(--text-secondary);">Annulla</button>'+
+        '<button type="button" id="btnNoteSave">Salva</button>'+
+      '</div>'+
+    '</div>';
+  }
+  function readNoteDraft(){
+    if(!noteDraft) return;
+    var d = document.getElementById("noteDate");
+    var t = document.getElementById("noteText");
+    if(d) noteDraft.date = d.value;
+    if(t) noteDraft.text = t.value;
+  }
+  function openNoteDraft(n){
+    noteDraft = {id:n.id, kind:n.kind || "nota", direction:n.direction || "",
+                 date:(n.created_at || "").slice(0,10), text:n.text || ""};
+  }
+  function closeNoteDraft(){ expandedNoteId = null; noteDraft = null; }
+
   function renderNotes(v){
     var notes = (v.notes || []).slice().reverse();
     if(!notes.length){
@@ -6602,16 +6651,80 @@
       var dir = n.direction === "loro"
         ? '<span class="note-dir" style="color:var(--green);">↓ Loro</span> · '
         : (n.direction === "noi" ? '<span class="note-dir" style="color:var(--tint);">↑ Noi</span> · ' : "");
-      return '<div class="swipe-row"><div class="row-content"><div class="note-row">'+
+      var aperta = String(expandedNoteId) === String(n.id);
+      return '<div class="swipe-row"><div class="row-content"><div class="note-row" data-note-row="'+n.id+'">'+
         '<div class="note-meta">'+dir+esc(meta)+'</div><div class="note-text">'+dato(n.text)+'</div>'+
-        '</div></div><div class="row-actions"><button data-del-note="'+n.id+'">Elimina</button></div></div>';
+        '</div>'+(aperta ? notePanelHtml(n) : '')+'</div>'+
+        '<div class="row-actions"><button data-del-note="'+n.id+'">Elimina</button></div></div>';
     }).join("");
   }
   notesList.addEventListener("click", function(e){
     var btn = e.target.closest("[data-del-note]");
-    if(!btn) return;
-    api("DELETE", "/api/notes/" + btn.getAttribute("data-del-note")).then(function(updated){ applyUpdatedVenue(updated); renderNotes(updated); renderList(); });
+    if(btn){
+      api("DELETE", "/api/notes/" + btn.getAttribute("data-del-note")).then(function(updated){
+        closeNoteDraft(); applyUpdatedVenue(updated); renderNotes(updated); renderAll();
+      });
+      return;
+    }
+    if(e.target.closest("#btnNoteCancel")){
+      var cv0 = currentVenue(); closeNoteDraft(); if(cv0) renderNotes(cv0);
+      return;
+    }
+    if(e.target.closest("#btnNoteSave")){
+      salvaNota();
+      return;
+    }
+    var dirBtn = e.target.closest("[data-note-dir]");
+    if(dirBtn && noteDraft){
+      readNoteDraft();
+      noteDraft.direction = dirBtn.getAttribute("data-note-dir");
+      var cv1 = currentVenue(); if(cv1) renderNotes(cv1);
+      return;
+    }
+    if(e.target.closest("#rowNoteKind") && noteDraft){
+      readNoteDraft();
+      var tipi = ["nota", "visita", "chiamata", "messaggio", "email"];
+      openSheet({title:"Tipo di attività", options: tipi.map(function(k){
+        return {label: noteKindLabel(k), checkmark: noteDraft.kind === k, onSelect: function(){
+          noteDraft.kind = k;
+          // Una nota scritta a mano non ha un verso; un'attivita' si': se
+          // non l'aveva parte da "noi", che e' il caso di quasi sempre.
+          if(k === "nota") noteDraft.direction = "";
+          else if(!noteDraft.direction) noteDraft.direction = "noi";
+          var cv2 = currentVenue(); if(cv2) renderNotes(cv2);
+        }};
+      })});
+      return;
+    }
+    var row = e.target.closest("[data-note-row]");
+    if(!row) return;
+    var id = row.getAttribute("data-note-row");
+    var cv = currentVenue(); if(!cv) return;
+    if(String(expandedNoteId) === String(id)){ closeNoteDraft(); }
+    else {
+      var target = (cv.notes || []).filter(function(x){ return String(x.id) === String(id); })[0];
+      if(!target) return;
+      expandedNoteId = id;
+      openNoteDraft(target);
+    }
+    renderNotes(cv);
   });
+  function salvaNota(){
+    if(!noteDraft) return;
+    readNoteDraft();
+    if(!(noteDraft.text || "").trim()){ toast("Scrivi cosa è successo"); return; }
+    if(!noteDraft.date){ toast("Metti una data"); return; }
+    api("PUT", "/api/notes/" + noteDraft.id, {
+      kind: noteDraft.kind, direction: noteDraft.direction || "",
+      date: noteDraft.date, text: noteDraft.text
+    }).then(function(updated){
+      closeNoteDraft();
+      applyUpdatedVenue(updated);
+      renderNotes(updated);
+      renderAll();
+      toast("Attività aggiornata");
+    }).catch(function(err){ toast(err.message); });
+  }
   document.getElementById("btnAddNote").addEventListener("click", function(){
     var text = fNewNote.value.trim();
     if(!text) return;

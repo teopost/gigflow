@@ -3166,6 +3166,71 @@ def add_note(conn, ws, loc_id, body):
     return fetch_location(conn, ws, loc_id)
 
 
+def update_note(conn, ws, note_id, body):
+    """Correggere un'attivita' gia' registrata: cosa e' successo, com'e'
+    partita, chi si e' mosso e soprattutto *quando*.
+
+    La data si scrive a mano perche' le cose si segnano quando ci si ricorda,
+    non quando succedono: la telefonata di venerdi' la scrivi il lunedi', e
+    se resta datata lunedi' tutti i conti su "da quanto non lo sentiamo"
+    dicono una cosa falsa. Si cambia solo il giorno: l'ora resta quella in
+    cui la riga e' nata, cosi' due attivita' dello stesso giorno restano in
+    ordine fra loro.
+
+    Il legame con la serata non si tocca: era la serata aperta quel giorno,
+    e spostare la data non riscrive la storia.
+    """
+    row = conn.execute(
+        "SELECT n.*, l.workspace_id FROM notes n JOIN locations l ON l.id = n.location_id "
+        "WHERE n.id = ? AND l.workspace_id = ?", (note_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Nota non trovata")
+
+    data = {}
+    if "text" in body:
+        testo = (body.get("text") or "").strip()
+        if not testo:
+            raise ApiError(400, "Il testo dell’attività non può restare vuoto")
+        data["text"] = testo
+    if "kind" in body:
+        kind = (body.get("kind") or "nota").strip() or "nota"
+        if kind not in NOTE_KINDS:
+            raise ApiError(400, "Tipo di attività non valido")
+        data["kind"] = kind
+    if "direction" in body:
+        direction = (body.get("direction") or "").strip() or None
+        if direction and direction not in NOTE_DIRECTIONS:
+            raise ApiError(400, "Verso dell’attività non valido")
+        data["direction"] = direction
+    # Una nota scritta a mano non ha un verso: se il tipo torna "nota" se ne
+    # va anche quello, se no resterebbe un "Noi" appeso a un pensiero.
+    if data.get("kind") == "nota":
+        data["direction"] = None
+    if "date" in body:
+        giorno = (body.get("date") or "").strip()
+        if not GIG_DATE_RE.match(giorno):
+            raise ApiError(400, "Data non valida")
+        try:
+            datetime.strptime(giorno, "%Y-%m-%d")
+        except ValueError:
+            raise ApiError(400, "Data non valida")
+        vecchia = row["created_at"] or now_iso()
+        coda = vecchia[10:] if len(vecchia) > 10 else "T12:00:00+00:00"
+        data["created_at"] = giorno + coda
+
+    if data:
+        set_clause = ",".join(f"{k} = ?" for k in data.keys())
+        conn.execute(
+            f"UPDATE notes SET {set_clause} WHERE id = ?", list(data.values()) + [note_id]
+        )
+        conn.execute(
+            "UPDATE locations SET updated_at = ? WHERE id = ?", (now_iso(), row["location_id"])
+        )
+        conn.commit()
+    return fetch_location(conn, ws, row["location_id"])
+
+
 def delete_note(conn, ws, note_id):
     row = conn.execute(
         "SELECT n.location_id FROM notes n JOIN locations l ON l.id = n.location_id "
@@ -4620,6 +4685,10 @@ def _h_add_note(conn, match, query, body, ctx):
     return 201, add_note(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_update_note(conn, match, query, body, ctx):
+    return 200, update_note(conn, require_ws(ctx), int(match.group(1)), body)
+
+
 def _h_delete_note(conn, match, query, body, ctx):
     return 200, delete_note(conn, require_ws(ctx), int(match.group(1)))
 
@@ -4937,6 +5006,7 @@ ROUTES = [
     ("POST", re.compile(r"^/api/locations/(\d+)/restore$"), _h_restore_location),
     ("DELETE", re.compile(r"^/api/locations/(\d+)/permanent$"), _h_purge_location),
     ("POST", re.compile(r"^/api/locations/(\d+)/notes$"), _h_add_note),
+    ("PUT", re.compile(r"^/api/notes/(\d+)$"), _h_update_note),
     ("DELETE", re.compile(r"^/api/notes/(\d+)$"), _h_delete_note),
     ("POST", re.compile(r"^/api/locations/(\d+)/gigs$"), _h_create_gig),
     ("PUT", re.compile(r"^/api/gigs/(\d+)$"), _h_update_gig),
