@@ -572,7 +572,13 @@
   .gig-confirm .yes{background:var(--green-soft);color:#1f8b3d;}
   .gig-confirm .no{background:var(--destructive-soft);color:var(--destructive);}
 
-  .note-row{padding:10px 16px;background:var(--bg-elevated);}
+  /* Lo stesso bordo delle serate e della cassa: dice a colpo d'occhio che
+     quella riga e' una cosa sola, e di che colore. Rosso quello che abbiamo
+     fatto noi, verde quello che e' arrivato da loro, grigio un pensiero
+     scritto a mano, che non l'ha mandato nessuno. */
+  .note-row{padding:10px 16px 10px 13px;background:var(--bg-elevated);border-left:3px solid var(--separator);}
+  .note-row.noi{border-left-color:var(--tint);}
+  .note-row.loro{border-left-color:var(--green);}
   .note-row + .note-row{border-top:.5px solid var(--separator);}
   .note-meta{font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums;margin-bottom:2px;}
   .note-text{font-size:15px;color:var(--text);white-space:pre-wrap;line-height:1.4;}
@@ -2145,11 +2151,13 @@
           <button type="button" class="act-chip on" data-dir="noi">↑ Noi</button>
           <button type="button" class="act-chip" data-dir="loro">↓ Loro</button>
         </div>
+        <div class="gig-panel" id="newNoteFields" hidden></div>
         <div class="act-strip" id="actStrip">
           <button type="button" class="act-chip" data-act="visita">🚗 Visita</button>
           <button type="button" class="act-chip" data-act="chiamata">📞 Chiamato</button>
           <button type="button" class="act-chip" data-act="messaggio">💬 Messaggio</button>
           <button type="button" class="act-chip" data-act="email">✉️ Email</button>
+          <button type="button" class="act-chip" id="btnNewNote">📝 Nota</button>
         </div>
       </div>
       <div class="section-footer">Prima chi si è mosso, poi come. <strong>Noi</strong> è quello di quasi sempre; <strong>Loro</strong> è quando ti rispondono o ti cercano, ed è la differenza che ti fa sapere chi non ti ha mai risposto. Un tocco la registra con la data di oggi. Resta un’attività del palcoscenico: da qui non nasce nessuna serata. Se una serata è aperta ed è ancora «Opportunità», passa a «Contattato».</div>
@@ -4242,10 +4250,13 @@
      a che punto e' questa serata, quella piccola sotto il nome dice che
      rapporto c'e' col palcoscenico. "Trattativa su un Lead" e "Trattativa su
      un Cliente" non sono la stessa telefonata. */
+  /* Senza data non si scriveva niente di utile ("Data da fissare" e' vero
+     per tutte finche' non sono confermate). Al suo posto la cosa che serve
+     davvero qui: quando l'hai sentito l'ultima volta. */
   function allGigRowHtml(x){
     var quando = x.g.gig_date
       ? fmtDateShort(x.g.gig_date)
-      : '<span style="color:var(--text-tertiary);">Data da fissare</span>';
+      : '<span style="color:var(--text-tertiary);">'+esc(ultimoContattoLabel(x.v))+'</span>';
     var sv = venueStatusInfo(x.v.status);
     var dove = [];
     if(x.v.city) dove.push(dato(x.v.city));
@@ -6599,12 +6610,12 @@
   var expandedNoteId = null;
   var noteDraft = null;
 
+  var NOTE_KIND_ORDER = ["nota", "visita", "chiamata", "messaggio", "email"];
   function noteKindLabel(kind){
     var k = NOTE_KIND_META[kind];
     return k ? k.icon + " " + k.label : "📝 Nota";
   }
-  function notePanelHtml(n){
-    var d = noteDraft || {kind:n.kind || "nota", direction:n.direction || "", date:(n.created_at||"").slice(0,10), text:n.text || ""};
+  function notePanelHtml(d){
     var nota = d.kind === "nota" || !d.kind;
     return '<div class="gig-panel">'+
       '<div class="field-row picker" id="rowNoteKind"><label>Tipo</label>'+
@@ -6652,9 +6663,10 @@
         ? '<span class="note-dir" style="color:var(--green);">↓ Loro</span> · '
         : (n.direction === "noi" ? '<span class="note-dir" style="color:var(--tint);">↑ Noi</span> · ' : "");
       var aperta = String(expandedNoteId) === String(n.id);
-      return '<div class="swipe-row"><div class="row-content"><div class="note-row" data-note-row="'+n.id+'">'+
+      var bordo = n.direction === "loro" ? " loro" : (n.direction === "noi" ? " noi" : "");
+      return '<div class="swipe-row"><div class="row-content"><div class="note-row'+bordo+'" data-note-row="'+n.id+'">'+
         '<div class="note-meta">'+dir+esc(meta)+'</div><div class="note-text">'+dato(n.text)+'</div>'+
-        '</div>'+(aperta ? notePanelHtml(n) : '')+'</div>'+
+        '</div>'+(aperta && noteDraft ? notePanelHtml(noteDraft) : '')+'</div>'+
         '<div class="row-actions"><button data-del-note="'+n.id+'">Elimina</button></div></div>';
     }).join("");
   }
@@ -6683,8 +6695,7 @@
     }
     if(e.target.closest("#rowNoteKind") && noteDraft){
       readNoteDraft();
-      var tipi = ["nota", "visita", "chiamata", "messaggio", "email"];
-      openSheet({title:"Tipo di attività", options: tipi.map(function(k){
+      openSheet({title:"Tipo di attività", options: NOTE_KIND_ORDER.map(function(k){
         return {label: noteKindLabel(k), checkmark: noteDraft.kind === k, onSelect: function(){
           noteDraft.kind = k;
           // Una nota scritta a mano non ha un verso; un'attivita' si': se
@@ -6706,9 +6717,79 @@
       if(!target) return;
       expandedNoteId = id;
       openNoteDraft(target);
+      newNoteDraft = null;
+      renderNewNoteFields();
     }
     renderNotes(cv);
   });
+  /* Il quinto tasto della striscia apre lo stesso pannello con cui si
+     correggono le altre: tipo, giorno, chi si e' mosso e cosa e' successo.
+     Non e' solo per le note — da qui si segna anche la telefonata di tre
+     giorni fa, con la sua data vera, che con un tocco solo non si poteva. */
+  var elNewNoteFields = document.getElementById("newNoteFields");
+  var newNoteDraft = null;
+  function renderNewNoteFields(){
+    elNewNoteFields.hidden = !newNoteDraft;
+    elNewNoteFields.innerHTML = newNoteDraft ? notePanelHtml(newNoteDraft) : "";
+  }
+  function readNewNoteDraft(){
+    if(!newNoteDraft) return;
+    var d = document.getElementById("noteDate");
+    var t = document.getElementById("noteText");
+    if(d) newNoteDraft.date = d.value;
+    if(t) newNoteDraft.text = t.value;
+  }
+  document.getElementById("btnNewNote").addEventListener("click", function(){
+    if(!currentId) return;
+    // Uno alla volta: i due pannelli hanno gli stessi campi, e due caselle
+    // "Data" aperte insieme sono due modi di sbagliare.
+    var cv = currentVenue();
+    closeNoteDraft();
+    newNoteDraft = {kind:"nota", direction:"", date: todayStr(), text:""};
+    renderNewNoteFields();
+    if(cv) renderNotes(cv);
+  });
+  elNewNoteFields.addEventListener("click", function(e){
+    if(!newNoteDraft) return;
+    if(e.target.closest("#btnNoteCancel")){ newNoteDraft = null; renderNewNoteFields(); return; }
+    if(e.target.closest("#btnNoteSave")){ salvaNuovaNota(); return; }
+    var dirBtn = e.target.closest("[data-note-dir]");
+    if(dirBtn){
+      readNewNoteDraft();
+      newNoteDraft.direction = dirBtn.getAttribute("data-note-dir");
+      renderNewNoteFields();
+      return;
+    }
+    if(e.target.closest("#rowNoteKind")){
+      readNewNoteDraft();
+      openSheet({title:"Tipo di attività", options: NOTE_KIND_ORDER.map(function(k){
+        return {label: noteKindLabel(k), checkmark: newNoteDraft.kind === k, onSelect: function(){
+          newNoteDraft.kind = k;
+          if(k === "nota") newNoteDraft.direction = "";
+          else if(!newNoteDraft.direction) newNoteDraft.direction = "noi";
+          renderNewNoteFields();
+        }};
+      })});
+    }
+  });
+  function salvaNuovaNota(){
+    if(!newNoteDraft || !currentId) return;
+    readNewNoteDraft();
+    if(!(newNoteDraft.text || "").trim()){ toast("Scrivi cosa è successo"); return; }
+    if(!newNoteDraft.date){ toast("Metti una data"); return; }
+    api("POST", "/api/locations/" + currentId + "/notes", {
+      kind: newNoteDraft.kind, direction: newNoteDraft.direction || "",
+      date: newNoteDraft.date, text: newNoteDraft.text
+    }).then(function(updated){
+      newNoteDraft = null;
+      renderNewNoteFields();
+      applyUpdatedVenue(updated);
+      renderNotes(updated);
+      renderAll();
+      toast("Attività aggiunta");
+    }).catch(function(err){ toast(err.message); });
+  }
+
   function salvaNota(){
     if(!noteDraft) return;
     readNoteDraft();
@@ -6804,8 +6885,12 @@
     renderSocialCoverRow();
     // Il verso torna su "Noi" a ogni scheda aperta: e' il caso di quasi
     // sempre, e restare su "Loro" da un palcoscenico all'altro vorrebbe dire
-    // segnare la telefonata di domani dalla parte sbagliata.
+    // segnare la telefonata di domani dalla parte sbagliata. Per la stessa
+    // ragione i pannelli delle attivita' non si portano dietro niente: quello
+    // che stavi scrivendo era di un altro posto.
     actDirection = "noi"; renderActDirStrip();
+    closeNoteDraft();
+    newNoteDraft = null; renderNewNoteFields();
     renderStatusRow(v);
     renderGigs(v);
     renderArtDirectorRow(v);

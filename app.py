@@ -3139,6 +3139,10 @@ def add_note(conn, ws, loc_id, body):
         raise ApiError(400, "Il testo della nota è obbligatorio")
     require_location(conn, ws, loc_id)
     ts = now_iso()
+    # Il giorno si puo' scrivere: una telefonata di venerdi' segnata il
+    # lunedi' deve restare di venerdi'. Tutto il resto (updated_at, la
+    # serata che avanza) resta a adesso, che e' quando e' successo davvero.
+    quando = note_created_at(body.get("date"), ts)
     # L'attivita' e' del palcoscenico. Si lega a una serata solo se quella
     # serata e' aperta adesso: appiccicarla all'ultima stagione chiusa vorrebbe
     # dire far comparire una telefonata di quest'anno sotto la serata
@@ -3148,7 +3152,7 @@ def add_note(conn, ws, loc_id, body):
     nota_id = conn.execute(
         "INSERT INTO notes (location_id, gig_id, kind, direction, text, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
-        (loc_id, aperta["id"] if aperta else None, kind, direction, text, ts),
+        (loc_id, aperta["id"] if aperta else None, kind, direction, text, quando),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
     # Aver contattato il posto e' esattamente cosa distingue "opportunita'"
@@ -3164,6 +3168,25 @@ def add_note(conn, ws, loc_id, body):
         advance_open_gig_on_activity(conn, aperta, ts)
     conn.commit()
     return fetch_location(conn, ws, loc_id)
+
+
+def note_created_at(giorno, riferimento=None):
+    """Il momento di un'attivita' quando il giorno lo scrivi tu: si cambia
+    solo la data, l'ora resta quella della riga (o di adesso, per una riga
+    nuova). Cosi' due attivita' dello stesso giorno restano in ordine fra
+    loro, e non c'e' bisogno di chiedere anche l'ora a chi sta segnando una
+    telefonata di tre giorni fa."""
+    riferimento = riferimento or now_iso()
+    giorno = (giorno or "").strip()
+    if not giorno:
+        return riferimento
+    if not GIG_DATE_RE.match(giorno):
+        raise ApiError(400, "Data non valida")
+    try:
+        datetime.strptime(giorno, "%Y-%m-%d")
+    except ValueError:
+        raise ApiError(400, "Data non valida")
+    return giorno + (riferimento[10:] if len(riferimento) > 10 else "T12:00:00+00:00")
 
 
 def update_note(conn, ws, note_id, body):
@@ -3208,16 +3231,7 @@ def update_note(conn, ws, note_id, body):
     if data.get("kind") == "nota":
         data["direction"] = None
     if "date" in body:
-        giorno = (body.get("date") or "").strip()
-        if not GIG_DATE_RE.match(giorno):
-            raise ApiError(400, "Data non valida")
-        try:
-            datetime.strptime(giorno, "%Y-%m-%d")
-        except ValueError:
-            raise ApiError(400, "Data non valida")
-        vecchia = row["created_at"] or now_iso()
-        coda = vecchia[10:] if len(vecchia) > 10 else "T12:00:00+00:00"
-        data["created_at"] = giorno + coda
+        data["created_at"] = note_created_at(body.get("date"), row["created_at"])
 
     if data:
         set_clause = ",".join(f"{k} = ?" for k in data.keys())
