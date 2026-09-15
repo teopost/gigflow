@@ -544,14 +544,9 @@
   .note-dir{font-weight:600;}
   .act-chip:active{opacity:.55;}
 
-  /* ---------- avvisi dell'agenda ---------- */
-  .nudge-btn{border:none;border-radius:8px;background:var(--tint);color:#fff;font-size:14px;font-weight:600;font-family:inherit;padding:9px 15px;cursor:pointer;}
-  .nudge-btn:active{opacity:.7;}
-  /* Una riga sola sopra l'elenco: quello che resta del riquadro di prima,
-     che aveva un titolo, una spiegazione e una lista tutta sua. */
-  .bulk-row{display:flex;align-items:center;gap:10px;margin:12px 16px 2px;}
-  .bulk-row span{flex:1;min-width:0;font-size:13px;color:var(--text-secondary);}
-  .bulk-row .nudge-btn{flex:none;}
+  /* Il pulsante in coda a una riga dell'agenda: adesso ne e' rimasto uno
+     solo, "Quando?" su "Da pianificare". Il nome viene da "Riproponi", che
+     stava qui prima. */
   .renew-btn{border:none;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:9px 13px;cursor:pointer;}
   .renew-btn:active{opacity:.7;}
   /* ---- Home: tessere e grafici. Nessuna libreria: barre in CSS, cosi'
@@ -915,11 +910,10 @@
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact">
         <div class="scope-note">Solo i palcoscenici da richiamare nel mese scelto qui sopra, serata aperta o no, in ordine di giorno. Fuori gli archiviati e chi non ha un promemoria: se ha una serata aperta lo trovi in «Da pianificare».</div>
-        <div id="recontactBulk"></div>
-        <div id="recontactList"></div>
+          <div id="recontactList"></div>
       </div>
       <div id="agendaPanePlan" hidden>
-        <div class="scope-note">I palcoscenici con una serata aperta a cui non hai ancora detto quando richiamarli: è l’arretrato. Fuori gli archiviati. Scegliere il periodo è l’unico gesto che serve, e sposta la riga in «Da contattare».</div>
+        <div class="scope-note">Tutti quelli che non sono più un Lead e a cui non hai ancora detto quando richiamarli: è l’arretrato. Fuori i Lead e gli archiviati. Scegliere il mese è l’unico gesto che serve, e sposta la riga in «Da contattare».</div>
         <div id="planList"></div>
       </div>
       <div id="agendaPaneGigs" hidden>
@@ -2399,10 +2393,10 @@
   /* I tre modi in cui una serata finisce: ci sei andato, era fissata e poi
      e' saltata (piove, il locale chiude, succede), oppure il titolare ha
      detto di no. Chiudere vuol dire che quella stagione li' e' andata come
-     e' andata: il palcoscenico esce dall'Agenda e per riprovarci l'anno
-     prossimo c'e' "Riproponi", che apre l'opportunita' nuova senza
-     cancellare com'e' finita questa. Stessa lista di CLOSING_STATUSES in
-     app.py. */
+     e' andata: quella serata li' non si tocca piu', e per riprovarci l'anno
+     prossimo se ne apre una nuova dalla scheda, senza cancellare com'e'
+     finita questa. Il palcoscenico intanto resta in Agenda, nel mese del
+     suo promemoria. Stessa lista di CLOSING_STATUSES in app.py. */
   var CLOSING_STATUSES = ["suonato", "annullato", "rifiutata"];
   function isClosingStatus(s){ return CLOSING_STATUSES.indexOf(s) > -1; }
 
@@ -2481,10 +2475,10 @@
 
      "Non l'ho chiamato" si legge sulla serata in corso, non sull'esistenza
      di una serata. Prima qui si guardava se c'era un tentativo aperto dopo
-     l'occorrenza, e bastava quello a dire "fatto": ma un giro di "Riproponi"
-     apre le serate a pacchi e le lascia tutte su "Opportunita'" — il
-     tentativo c'e', la telefonata no, ed era esattamente il caso che questo
-     elenco deve far vedere. Chi si e' mosso davvero e' passato a Contattato,
+     l'occorrenza, e bastava quello a dire "fatto": ma una serata aperta e
+     lasciata su "Opportunita'" e' un tentativo che c'e' senza che la
+     telefonata ci sia stata, ed era esattamente il caso che questo conto
+     deve far vedere. Chi si e' mosso davvero e' passato a Contattato,
      Interessato, Trattativa o Confermato, e quelli non sono in ritardo:
      hanno una trattativa per le mani, non una chiamata da fare.
 
@@ -2520,7 +2514,7 @@
        che la serata ci fosse, e siccome "Da contattare" teneva dentro solo
        chi ne aveva una aperta la domanda non si vedeva. Adesso che l'elenco
        tiene tutti, chi non ha niente di aperto e' anzi il caso piu' chiaro:
-       e' esattamente quello a cui offrire "Riproponi". */
+       non l'hai chiamato e non hai nemmeno cominciato. */
     if((!g || g.status === "opportunita") && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
       return {date: passata, late: true};
     return {date: prossima, late: false};
@@ -2589,7 +2583,6 @@
   function currentGig(v){
     return venueGigs(v).filter(function(g){ return g.open; })[0] || null;
   }
-  function hasOpenGig(v){ return !!currentGig(v); }
   /* Una stagione chiusa che non e' finita in nessuno dei tre modi buoni e'
      semplicemente finita nel nulla: dirlo e' piu' onesto che mostrare "In
      trattativa" su una trattativa di tre anni fa. */
@@ -4538,7 +4531,7 @@
 
      Chi ha suonato non e' un'eccezione da scrivere qui: la sua serata si
      chiude, non ne resta nessuna aperta, e col promemoria che si e' portato
-     dietro ricompare nel mese giusto. "Riproponi" apre quella nuova.
+     dietro ricompare nel mese giusto, pronto per l'anno nuovo.
 
      Fuori restano gli archiviati e chi il promemoria non ce l'ha: quelli
      stanno in "Da pianificare", e i due segmenti continuano a non
@@ -4562,21 +4555,6 @@
         if(a.giorno !== b.giorno) return a.giorno - b.giorno;
         return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
       });
-  }
-  /* Chi non ha niente di aperto: sono le righe che mostrano "Riproponi",
-     ed e' lo stesso insieme su cui agisce il pulsante cumulativo in cima.
-     Solo dentro al mese che stai guardando: un pulsante che agisce anche su
-     righe che non vedi non e' un pulsante.
-
-     Prima la domanda era "e' in ritardo e non ha niente di aperto". La
-     prima meta' e' caduta con gli scaduti: in un mese che si sceglie a
-     mano, "in ritardo" voleva solo dire "l'hai aperto a settembre", e il
-     pulsante spariva da tutte le righe di ottobre per un motivo che non
-     c'entrava niente con loro. */
-  function dueToRenew(){
-    return recontactInMonth(meseAgenda).filter(function(x){
-      return !venueGigs(x.v).some(function(g){ return g.open; });
-    });
   }
   /* Tutte le serate con una data, archiviati compresi. Il segmento Serate
      non e' un elenco di cose da fare — quelli sono gli altri due, e li' gli
@@ -4604,17 +4582,24 @@
      un periodo, li' chi ce l'ha. Scegliere il periodo e' l'unico gesto che
      serve, e sposta la riga da una parte all'altra.
 
-     Dentro chi ha una serata aperta, come in "Da contattare": un indirizzo
-     su cui non hai ancora deciso di provarci non e' un arretrato, e sono
-     trecento — ci annegherebbe tutto il resto. Il passo che conta qui e'
-     uno solo: aver aperto la serata. */
+     Dentro ci va chiunque non sia un Lead. Un Lead e' un indirizzo copiato
+     da un elenco, su cui non hai ancora fatto niente: sono cinquecento, e a
+     tenerli qui l'arretrato vero — i Prospect, quelli che hai gia' toccato
+     — ci annegherebbe. Il passo che conta e' uscire da Lead, e lo fai tu
+     dalla scheda.
+
+     Fino al 15 settembre 2026 qui ci voleva una serata aperta, e l'elenco
+     conteneva una riga in tutto: chiudere una trattativa faceva sparire il
+     palcoscenico da tutte e due i segmenti dell'Agenda, e un Prospect
+     sentito a marzo e poi lasciato li' non lo ritrovava piu' nessuno.
+     Adesso sono 61. */
   function statusRank(k){
     var i = VENUE_STATUSES.findIndex(function(x){ return x.key === k; });
     return i < 0 ? 99 : i;
   }
   function venuesToPlan(){
     return venues.filter(function(v){
-      return !v.deleted_at && hasOpenGig(v) && !v.recontact_period;
+      return !v.deleted_at && v.status !== "lead" && !v.recontact_period;
     }).slice().sort(function(a, b){
       var ra = statusRank(a.status), rb = statusRank(b.status);
       if(ra !== rb) return ra - rb;
@@ -4651,7 +4636,7 @@
     var righe = venuesToPlan();
     if(!righe.length){
       elPlanList.innerHTML = '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
-        '<p>Ogni palcoscenico su cui hai cominciato a lavorare ha un periodo in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p></div>';
+        '<p>Ogni palcoscenico che hai già toccato ha un mese in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p></div>';
       return;
     }
     var html = "", corrente = null;
@@ -4730,7 +4715,6 @@
     elMonthBar.hidden = agendaView !== "recontact";
     renderMonthBar();
     renderRecontactList();
-    renderRenewAll();
     renderPlanList();
     renderAgendaGigs();
     if(agendaView === "gigs"){
@@ -4784,15 +4768,13 @@
      posto di un'agenda — e l'allarme era sempre acceso, quindi non era un
      allarme.
 
-     Il pulsante sta dove starebbe la freccia, e solo dove serve: su un
-     palcoscenico senza nessuna serata aperta la cosa da fare e' una sola,
-     riaprirla. Dove una serata aperta c'e' gia', la riga si apre e basta. */
+     Niente pulsanti sulla riga: si tocca e si apre la scheda, che e' dove
+     si chiama, si scrive com'e' andata e si apre la serata. "Riproponi" e'
+     uscito dall'app il 15 settembre 2026 — apriva una serata a tua insaputa
+     da tre posti diversi, e la stessa cosa la fa il pulsante della scheda,
+     dove almeno vedi cosa stai aprendo. */
   function recontactRowHtml(x){
-    var v = x.v;
-    var aperta = venueGigs(v).some(function(g){ return g.open; });
-    var trail = aperta
-      ? CHEVRON
-      : '<button type="button" class="renew-btn" data-renew="'+v.id+'">Riproponi</button>';
+    var v = x.v, trail = CHEVRON;
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
@@ -4838,67 +4820,9 @@
     if(purge){ purgeVenueRow(purge.getAttribute("data-purge-id")); return; }
     var del = e.target.closest("[data-del-id]");
     if(del){ deleteVenueRow(del.getAttribute("data-del-id")); return; }
-    var btn = e.target.closest("[data-renew]");
-    if(btn){ renewOne(btn.getAttribute("data-renew"), btn); return; }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
-
-  /* Il giro annuale non scatta da solo a mezzanotte: il periodo dice quando
-     tocca, e riproporsi resta un tocco tuo. Meglio un promemoria che un
-     automatismo: la stagione nuova la decidi tu, non il calendario.
-
-     Prima questo stava in un riquadro suo, con una lista sua scelta con un
-     altro criterio: due elenchi uno sopra l'altro, e un palcoscenico poteva
-     stare in tutti e due o in nessuno. Adesso l'elenco e' uno solo e il
-     pulsante sta sulla riga di chi lo aspetta. */
-  function renewVenue(v){
-    return api("POST", "/api/locations/" + v.id + "/gigs", {})
-      .then(applyUpdatedVenue);
-  }
-  /* Riproporre da una serata suonata apre la serata nuova sul palcoscenico,
-     non sulla riga toccata: quella e' storia e resta com'e'.
-
-     Aprire una serata chiude quella aperta, qualunque fosse. Se ce n'e' gia'
-     una in corso, riproporre la chiuderebbe di nascosto — una trattativa in
-     piedi buttata via con uno scorrimento. Meglio dirlo e non fare niente. */
-  function renewFromGig(id, btn){
-    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
-    if(!v) return;
-    if(venueGigs(v).some(function(g){ return g.open; })){
-      toast("Qui c'è già una serata aperta: continua da quella.");
-      return;
-    }
-    renewOne(id, btn);
-  }
-  function renewOne(id, btn){
-    var v = venues.filter(function(x){ return String(x.id) === String(id); })[0];
-    if(!v) return;
-    var nome = v.name || "Senza nome";
-    withButtonBusy(btn, function(){ return renewVenue(v); }).then(function(){
-      renderAll();
-      toast("Nuova serata · " + nome + " · opportunità");
-    }).catch(function(err){ toast(err.message); });
-  }
-  /* Il cumulativo solo da due in su: con uno solo direbbe la stessa cosa del
-     pulsante della sua riga, due centimetri piu' in alto. */
-  function renderRenewAll(){
-    var el = document.getElementById("recontactBulk");
-    var cands = dueToRenew();
-    if(cands.length < 2){ el.innerHTML = ""; return; }
-    el.innerHTML = '<div class="bulk-row"><span>'+cands.length+' aspettano di essere ripresi</span>'+
-      '<button class="nudge-btn" id="btnRenewAll">Riproponi tutti</button></div>';
-    document.getElementById("btnRenewAll").addEventListener("click", function(){
-      withButtonBusy(this, function(){
-        return cands.reduce(function(chain, x){
-          return chain.then(function(){ return renewVenue(x.v); });
-        }, Promise.resolve());
-      }).then(function(){
-        renderAll();
-        toast(cands.length + " serate aperte, in stato «opportunità»");
-      }).catch(function(err){ toast(err.message); });
-    });
-  }
 
   /* Il periodo scelto nel pannello "Ho suonato", finche' non premi il
      pulsante. Si parte da quello che il palcoscenico ha gia'; se non ha
@@ -4917,8 +4841,10 @@
      Tre righe come le celle dei palcoscenici — nome, quando, dove e quanto —
      invece di una riga sola lunga il doppio dello schermo.
 
-     Su una serata suonata lo scorrimento scopre "Riproponi": e' li' che
-     comincia il giro dell'anno dopo, sulla riga della volta scorsa. */
+     Fino al 15 settembre 2026 su una serata suonata lo scorrimento scopriva
+     "Riproponi". Adesso la serata dell'anno dopo si apre dalla scheda del
+     palcoscenico, dove si vede cosa si sta aprendo: la riga di qui si tocca
+     e porta li'. */
   function gigAgendaRowHtml(x, tag, tagColor){
     var quando = [fmtDateShort(x.g.gig_date)];
     if(tag) quando.push(whenHtml(tag, tagColor));
@@ -4935,14 +4861,7 @@
       '<div class="row-trail">'+statusPillHtml(gigStateLabel(x.g), gigStateColors(x.g))+
       CHEVRON+'</div>'+
     '</div>';
-    // "Riproponi" apre la stagione dopo: su un palcoscenico archiviato
-    // vorrebbe dire ricominciare a trattare con un posto che hai messo via,
-    // e la serata nuova non si vedrebbe in nessun elenco. La riga resta,
-    // il gesto no.
-    if(x.g.status !== "suonato" || x.v.deleted_at) return riga;
-    return '<div class="swipe-row"><div class="row-content">'+riga+'</div>'+
-      '<div class="row-actions"><button class="role" data-renew="'+x.v.id+'">Riproponi</button></div>'+
-    '</div>';
+    return riga;
   }
 
   /* Quali anni sono aperti. L'anno in corso nasce aperto, gli altri chiusi;
@@ -5067,8 +4986,6 @@
       });
       return;
     }
-    var ripr = e.target.closest("[data-renew]");
-    if(ripr){ renewFromGig(ripr.getAttribute("data-renew"), ripr); return; }
     var yes = e.target.closest("[data-played]");
     var no = yes ? null : e.target.closest("[data-cancelled]");
     if(yes || no){
