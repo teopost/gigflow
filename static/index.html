@@ -2051,10 +2051,18 @@
           <div class="picker-value"><span id="fCityValue" style="color:var(--text-tertiary);">Scegli una città</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
-        <div class="field-row"><label for="fLat">Latitudine</label><input id="fLat" type="text" inputmode="decimal" placeholder="43.9891"></div>
-        <div class="field-row"><label for="fLng">Longitudine</label><input id="fLng" type="text" inputmode="decimal" placeholder="12.6544"></div>
+        <div class="field-row"><label>Posizione</label>
+          <div class="picker-value"><span id="posizioneValue" style="color:var(--text-tertiary);">non trovata</span></div>
+        </div>
+        <!-- Le coordinate restano, ma non si scrivono a mano: sono il
+             risultato della geocodifica, non un dato da battere a tastiera.
+             Restano qui dentro perche' la scheda le rimanda al server come
+             tutto il resto — toglierle dal modulo vorrebbe dire cancellarle
+             al primo salvataggio. -->
+        <input id="fLat" type="hidden">
+        <input id="fLng" type="hidden">
       </div>
-      <div class="section-footer">Servono per mettere in futuro tutti i palcoscenici su una mappa. Tienile premute su Google Maps per copiarle.</div>
+      <div class="section-footer">La posizione sulla mappa si ricava dall’indirizzo e dalla città: non c’è niente da scrivere. Chi ce l’ha compare sulla mappa e ha il pulsante Mappa qui sopra.</div>
 
       <div class="section-header">INFO PALCOSCENICO</div>
       <div class="grouped-list">
@@ -5996,6 +6004,17 @@
       });
   });
 
+  /* Dove sta, detto a parole: le due cifre non le legge nessuno, e il
+     perche' si e' li' o non si e' da nessuna parte e' l'unica cosa che
+     interessa a chi guarda la scheda. */
+  function renderPosizioneRow(v){
+    var el = document.getElementById("posizioneValue");
+    if(!el) return;
+    var c = v && v.lat != null && v.lat !== "" && v.lng != null && v.lng !== "";
+    el.textContent = c ? "sulla mappa" : "non trovata";
+    el.style.color = c ? "" : "var(--text-tertiary)";
+  }
+
   function renderQuickActions(v){
     var actions = [];
     // Chiama ripiega sul fisso quando il cellulare manca: un posto che ha
@@ -6874,6 +6893,7 @@
     fAddress.value = v.address || "";
     fLat.value = v.lat != null ? v.lat : "";
     fLng.value = v.lng != null ? v.lng : "";
+    renderPosizioneRow(v);
     fCapacity.value = v.capacity || "";
     renderGenreRow(v);
     fContactName.value = v.contact_name || "";
