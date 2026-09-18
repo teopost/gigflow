@@ -169,11 +169,14 @@ def import_venues_sheet(conn, rows, existing_names, source_label):
         band_list = row_get(idx, row, "Band che ci hanno suonato")
         nota = row_get(idx, row, "Nota")
 
-        website = None if fb in ("", "-") else fb
+        # La colonna del foglio e' "Pagina Facebook": va nel campo Facebook,
+        # che dal 17 settembre 2026 e' separato dal sito e dal 18 e' un
+        # campo suo, accanto a quello di Instagram.
+        facebook = None if fb in ("", "-") else fb
         data = {
             "name": name,
             "city": citta or None,
-            "website": website,
+            "facebook": facebook,
             "type": build_venue_type(tipo_raw, name),
             "status": "lead",
         }

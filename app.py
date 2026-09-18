@@ -222,7 +222,15 @@ LOCATION_FIELDS = [
     # numeri fossero distinti, ed e' quello su cui vivono Chiama e WhatsApp.
     # Rinominare la colonna avrebbe voluto dire spostare i numeri gia'
     # inseriti, quindi il fisso arriva accanto come "landline".
-    "contact_name", "landline", "phone", "email", "website", "capacity", "genre",
+    # "website" e' il sito vero del locale, "facebook" e "instagram" le due
+    # pagine: stavano tutti in un campo solo, e chi cercava il sito doveva
+    # leggere il link per sapere cosa aveva davanti (17 settembre 2026).
+    # Facebook e Instagram sono diventati due campi il 18 settembre: erano
+    # uno, "social", e un locale che ha entrambi doveva scegliere quale
+    # perdere. Le foto di copertina si prendono da questi due, Facebook
+    # prima perche' la sua immagine e' grande.
+    "contact_name", "landline", "phone", "email", "website", "facebook", "instagram",
+    "capacity", "genre",
     "art_director_id", "status", "recontact_period", "planning_note",
     "owner_email",
     # "favorite" non c'e' piu': la stella non e' un campo del palcoscenico,
@@ -405,6 +413,32 @@ CLOSING_STATUSES = {"suonato", "annullato", REJECTED_STATUS}
 
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+# --- i compiti ---------------------------------------------------------
+# Una cosa da fare su un palcoscenico, con dentro le quattro cose che
+# servono a farla: cosa, entro quando, a che punto sta e chi la fa.
+#
+# Gli stati sono tre, e sono tre modi in cui un compito finisce di essere
+# roba di oggi: "Da fare" e' aperto, "Fatto" l'hai fatto, "Declinato" hai
+# deciso di non farlo (17 settembre 2026). Declinato non e' Fatto e non e'
+# una cancellazione: la riga resta, e dice che quella cosa e' stata
+# guardata e lasciata andare — che e' un'informazione, mentre una riga
+# sparita non dice niente. Una scala di mezzo (in corso, sospeso) invece no:
+# sposterebbe solo il momento in cui uno si racconta una storia.
+TASK_FIELDS = ["description", "due_date", "status", "assignee_email"]
+TASK_TODO = "da_fare"
+TASK_STATUS_VALUES = {TASK_TODO, "declinato", "fatto"}
+# Prima i compiti da fare e, dentro quelli, i piu' vicini a scadere: e'
+# l'ordine in cui li guarderesti. Quelli senza scadenza vengono dopo quelli
+# che ce l'hanno — non hanno una data che li reclami — e quelli chiusi,
+# fatti o declinati, scendono in fondo: li' uno ci va solo per ricordarsi
+# che sono chiusi.
+# Le colonne sono scritte col nome della tabella davanti perche' questo
+# pezzo di SQL finisce anche in una query che unisce tasks e locations, e
+# "status" da solo li' dentro e' ambiguo — ce l'hanno tutte e due. Per lo
+# stesso motivo in quelle query la tabella non si abbrevia.
+TASK_ORDER = ("ORDER BY (tasks.status <> '" + TASK_TODO + "') ASC, "
+              "(tasks.due_date IS NULL) ASC, tasks.due_date ASC, tasks.id ASC")
+
 # Il promemoria di ricontatto non e' una data: e' un periodo dell'anno. Un
 # locale si richiama piu' o meno quando lo si richiamava l'anno prima —
 # "PalaRubicone a ottobre" — e l'anno di quella frase non lo sa nessuno,
@@ -501,6 +535,8 @@ def init_db():
             phone TEXT,
             email TEXT,
             website TEXT,
+            facebook TEXT,
+            instagram TEXT,
             capacity INTEGER,
             genre TEXT,
             art_director_id INTEGER REFERENCES art_directors(id) ON DELETE SET NULL,
@@ -517,8 +553,8 @@ def init_db():
             text TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
-        -- kind, gig_id e direction arrivano da migrate_schema: la tabella e'
-        -- nata prima di loro e si aggiunge una colonna per volta.
+        -- kind, gig_id, direction e created_by arrivano da migrate_schema: la
+        -- tabella e' nata prima di loro e si aggiunge una colonna per volta.
 
         -- La stella e' di chi la mette: il posto e' della band, ma che ti
         -- interessi o no lo decidi tu, e l'email sta dentro la chiave — cosi'
@@ -709,6 +745,24 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
+        -- I compiti di un palcoscenico: "mandare il preventivo", "richiamare
+        -- il gestore lunedi'". Sono attaccati al posto come le serate, e
+        -- come quelle ce ne possono essere piu' d'uno per volta; a
+        -- differenza delle serate non si chiudono a vicenda — dieci cose da
+        -- fare sullo stesso locale sono dieci righe, tutte vive insieme.
+        -- assignee_email e' l'email di un membro della band, la stessa
+        -- chiave con cui si scrive chi possiede un palcoscenico.
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            description TEXT NOT NULL,
+            due_date TEXT,
+            status TEXT NOT NULL DEFAULT 'da_fare',
+            assignee_email TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         -- La cassa della band. Dentro ci sono solo i movimenti scritti a
         -- mano: i compensi delle serate NON stanno qui. Quelli vivono su
         -- gigs.fee e la cassa li mostra leggendoli da li' (li compone
@@ -806,6 +860,64 @@ def migrate_schema(conn):
         # c'era gia' (vedi LOCATION_FIELDS).
         conn.execute("ALTER TABLE locations ADD COLUMN landline TEXT")
 
+    # Il sito e il social stavano in una casella sola, e in mezza rubrica
+    # quella casella e' una pagina Facebook: chi cercava il sito del locale
+    # trovava un link da leggere per capire cosa fosse. Adesso sono due
+    # campi, e i link che c'erano si dividono da soli — facebook e instagram
+    # passano al nuovo, tutto il resto resta dov'e'. Il travaso gira una
+    # volta sola, quando la colonna nasce: dopo, chi sposta un link a mano
+    # non se lo ritrova rispostato al riavvio dopo.
+    if "social" not in cols and "instagram" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN social TEXT")
+        conn.execute(
+            "UPDATE locations SET social = website, website = NULL "
+            "WHERE website IS NOT NULL AND ("
+            "  LOWER(website) LIKE '%facebook%' OR LOWER(website) LIKE '%instagram%')"
+        )
+        cols.add("social")
+
+    # ...e il giorno dopo "social" si e' diviso in due: Facebook e Instagram
+    # sono due posti diversi, un locale puo' avere tutti e due e con una
+    # casella sola metterne uno voleva dire cancellare l'altro (18 settembre
+    # 2026).
+    #
+    # La casella che c'era diventa Instagram (e' il nome che le ha dato
+    # Stefano) e accanto nasce Facebook; poi i link si rimettono al loro
+    # posto guardando come sono scritti — ed e' la parte che conta, perche'
+    # dentro "social" di pagine Facebook ce n'erano 264 e di profili
+    # Instagram 31: lasciarle dove stavano avrebbe voluto dire un archivio
+    # che chiama Instagram quasi solo Facebook.
+    if "facebook" not in cols:
+        if "social" in cols:
+            conn.execute("ALTER TABLE locations RENAME COLUMN social TO instagram")
+        elif "instagram" not in cols:
+            conn.execute("ALTER TABLE locations ADD COLUMN instagram TEXT")
+        conn.execute("ALTER TABLE locations ADD COLUMN facebook TEXT")
+        # Facebook riconosce anche fb.com e fb.me, le forme corte che girano
+        # nei messaggi. Instagram resta dov'e': quello che non e' Facebook e
+        # stava nel campo del social e' roba di Instagram, ed e' cosi' che
+        # c'e' finita.
+        conn.execute(
+            "UPDATE locations SET facebook = instagram, instagram = NULL "
+            "WHERE instagram IS NOT NULL AND ("
+            "  LOWER(instagram) LIKE '%facebook.com%' OR LOWER(instagram) LIKE '%fb.com%'"
+            "  OR LOWER(instagram) LIKE '%fb.me%')"
+        )
+        # Nel sito, intanto, qualche pagina Facebook si era rimessa: il
+        # travaso di ieri gira una volta sola, e chi ha inserito un locale
+        # dopo l'ha scritta li'.
+        conn.execute(
+            "UPDATE locations SET facebook = website, website = NULL "
+            "WHERE (facebook IS NULL OR facebook = '') AND website IS NOT NULL AND ("
+            "  LOWER(website) LIKE '%facebook.com%' OR LOWER(website) LIKE '%fb.com%'"
+            "  OR LOWER(website) LIKE '%fb.me%')"
+        )
+        conn.execute(
+            "UPDATE locations SET instagram = website, website = NULL "
+            "WHERE (instagram IS NULL OR instagram = '') AND website IS NOT NULL "
+            "  AND LOWER(website) LIKE '%instagram%'"
+        )
+
     # I tag sono nati di ciascuno (una riga per persona, l'email nella
     # chiave) e sono diventati della band nel giro di un pomeriggio: quello
     # che dicono — "anni80-90", "estivi" — e' una cosa vera del locale, non
@@ -885,6 +997,11 @@ def migrate_schema(conn):
         # Senza REFERENCES: la nota resta appesa al palcoscenico anche se la
         # serata viene cancellata, il legame col ciclo e' un in piu'.
         conn.execute("ALTER TABLE notes ADD COLUMN gig_id INTEGER")
+    if "created_by" not in note_cols:
+        # Chi l'ha segnata. Le righe di prima restano senza: in una band in
+        # cui scrivono in tre, "non si sa" e' la verita' — e inventare il
+        # nome di chi sta guardando sarebbe peggio di lasciarlo vuoto.
+        conn.execute("ALTER TABLE notes ADD COLUMN created_by TEXT")
     if "direction" not in note_cols:
         conn.execute("ALTER TABLE notes ADD COLUMN direction TEXT")
         # Tutto quello che c'e' gia' l'abbiamo fatto noi: le etichette di
@@ -2749,6 +2866,119 @@ def delete_gig(conn, ws, gig_id):
     return fetch_location(conn, ws, loc_id)
 
 
+# ----------------------------------------------------------------- compiti --
+# Gli stessi quattro verbi delle serate, e per la stessa ragione: un compito
+# e' una riga attaccata al palcoscenico, si crea, si cambia e si butta, e
+# ogni scrittura restituisce il palcoscenico intero — cosi' la scheda aperta
+# si ritrova aggiornata senza dover chiedere due volte.
+#
+# Quello che i compiti NON fanno, al contrario delle serate: non si chiudono
+# a vicenda (di aperti ce ne stanno quanti ne vuoi) e non toccano lo stato
+# del palcoscenico. Mandare un preventivo non cambia il rapporto con il
+# locale: quello lo dice la serata.
+
+
+def task_to_dict(row):
+    d = dict(row)
+    # "open" e' la domanda che fanno tutti gli elenchi — c'e' ancora da fare
+    # qualcosa? — e da quando gli stati sono tre non e' piu' il contrario di
+    # "done": un compito declinato non e' fatto, ma non e' nemmeno aperto.
+    d["open"] = d.get("status") == TASK_TODO
+    d["done"] = d.get("status") == "fatto"
+    return d
+
+
+def clean_task_payload(body, partial):
+    data = {}
+    for field in TASK_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if field == "status":
+            if value and value not in TASK_STATUS_VALUES:
+                raise ApiError(400, "Stato del compito non valido")
+            value = value or TASK_TODO
+        elif field == "due_date":
+            value = (value or "").strip() or None
+            if value and not GIG_DATE_RE.match(value):
+                raise ApiError(400, "Scadenza non valida")
+        elif field == "assignee_email":
+            # Vuoto vuol dire "nessuno l'ha ancora preso in carico": si
+            # scrive NULL, com'e' nato, e non "" — due vuoti diversi sulla
+            # stessa colonna si pagano a ogni query.
+            value = (value or "").strip().lower() or None
+        elif isinstance(value, str):
+            value = value.strip()
+        data[field] = value
+    if not partial:
+        data.setdefault("status", TASK_TODO)
+    # Un compito senza descrizione e' una riga che non dice niente: vale
+    # sia per chi lo crea sia per chi prova a svuotarla dopo.
+    if ("description" in data or not partial) and not data.get("description"):
+        raise ApiError(400, "Scrivi cosa c’è da fare")
+    return data
+
+
+def require_band_member(conn, ws, email):
+    """Chi deve fare il compito e' uno della band, non un indirizzo scritto a
+    mano: l'elenco da cui si sceglie e' lo stesso di list_owners, e un'email
+    fuori da quella lista sarebbe un nome che nessuno ritrova piu'."""
+    if not email:
+        return
+    row = conn.execute(
+        "SELECT 1 FROM workspace_members WHERE workspace_id = ? AND LOWER(email) = ?",
+        (ws, email),
+    ).fetchone()
+    if not row:
+        raise ApiError(400, "Questa persona non fa parte della band")
+
+
+def create_task(conn, ws, loc_id, body):
+    require_location(conn, ws, loc_id)
+    data = clean_task_payload(body or {}, partial=False)
+    require_band_member(conn, ws, data.get("assignee_email"))
+    ts = now_iso()
+    fields = ["location_id"] + list(data.keys()) + ["created_at", "updated_at"]
+    values = [loc_id] + list(data.values()) + [ts, ts]
+    placeholders = ",".join("?" for _ in fields)
+    conn.execute(f"INSERT INTO tasks ({','.join(fields)}) VALUES ({placeholders})", values)
+    conn.commit()
+    return fetch_location(conn, ws, loc_id)
+
+
+def task_location_id(conn, ws, task_id):
+    row = conn.execute(
+        "SELECT t.location_id FROM tasks t JOIN locations l ON l.id = t.location_id "
+        "WHERE t.id = ? AND l.workspace_id = ?",
+        (task_id, ws),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Compito non trovato")
+    return row["location_id"]
+
+
+def update_task(conn, ws, task_id, body):
+    loc_id = task_location_id(conn, ws, task_id)
+    data = clean_task_payload(body or {}, partial=True)
+    if "assignee_email" in data:
+        require_band_member(conn, ws, data["assignee_email"])
+    if data:
+        data["updated_at"] = now_iso()
+        set_clause = ",".join(f"{k} = ?" for k in data.keys())
+        conn.execute(
+            f"UPDATE tasks SET {set_clause} WHERE id = ?", list(data.values()) + [task_id]
+        )
+        conn.commit()
+    return fetch_location(conn, ws, loc_id)
+
+
+def delete_task(conn, ws, task_id):
+    loc_id = task_location_id(conn, ws, task_id)
+    conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    return fetch_location(conn, ws, loc_id)
+
+
 # ------------------------------------------------------------------ cassa --
 # La cassa e' un elenco solo, e dentro ci sono due razze di righe.
 #
@@ -3000,7 +3230,8 @@ def delete_cost_category(conn, ws, value_id):
 
 
 def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None,
-                     gigs_by_location=None, tags_by_location=None):
+                     gigs_by_location=None, tags_by_location=None,
+                     tasks_by_location=None):
     d = dict(row)
     ad = ad_by_id.get(d.get("art_director_id"))
     d["art_director_name"] = ad["name"] if ad else None
@@ -3010,6 +3241,9 @@ def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None,
     d["tags"] = (tags_by_location or {}).get(d["id"], [])
     gigs = (gigs_by_location or {}).get(d["id"], [])
     d["gigs"] = gigs
+    # I compiti come le serate: arrivano dentro il palcoscenico, cosi' la
+    # scheda non deve chiedere niente a parte.
+    d["tasks"] = (tasks_by_location or {}).get(d["id"], [])
     # Quante volte ci hai suonato e in quali stagioni: e' il dato che dice se
     # vale la pena richiamare questo posto, e viene gratis dalle righe.
     played = [g for g in gigs if g["status"] == "suonato"]
@@ -3074,11 +3308,19 @@ def fetch_locations(conn, ws, status=None, search=None, include_deleted=False):
     for g in gig_rows:
         gigs_by_location.setdefault(g["location_id"], []).append(gig_to_dict(g))
 
+    task_rows = conn.execute(
+        "SELECT tasks.* FROM tasks JOIN locations l ON l.id = tasks.location_id "
+        "WHERE l.workspace_id = ? " + TASK_ORDER, (ws,)
+    ).fetchall()
+    tasks_by_location = {}
+    for t in task_rows:
+        tasks_by_location.setdefault(t["location_id"], []).append(task_to_dict(t))
+
     tags_by_location = tags_per_location(conn, ws=ws)
 
     return [
         location_to_dict(r, notes_by_location, ad_by_id, photos_by_location,
-                         gigs_by_location, tags_by_location)
+                         gigs_by_location, tags_by_location, tasks_by_location)
         for r in rows
     ]
 
@@ -3103,9 +3345,13 @@ def fetch_location(conn, ws, loc_id):
         "SELECT * FROM gigs WHERE location_id = ? " + GIG_ORDER, (loc_id,)
     ).fetchall()
     gigs_by_location = {loc_id: [gig_to_dict(g) for g in gig_rows]}
+    task_rows = conn.execute(
+        "SELECT * FROM tasks WHERE location_id = ? " + TASK_ORDER, (loc_id,)
+    ).fetchall()
+    tasks_by_location = {loc_id: [task_to_dict(t) for t in task_rows]}
     return location_to_dict(
         row, notes_by_location, ad_by_id, photos_by_location, gigs_by_location,
-        tags_per_location(conn, loc_id=loc_id)
+        tags_per_location(conn, loc_id=loc_id), tasks_by_location
     )
 
 
@@ -3255,7 +3501,7 @@ def purge_location(conn, ws, loc_id):
             pass
 
 
-def add_note(conn, ws, loc_id, body):
+def add_note(conn, ws, loc_id, body, email=None):
     kind = (body.get("kind") or "nota").strip() or "nota"
     if kind not in NOTE_KINDS:
         raise ApiError(400, "Tipo di attività non valido")
@@ -3297,10 +3543,13 @@ def add_note(conn, ws, loc_id, body):
     # dell'anno scorso.
     gig = current_gig_row(conn, loc_id)
     aperta = gig if (gig is not None and gig["closed_at"] is None) else None
+    # Chi l'ha segnata: in una band in cui scrivono in tre, "chiamato" senza
+    # un nome accanto non dice a chi chiedere com'e' andata. Si prende dalla
+    # sessione e non dal corpo della richiesta: e' un fatto, non un campo.
     nota_id = conn.execute(
-        "INSERT INTO notes (location_id, gig_id, kind, direction, text, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (loc_id, aperta["id"] if aperta else None, kind, direction, text, quando),
+        "INSERT INTO notes (location_id, gig_id, kind, direction, text, created_by, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (loc_id, aperta["id"] if aperta else None, kind, direction, text, email, quando),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
     # Aver contattato il posto e' esattamente cosa distingue "opportunita'"
@@ -3664,6 +3913,7 @@ CITY_PROVINCE_RE = re.compile(r"^(.*?)\s*\(([A-Za-z]{2,3})\)\s*$")
 _geo_lock = threading.Lock()
 _geo_ultima = [0.0]
 _geo_comuni = [None]
+_geo_sanmarino = [None]
 
 
 def geo_normalize_city(city):
@@ -3694,6 +3944,38 @@ def geo_comuni_index():
     return _geo_comuni[0]
 
 
+def geo_sanmarino_nomi():
+    """I castelli di San Marino (e le curazie che hanno un nome proprio,
+    come Dogana e Falciano), letti da province.json.
+
+    Sono li' e non qui perche' la scheda usa lo stesso elenco per capire
+    provincia e regione: un secondo elenco scritto in questo file avrebbe
+    voluto dire aggiungere Falciano in due posti, e prima o poi in uno
+    solo."""
+    if _geo_sanmarino[0] is None:
+        nomi = set()
+        try:
+            with open(os.path.join(STATIC_DIR, "province.json"), encoding="utf-8") as f:
+                for n in json.load(f).get("sanmarino") or []:
+                    chiave = " ".join(_parole_semplici(n))
+                    if chiave:
+                        nomi.add(chiave)
+        except Exception:
+            pass
+        _geo_sanmarino[0] = nomi
+    return _geo_sanmarino[0]
+
+
+def geo_e_sanmarino(citta, provincia=None):
+    """Vero quando la citta' sta a San Marino: perche' lo dice la sigla —
+    "Falciano (SM)", come la scrive l'elenco delle citta' — o perche' il
+    nome e' quello di un castello, che e' come ci sono arrivate le citta'
+    importate dall'Excel ("Domagnano", "Dogana")."""
+    if (provincia or "").strip().upper() in ("SM", "RSM"):
+        return True
+    return " ".join(_parole_semplici(citta)) in geo_sanmarino_nomi()
+
+
 def geo_comune(citta):
     """Da "Bellaria" a ("Bellaria-Igea Marina", "RN"), quando l'elenco dei
     comuni non lascia dubbi.
@@ -3702,6 +3984,11 @@ def geo_comune(citta):
     Spina", un castello di San Marino) o se e' l'inizio di piu' comuni
     ("Misano" sono due, una in Romagna e una in Bergamasca): tirare a
     indovinare fra due province lontane e' come sbagliarle entrambe."""
+    # San Marino prima di tutto: mezzo castello ha un omonimo in Italia, e
+    # senza questa riga "Falciano" diventava "Falciano del Massico", in
+    # provincia di Caserta.
+    if geo_e_sanmarino(citta):
+        return None
     chiave = " ".join(_parole_semplici(citta))
     if not chiave:
         return None
@@ -3726,6 +4013,11 @@ def geo_citta_incerta(city):
     citta, provincia = geo_normalize_city(city)
     if not citta or provincia:
         return False
+    # "Serravalle" da solo sarebbe incerto fra sei comuni italiani, ma e'
+    # anche un castello di San Marino, e li' vince San Marino: e' quello che
+    # fa anche la scheda quando ne cerca provincia e regione.
+    if geo_e_sanmarino(citta):
+        return False
     chiave = " ".join(_parole_semplici(citta))
     if not chiave:
         return False
@@ -3744,17 +4036,24 @@ def geo_candidates(name, address, city):
 
     "Italia" in coda si scrive solo quando la citta' e' davvero un comune
     italiano: senza quella parola i locali di San Marino non si trovavano,
-    con quella parola le frazioni si trovano lo stesso."""
+    con quella parola le frazioni si trovano lo stesso. Le citta' di San
+    Marino hanno la loro coda, "San Marino": sono la meta' degli omonimi
+    italiani — "Falciano" da solo e' prima in provincia di Arezzo, e
+    "Falciano, SM, Italia" non e' nessun posto."""
     citta, provincia = geo_normalize_city(city)
     nomi = [citta] if citta else []
-    if citta and not provincia:
+    sanmarino = bool(citta) and geo_e_sanmarino(citta, provincia)
+    if citta and not provincia and not sanmarino:
         comune = geo_comune(citta)
         if comune:
             citta, provincia = comune[0], comune[1]
             nomi.append(citta)
-    dove = f"{citta}, {provincia}" if provincia else citta
-    if dove and provincia:
-        dove = f"{dove}, Italia"
+    if sanmarino:
+        dove = f"{citta}, San Marino"
+    else:
+        dove = f"{citta}, {provincia}" if provincia else citta
+        if dove and provincia:
+            dove = f"{dove}, Italia"
     name = (name or "").strip()
     address = (address or "").strip()
 
@@ -4316,33 +4615,35 @@ def _facebook_pic_url(page_id):
 
 
 def social_cover(conn, ws, loc_id, body=None):
-    """Prende l'immagine del profilo dal social che sta nel campo Sito e la
-    mette come copertina del palcoscenico. Resta una foto come le altre: si
+    """Prende l'immagine del profilo da Facebook o da Instagram e la mette
+    come copertina del palcoscenico. Resta una foto come le altre: si
     cancella dalla striscia, e la copertina si puo' rimettere su un'altra con
     la stella.
 
-    Il link e' uno solo e decide lui dove andare a prendere la foto: se
-    dentro c'e' facebook.com si passa dal Graph, se c'e' instagram.com dai
-    meta tag della pagina pubblica. Un campo solo, un pulsante solo, e chi lo
-    usa non deve sapere che sotto ci sono due strade diverse.
+    Il link decide lui dove andare a prendere la foto: se dentro c'e'
+    facebook.com si passa dal Graph, se c'e' instagram.com dai meta tag della
+    pagina pubblica. Un pulsante solo, e chi lo usa non deve sapere che sotto
+    ci sono due strade diverse.
 
     Il link arriva dalla scheda aperta, non dal database: la scheda e' una
     bozza finche' non si salva, e chiedere questa immagine per un indirizzo
     diverso da quello che hai davanti sarebbe difficile da spiegare. Se non
-    arriva niente si ripiega su quello salvato."""
+    arriva niente si ripiega su quello salvato — e li' Facebook viene prima,
+    perche' la sua immagine e' grande (720 pixel contro 150)."""
     row = conn.execute(
-        "SELECT website FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
+        "SELECT facebook, instagram FROM locations WHERE id = ? AND workspace_id = ?",
+        (loc_id, ws),
     ).fetchone()
     if not row:
         raise ApiError(404, "Palcoscenico non trovato")
 
-    url = (body or {}).get("url") or row["website"]
+    url = (body or {}).get("url") or row["facebook"] or row["instagram"]
     page_id = facebook_page_id(url)
     ig_user = None if page_id else instagram_username(url)
     if not page_id and not ig_user:
         raise ApiError(
             400,
-            "Nel campo Sito non c'e' una pagina Facebook o un profilo Instagram",
+            "Questo link non e' una pagina Facebook ne' un profilo Instagram",
             "non_social",
         )
 
@@ -5201,11 +5502,12 @@ def export_zip(conn):
     fogli.append(("palcoscenici.csv", _csv_bytes(
         ["id", "band", "nome", "tipo", "categoria", "contesto", "stagionalita", "periodo",
          "citta", "indirizzo", "lat", "lng", "capienza", "genere", "titolare", "telefono",
-         "cellulare", "email", "sito", "art_director", "stato", "periodo_ricontatto",
+         "cellulare", "email", "sito", "facebook", "instagram", "art_director", "stato", "periodo_ricontatto",
          "promemoria", "inserito_da", "archiviato_il", "creato_il", "aggiornato_il"],
         [(r["id"], r["band"], r["name"], r["type"], r["category"], r["context"], r["seasonality"],
           r["live_period"], r["city"], r["address"], r["lat"], r["lng"], r["capacity"], r["genre"],
-          r["contact_name"], r["landline"], r["phone"], r["email"], r["website"], r["ad"],
+          r["contact_name"], r["landline"], r["phone"], r["email"], r["website"],
+          r["facebook"], r["instagram"], r["ad"],
           r["status"], r["recontact_period"], r["planning_note"],
           r["owner_email"], r["deleted_at"],
           r["created_at"], r["updated_at"])
@@ -5247,6 +5549,17 @@ def export_zip(conn):
             "LEFT JOIN workspaces w ON w.id = l.workspace_id "
             "ORDER BY g.gig_date DESC, g.id DESC")])))
 
+    fogli.append(("compiti.csv", _csv_bytes(
+        ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "descrizione",
+         "scadenza", "stato", "assegnato_a", "creato_il", "aggiornato_il"],
+        [(t["id"], t["band"], t["location_id"], t["palco"], t["city"], t["description"],
+          t["due_date"], t["status"], t["assignee_email"], t["created_at"], t["updated_at"])
+         for t in _query(conn,
+            "SELECT t.*, l.name AS palco, l.city, w.name AS band FROM tasks t "
+            "LEFT JOIN locations l ON l.id = t.location_id "
+            "LEFT JOIN workspaces w ON w.id = l.workspace_id "
+            "ORDER BY t.due_date IS NULL, t.due_date ASC, t.id ASC")])))
+
     # In cassa.csv ci sono i movimenti scritti a mano, e basta: i compensi
     # delle serate non sono righe di questa tabella, stanno nella colonna
     # "compenso" di serate.csv. Ripeterli qui vorrebbe dire consegnare lo
@@ -5265,9 +5578,10 @@ def export_zip(conn):
             "ORDER BY w.name, c.entry_date DESC, c.id DESC")])))
 
     fogli.append(("note.csv", _csv_bytes(
-        ["id", "band", "palcoscenico_id", "palcoscenico", "tipo", "testo", "serata_id", "creata_il"],
+        ["id", "band", "palcoscenico_id", "palcoscenico", "tipo", "testo", "serata_id",
+         "segnata_da", "creata_il"],
         [(n["id"], n["band"], n["location_id"], n["palco"], n["kind"], n["text"],
-          n["gig_id"], n["created_at"])
+          n["gig_id"], n["created_by"], n["created_at"])
          for n in _query(conn,
             "SELECT n.*, l.name AS palco, w.name AS band FROM notes n "
             "LEFT JOIN locations l ON l.id = n.location_id "
@@ -5405,7 +5719,7 @@ def _h_restore_location(conn, match, query, body, ctx):
 
 
 def _h_add_note(conn, match, query, body, ctx):
-    return 201, add_note(conn, require_ws(ctx), int(match.group(1)), body)
+    return 201, add_note(conn, require_ws(ctx), int(match.group(1)), body, ctx.email)
 
 
 def _h_geocode_location(conn, match, query, body, ctx):
@@ -5453,6 +5767,18 @@ def _h_update_gig(conn, match, query, body, ctx):
 
 def _h_delete_gig(conn, match, query, body, ctx):
     return 200, delete_gig(conn, require_ws(ctx), int(match.group(1)))
+
+
+def _h_create_task(conn, match, query, body, ctx):
+    return 201, create_task(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_update_task(conn, match, query, body, ctx):
+    return 200, update_task(conn, require_ws(ctx), int(match.group(1)), body)
+
+
+def _h_delete_task(conn, match, query, body, ctx):
+    return 200, delete_task(conn, require_ws(ctx), int(match.group(1)))
 
 
 def _h_add_photo(conn, match, query, body, ctx):
@@ -5761,6 +6087,9 @@ ROUTES = [
     ("POST", re.compile(r"^/api/locations/(\d+)/gigs$"), _h_create_gig),
     ("PUT", re.compile(r"^/api/gigs/(\d+)$"), _h_update_gig),
     ("DELETE", re.compile(r"^/api/gigs/(\d+)$"), _h_delete_gig),
+    ("POST", re.compile(r"^/api/locations/(\d+)/tasks$"), _h_create_task),
+    ("PUT", re.compile(r"^/api/tasks/(\d+)$"), _h_update_task),
+    ("DELETE", re.compile(r"^/api/tasks/(\d+)$"), _h_delete_task),
     ("GET", re.compile(r"^/api/cash$"), _h_list_cash),
     ("POST", re.compile(r"^/api/cash$"), _h_create_cash),
     ("GET", re.compile(r"^/api/cash/categories$"), _h_list_cost_categories),
