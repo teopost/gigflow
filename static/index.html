@@ -11806,6 +11806,57 @@
     }
     frasi.push("Il permesso vale per un dispositivo alla volta: telefono e tablet si accendono ognuno per conto suo. La prova arriva a te, su quelli accesi.");
     elPushFoot.textContent = frasi.join(" ");
+    pushDiagnostica();
+  }
+
+  /* Quale service worker sta rispondendo su questo dispositivo, davvero.
+     E' la prima cosa da guardare quando una notifica arriva muta: il
+     gestore delle push vive dentro sw.js, e finche' e' attiva una versione
+     che non ce l'ha il telefono suona e il browser mostra un avviso
+     generico al posto del nostro testo. L'app installata non si aggiorna da
+     sola: la versione nuova resta in attesa finche' non si tocca
+     "Aggiorna". */
+  function pushDiagnostica(){
+    if(!window.gigflowUpdate || !window.gigflowUpdate.versioneInUso) return;
+    Promise.all([
+      window.gigflowUpdate.versioneInUso(),
+      api("GET", "/api/version").catch(function(){ return null; })
+    ]).then(function(esiti){
+      var attivo = esiti[0], sulServer = esiti[1] && esiti[1].version;
+      if(!attivo) return;
+      if(sulServer && attivo !== sulServer){
+        elPushFoot.textContent += " \u26a0\ufe0f Su questo dispositivo \u00e8 attiva la versione " + attivo +
+          ", sul server c\u2019\u00e8 la " + sulServer +
+          ": finch\u00e9 non tocchi \u00abAggiorna\u00bb la notifica arriva senza testo.";
+      } else {
+        elPushFoot.textContent += " Versione attiva su questo dispositivo: " + attivo + ".";
+      }
+      return pushUltimaRicevuta();
+    }).catch(function(){});
+  }
+
+  /* Cosa dice il service worker di aver ricevuto. E' la riga che separa i
+     due guai che da fuori si assomigliano: se qui c'e' un'ora, la push e'
+     arrivata fin dentro l'app e il problema e' Android che non l'ha
+     mostrata; se non c'e' niente, non e' mai arrivata e il problema sta
+     prima — permesso, iscrizione, o il telefono che tiene l'app ferma. */
+  function pushUltimaRicevuta(){
+    if(!("caches" in window)) return;
+    return caches.open("gigflow-push-log").then(function(cache){
+      return cache.match("/ultima-push");
+    }).then(function(risposta){
+      if(!risposta){
+        elPushFoot.textContent += " Il service worker non ha ancora ricevuto nessuna push su questo dispositivo.";
+        return;
+      }
+      return risposta.json().then(function(voce){
+        var quando = new Date(voce.quando);
+        var ora = isNaN(quando) ? voce.quando : quando.toLocaleString("it-IT");
+        elPushFoot.textContent += " Ultima push ricevuta dal service worker: " + ora +
+          (voce.titolo ? " (\u00ab" + voce.titolo + " \u2014 " + (voce.testo || "") + "\u00bb)" : "") +
+          (voce.errore ? " \u2014 ma mostrarla \u00e8 fallito: " + voce.errore : "") + ".";
+      });
+    }).catch(function(){});
   }
 
   function pushRefresh(){

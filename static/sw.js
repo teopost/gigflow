@@ -22,6 +22,11 @@
 
 const BUILD = "__BUILD__";
 const CACHE_NAME = "palcoscenici-shell-" + BUILD;
+// Il registro delle push arrivate (vedi annotaPush): non è la shell di una
+// versione, è una traccia di quello che è successo su questo telefono, e
+// deve sopravvivere agli aggiornamenti — altrimenti sparirebbe proprio nel
+// momento in cui uno aggiorna per andare a vedere cosa non ha funzionato.
+const PUSH_LOG_CACHE = "gigflow-push-log";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json?v=2",
@@ -38,7 +43,13 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== CACHE_NAME && k !== PUSH_LOG_CACHE)
+            .map((k) => caches.delete(k))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
@@ -67,19 +78,55 @@ self.addEventListener("push", (event) => {
     dati = { body: event.data ? event.data.text() : "" };
   }
   const titolo = dati.title || "GigFlow";
+  // Un corpo vuoto lascerebbe una notifica con la sola riga del titolo, che
+  // si legge come "e' arrivato qualcosa ma non si sa cosa": meglio dire
+  // almeno cosa fare.
+  const testo = dati.body || "Tocca per aprire GigFlow";
   event.waitUntil(
-    self.registration.showNotification(titolo, {
-      body: dati.body || "",
-      icon: "/icons/icon-192.png?v=2",
-      badge: "/icons/icon-192.png?v=2",
-      // Stesso tag = la notifica nuova sostituisce quella vecchia invece di
-      // impilarsi. Chi manda decide cosa può sovrascrivere cosa; senza tag
-      // esplicito tutte le notifiche di GigFlow restano una sola riga.
-      tag: dati.tag || "gigflow",
-      data: { url: dati.url || "/" },
-    })
+    self.registration
+      .showNotification(titolo, {
+        body: testo,
+        icon: "/icons/icon-192.png?v=2",
+        badge: "/icons/icon-192.png?v=2",
+        // Stesso tag = la notifica nuova sostituisce quella vecchia invece di
+        // impilarsi. Chi manda decide cosa può sovrascrivere cosa; senza tag
+        // esplicito tutte le notifiche di GigFlow restano una sola riga.
+        tag: dati.tag || "gigflow",
+        data: { url: dati.url || "/" },
+      })
+      .then(() => annotaPush(titolo, testo, null))
+      .catch((err) => annotaPush(titolo, testo, String((err && err.message) || err)))
   );
 });
+
+// Il registro dell'ultima push arrivata qui dentro. Serve a separare due
+// guai che da fuori si assomigliano: "la push non è mai arrivata al
+// telefono" e "è arrivata, ma Android non ha mostrato niente". Senza
+// questo si può solo tirare a indovinare, perché il service worker quando
+// riceve una push gira da solo, senza pagina aperta e senza console.
+//
+// Sta in una cache e non in IndexedDB perché la cache è già aperta qui e la
+// pagina la sa leggere con due righe. Una voce sola, sempre sovrascritta.
+function annotaPush(titolo, testo, errore) {
+  return caches
+    .open(PUSH_LOG_CACHE)
+    .then((cache) =>
+      cache.put(
+        "/ultima-push",
+        new Response(
+          JSON.stringify({
+            quando: new Date().toISOString(),
+            titolo: titolo,
+            testo: testo,
+            errore: errore,
+            build: BUILD,
+          }),
+          { headers: { "Content-Type": "application/json" } }
+        )
+      )
+    )
+    .catch(() => {});
+}
 
 // Al tocco: se l'app è già aperta da qualche parte si porta in primo piano
 // quella, invece di aprirne una seconda copia.
