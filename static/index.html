@@ -1181,6 +1181,12 @@
             <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
           </label>
         </div>
+        <div class="field-row picker" id="rowPushWho">
+          <label style="flex:1;">A chi</label>
+          <div class="picker-value"><span id="pushWhoValue">Solo a me</span>
+          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        </div>
+        <div class="field-row stacked"><textarea id="pushTestText" rows="2" placeholder="Notifica di prova: se la stai leggendo, funziona." style="text-align:left;"></textarea></div>
         <div class="field-row picker" id="rowPushTest"><span class="link-action">Invia una notifica di prova</span></div>
       </div>
       <div class="section-footer" id="pushFoot">Le notifiche che arrivano sul telefono anche con l’app chiusa. Il permesso si dà una volta per dispositivo, e vale solo per quello: telefono e tablet vanno accesi ognuno per conto suo. La prova arriva a te, sui dispositivi che hai acceso.</div>
@@ -11804,7 +11810,7 @@
     if(pushConfig && pushConfig.devices){
       frasi.push(pushConfig.devices === 1 ? "Un dispositivo registrato in tutto." : pushConfig.devices + " dispositivi registrati in tutto.");
     }
-    frasi.push("Il permesso vale per un dispositivo alla volta: telefono e tablet si accendono ognuno per conto suo. La prova arriva a te, su quelli accesi.");
+    frasi.push("Il permesso vale per un dispositivo alla volta: telefono e tablet si accendono ognuno per conto suo. La prova va a chi scegli in \u00abA chi\u00bb \u2014 lasciato com\u2019\u00e8, arriva solo a te \u2014 e dice quello che scrivi qui sotto.");
     elPushFoot.textContent = frasi.join(" ");
     pushDiagnostica();
   }
@@ -11860,6 +11866,7 @@
   }
 
   function pushRefresh(){
+    renderPushWho();
     if(!pushSupportato()){ elPushToggle.disabled = true; pushSpiega(false); return; }
     api("GET", "/api/push/config").then(function(cfg){
       pushConfig = cfg;
@@ -11925,9 +11932,65 @@
     });
   });
 
+  /* A chi mandare la prova. Vuoto vuol dire "a me": e' il caso di gran
+     lunga piu' frequente, e chiedere di spuntare il proprio nome ogni volta
+     sarebbe un passaggio in piu' per niente. L'elenco e' di tutta
+     l'installazione, come il resto dell'Admin: le notifiche si provano con
+     il collega che ha l'iPhone, non per forza con chi suona nella tua
+     stessa band, e quello che cambia da telefono a telefono e' esattamente
+     la cosa che non si riesce a provare da soli. */
+  var pushDestinatari = [];   // email scelte; vuoto = solo io
+  var pushPersone = [];       // chi ha almeno un dispositivo registrato
+
+  function pushNomeDi(email){
+    for(var i = 0; i < pushPersone.length; i++){
+      if(pushPersone[i].email === email) return pushPersone[i].name;
+    }
+    return email;
+  }
+
+  function renderPushWho(){
+    var el = document.getElementById("pushWhoValue");
+    if(!pushDestinatari.length){ el.textContent = "Solo a me"; return; }
+    if(pushDestinatari.length === 1){ el.textContent = pushNomeDi(pushDestinatari[0]); return; }
+    el.textContent = pushDestinatari.length + " persone";
+  }
+
+  document.getElementById("rowPushWho").addEventListener("click", function(){
+    api("GET", "/api/admin/push/people").then(function(esito){
+      pushPersone = esito.people || [];
+      if(!pushPersone.length){ toast("Nessuno ha ancora acceso le notifiche"); return; }
+      var scelti = {};
+      pushDestinatari.forEach(function(e){ scelti[e] = true; });
+      var opts = pushPersone.map(function(persona){
+        return {
+          label: persona.name + (persona.devices > 1 ? " (" + persona.devices + " dispositivi)" : ""),
+          dato: true,
+          checkmark: !!scelti[persona.email],
+          onToggle: function(on){
+            if(on) scelti[persona.email] = true; else delete scelti[persona.email];
+          }
+        };
+      });
+      openSheet({
+        title: "A chi mandare la prova",
+        multiSelect: true,
+        options: opts,
+        onDone: function(){
+          pushDestinatari = Object.keys(scelti);
+          renderPushWho();
+        }
+      });
+    }).catch(function(errore){ toast(errore.message || "Elenco non disponibile"); });
+  });
+
   document.getElementById("rowPushTest").addEventListener("click", function(){
-    api("POST", "/api/admin/push/test", {}).then(function(esito){
-      toast(esito.devices === 1 ? "Mandata a 1 dispositivo" : "Mandata a " + esito.devices + " dispositivi");
+    var testo = document.getElementById("pushTestText").value.trim();
+    api("POST", "/api/admin/push/test", {emails: pushDestinatari, text: testo}).then(function(esito){
+      var dispositivi = esito.devices === 1 ? "1 dispositivo" : esito.devices + " dispositivi";
+      toast(esito.people > 1
+        ? "Mandata a " + esito.people + " persone, " + dispositivi
+        : "Mandata a " + dispositivi);
     }).catch(function(errore){
       toast(errore.message || "Prova non riuscita");
     });

@@ -1958,15 +1958,53 @@ def push_unsubscribe(conn, email, body):
     return push_devices(conn, email)
 
 
-def notify_push_prova(conn, email):
+PUSH_TESTO_DI_PROVA = "Notifica di prova: se la stai leggendo, funziona."
+
+
+def push_people(conn):
+    """Chi, su questa installazione, ha almeno un dispositivo registrato.
+    E' l'elenco dei destinatari possibili di una prova: a chi non ha detto
+    di si' da nessuna parte non si puo' mandare niente, e farlo comparire
+    fra le scelte vorrebbe dire offrire un pulsante che non fa niente."""
+    righe = conn.execute(
+        """
+        SELECT s.email AS email,
+               p.name AS name,
+               COUNT(*) AS devices
+        FROM push_subscriptions s
+        LEFT JOIN user_profiles p ON p.email = s.email
+        GROUP BY s.email
+        ORDER BY COALESCE(NULLIF(p.name, ''), s.email) COLLATE NOCASE
+        """
+    ).fetchall()
+    return [
+        {
+            "email": r["email"],
+            "name": r["name"] or r["email"].split("@")[0],
+            "devices": r["devices"],
+        }
+        for r in righe
+    ]
+
+
+def notify_push_prova(conn, emails, testo=None):
     """La notifica che parte dal link nell'Admin. Non e' un fatto dell'app:
     serve a rispondere all'unica domanda che conta quando si monta questa
-    roba — arriva davvero sul telefono, con l'app chiusa?"""
-    return push_send(
-        conn, email, "GigFlow",
-        "Notifica di prova: se la stai leggendo, funziona.",
-        "/",
-    )
+    roba — arriva davvero sul telefono, con l'app chiusa? Per questo si puo'
+    scegliere a chi mandarla e cosa farle dire: le risposte cambiano da
+    telefono a telefono, e un iPhone di un'altra persona e' esattamente il
+    caso che qui non si riesce a provare da soli.
+
+    Restituisce l'elenco di chi l'ha ricevuta, con quanti dispositivi per
+    ciascuno: chi non ne ha nessuno resta fuori invece di contare come
+    mandata."""
+    testo = (testo or "").strip() or PUSH_TESTO_DI_PROVA
+    esiti = []
+    for email in emails:
+        quanti = push_send(conn, email, "GigFlow", testo, "/")
+        if quanti:
+            esiti.append({"email": email, "devices": quanti})
+    return esiti
 
 
 # --- workspace (le band) e inviti ---------------------------------------
@@ -6319,20 +6357,42 @@ def _h_push_unsubscribe(conn, match, query, body, ctx):
     return 200, {"devices": push_unsubscribe(conn, ctx.email, body)}
 
 
+def _h_push_people(conn, match, query, body, ctx):
+    """L'elenco fra cui scegliere i destinatari della prova. E' di tutta
+    l'installazione e non della band attiva, come il resto dell'Admin: chi
+    prova le notifiche lo fa con il collega che ha l'iPhone, non per
+    forza con chi suona nel suo stesso gruppo."""
+    require_admin(ctx)
+    return 200, {"people": push_people(conn)}
+
+
 def _h_push_test(conn, match, query, body, ctx):
-    """La prova dall'Admin: la notifica arriva a chi ha toccato il link, sui
-    suoi dispositivi. Non c'e' modo di scrivere a qualcun altro da qui —
-    provare le notifiche e' una cosa che si fa addosso a se' stessi."""
+    """La prova dall'Admin: a chi la manda e cosa dice li sceglie chi la
+    manda. Senza destinatari indicati va a chi ha toccato il link, che e' il
+    caso di gran lunga piu' frequente."""
     require_admin(ctx)
     if not push_enabled():
         raise ApiError(400, "Le notifiche push non sono configurate su questo server")
-    quanti = notify_push_prova(conn, ctx.email)
-    if not quanti:
+    emails = [
+        e.strip().lower() for e in (body.get("emails") or []) if str(e).strip()
+    ] or [ctx.email]
+    # Si scrive solo a chi un dispositivo ce l'ha davvero: l'elenco arriva
+    # dal client, e un indirizzo qualsiasi qui dentro non deve poter
+    # diventare un messaggio a qualcuno che non ha mai acceso niente.
+    conosciuti = {p["email"] for p in push_people(conn)}
+    destinatari = [e for e in emails if e in conosciuti]
+    if not destinatari:
         raise ApiError(
             400,
-            "Nessun dispositivo registrato: accendi prima le notifiche su questo telefono",
+            "Nessun dispositivo registrato per chi hai scelto: le notifiche"
+            " vanno accese sul telefono di quella persona",
         )
-    return 200, {"devices": quanti}
+    esiti = notify_push_prova(conn, destinatari, body.get("text"))
+    return 200, {
+        "sent": esiti,
+        "people": len(esiti),
+        "devices": sum(e["devices"] for e in esiti),
+    }
 
 
 SLAKER_ALLOWED = {
@@ -6418,6 +6478,7 @@ ROUTES = [
     ("GET", re.compile(r"^/api/push/config$"), _h_push_config),
     ("POST", re.compile(r"^/api/push/subscribe$"), _h_push_subscribe),
     ("POST", re.compile(r"^/api/push/unsubscribe$"), _h_push_unsubscribe),
+    ("GET", re.compile(r"^/api/admin/push/people$"), _h_push_people),
     ("POST", re.compile(r"^/api/admin/push/test$"), _h_push_test),
     ("GET", re.compile(r"^/api/venue_types$"), _h_list_venue_types),
     ("POST", re.compile(r"^/api/venue_types$"), _h_create_venue_type),
