@@ -1172,6 +1172,19 @@
       </div>
       <div class="section-footer">Il gesto che ricarica i dati quando trascini un elenco verso il basso. Su un elenco corto — un trimestre dell’Agenda con poche righe — il dito trova sempre la cima, e quello che volevi fosse uno scorrimento diventa un ricaricamento: se la lista sfarfalla o si aggiorna da sola, spegnilo. Vale subito, senza riaprire l’app, e solo su questo dispositivo.</div>
 
+      <div class="section-header">NOTIFICHE PUSH</div>
+      <div class="grouped-list">
+        <div class="field-row">
+          <label for="pushToggle" style="flex:1;">Avvisami su questo dispositivo</label>
+          <label class="ios-switch">
+            <input type="checkbox" id="pushToggle">
+            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+          </label>
+        </div>
+        <div class="field-row picker" id="rowPushTest"><span class="link-action">Invia una notifica di prova</span></div>
+      </div>
+      <div class="section-footer" id="pushFoot">Le notifiche che arrivano sul telefono anche con l’app chiusa. Il permesso si dà una volta per dispositivo, e vale solo per quello: telefono e tablet vanno accesi ognuno per conto suo. La prova arriva a te, sui dispositivi che hai acceso.</div>
+
       <div class="section-header">ESPORTAZIONE</div>
       <div class="grouped-list">
         <div class="row" id="rowAdminExport">
@@ -11001,6 +11014,7 @@
   function openAdminScreen(){
     elAdminScreen.hidden = false;
     renderGeoSection();
+    pushRefresh();
     requestAnimationFrame(function(){ elAdminScreen.classList.add("in"); });
   }
 
@@ -11728,6 +11742,145 @@
   addEdgeSwipeBack(elWaTemplateEditScreen, closeWaTemplateEditScreen);
   addEdgeSwipeBack(elMailTemplatesScreen, closeMailTemplatesScreen);
   addEdgeSwipeBack(elMailTemplateEditScreen, closeMailTemplateEditScreen);
+
+  /* ---------------- notifiche push ----------------
+     Il permesso lo dà il browser, non l'app: qui dentro si può solo
+     chiederlo, e una volta sola per dispositivo. Se uno dice di no, dire
+     "no" è definitivo — il browser non ce lo fa più chiedere, e l'unico
+     modo di tornare indietro è dalle impostazioni del telefono. Per questo
+     l'interruttore torna indietro da solo invece di restare acceso a
+     mentire.
+
+     L'iscrizione vive in due posti che devono restare d'accordo: nel
+     browser (il PushManager) e nella tabella del server. L'interruttore
+     mostra il primo, perché è quello che decide se la notifica arriverà
+     davvero; il server viene allineato subito dopo. */
+  var elPushToggle = document.getElementById("pushToggle");
+  var elPushFoot = document.getElementById("pushFoot");
+  var pushConfig = null;
+  var pushBusy = false;
+
+  function pushSupportato(){
+    return ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window);
+  }
+
+  /* La chiave pubblica viaggia come testo base64url e il PushManager la
+     vuole in byte. */
+  function pushChiaveInByte(base64){
+    var piatta = (base64 + "=".repeat((4 - base64.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+    var grezzo = atob(piatta);
+    var byte = new Uint8Array(grezzo.length);
+    for(var i = 0; i < grezzo.length; i++) byte[i] = grezzo.charCodeAt(i);
+    return byte;
+  }
+
+  /* getRegistration e non ready: su un contesto non sicuro il service
+     worker non si registra e "ready" non si risolverebbe mai, lasciando
+     l'Admin appeso a un interruttore che non risponde. */
+  function pushRegistrazione(){
+    if(!pushSupportato()) return Promise.resolve(null);
+    return navigator.serviceWorker.getRegistration().then(function(reg){ return reg || null; });
+  }
+
+  function pushIscrizione(){
+    return pushRegistrazione().then(function(reg){
+      return reg ? reg.pushManager.getSubscription() : null;
+    }).catch(function(){ return null; });
+  }
+
+  function pushSpiega(iscritto){
+    var frasi = [];
+    if(!pushSupportato()){
+      frasi.push("Questo dispositivo non sa ricevere notifiche push. Su iPhone servono iOS 16.4 e l\u2019app aggiunta alla schermata Home.");
+    } else if(!pushConfig || !pushConfig.enabled){
+      frasi.push("Il server non ha le chiavi VAPID: le notifiche sono spente per tutti.");
+    } else if(Notification.permission === "denied"){
+      frasi.push("Il permesso \u00e8 stato negato su questo dispositivo: si riaccende solo dalle impostazioni del telefono, non da qui.");
+    } else if(iscritto){
+      frasi.push("Acceso su questo dispositivo.");
+    } else {
+      frasi.push("Spento su questo dispositivo.");
+    }
+    if(pushConfig && pushConfig.devices){
+      frasi.push(pushConfig.devices === 1 ? "Un dispositivo registrato in tutto." : pushConfig.devices + " dispositivi registrati in tutto.");
+    }
+    frasi.push("Il permesso vale per un dispositivo alla volta: telefono e tablet si accendono ognuno per conto suo. La prova arriva a te, su quelli accesi.");
+    elPushFoot.textContent = frasi.join(" ");
+  }
+
+  function pushRefresh(){
+    if(!pushSupportato()){ elPushToggle.disabled = true; pushSpiega(false); return; }
+    api("GET", "/api/push/config").then(function(cfg){
+      pushConfig = cfg;
+      return pushIscrizione();
+    }).then(function(iscrizione){
+      elPushToggle.checked = !!iscrizione && Notification.permission === "granted";
+      elPushToggle.disabled = !pushConfig.enabled || Notification.permission === "denied";
+      pushSpiega(!!iscrizione);
+    }).catch(function(){
+      // Non si sa niente: dirlo, invece di dare la colpa alle chiavi del
+      // server come farebbe pushSpiega() senza configurazione.
+      pushConfig = null;
+      elPushFoot.textContent = "Non riesco a leggere le impostazioni delle notifiche dal server.";
+    });
+  }
+
+  function pushAccendi(){
+    return Notification.requestPermission().then(function(permesso){
+      if(permesso !== "granted") throw new Error("Permesso negato");
+      return pushRegistrazione();
+    }).then(function(reg){
+      if(!reg) throw new Error("Service worker non disponibile");
+      return reg.pushManager.subscribe({
+        // Obbligatorio e fatto rispettare dal browser: ogni push deve
+        // finire in una notifica che si vede. Non si possono mandare
+        // messaggi silenziosi.
+        userVisibleOnly: true,
+        applicationServerKey: pushChiaveInByte(pushConfig.public_key)
+      });
+    }).then(function(iscrizione){
+      var j = iscrizione.toJSON();
+      return api("POST", "/api/push/subscribe", {
+        endpoint: j.endpoint,
+        keys: j.keys,
+        user_agent: navigator.userAgent
+      });
+    });
+  }
+
+  function pushSpegni(){
+    return pushIscrizione().then(function(iscrizione){
+      if(!iscrizione) return api("POST", "/api/push/unsubscribe", {});
+      var endpoint = iscrizione.endpoint;
+      return iscrizione.unsubscribe().then(function(){
+        return api("POST", "/api/push/unsubscribe", {endpoint: endpoint});
+      });
+    });
+  }
+
+  elPushToggle.addEventListener("change", function(){
+    if(pushBusy){ elPushToggle.checked = !elPushToggle.checked; return; }
+    pushBusy = true;
+    var acceso = elPushToggle.checked;
+    (acceso ? pushAccendi() : pushSpegni()).then(function(esito){
+      if(esito && typeof esito.devices === "number") pushConfig.devices = esito.devices;
+      toast(acceso ? "Notifiche accese su questo dispositivo" : "Notifiche spente su questo dispositivo");
+    }).catch(function(errore){
+      elPushToggle.checked = !acceso;
+      toast(errore.message || "Non \u00e8 stato possibile cambiare le notifiche");
+    }).then(function(){
+      pushBusy = false;
+      pushRefresh();
+    });
+  });
+
+  document.getElementById("rowPushTest").addEventListener("click", function(){
+    api("POST", "/api/admin/push/test", {}).then(function(esito){
+      toast(esito.devices === 1 ? "Mandata a 1 dispositivo" : "Mandata a " + esito.devices + " dispositivi");
+    }).catch(function(errore){
+      toast(errore.message || "Prova non riuscita");
+    });
+  });
 
   /* ---------------- boot ---------------- */
   // loadMe per primo: decide se c'e' una band attiva, e senza quella le

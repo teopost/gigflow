@@ -29,6 +29,18 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, urlencode, unquote, quote
 
+# L'unica dipendenza esterna di tutta l'app, e serve a una cosa sola: le
+# notifiche push sul telefono. Il Web Push vuole una firma ECDSA e una
+# cifratura che la libreria standard non ha, e riscriverle a mano qui
+# sarebbe stato l'unico pezzo di crittografia scritto in casa. Se la
+# libreria non c'e' l'app parte lo stesso con le push spente: e' cosi' che
+# gira chi ha costruito l'immagine prima che esistessero.
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:  # pragma: no cover - immagine senza la libreria
+    webpush = None
+    WebPushException = None
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "crm.db")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -161,6 +173,32 @@ TELEGRAM_API = "https://api.telegram.org/bot%s/sendMessage"
 # del telefono e' un messaggio, ma un'app aperta e usata per un pomeriggio
 # non ne fa uno dietro l'altro. E' l'unico numero da girare se sono troppi.
 NOTIFY_VISIT_GAP_MINUTES = 30
+
+# --- notifiche push sul telefono (opzionale) ----------------------------
+# Il Web Push e' uno standard del browser, non il servizio di qualcuno: non
+# c'e' nessun account da aprire, nessun Firebase, nessuna chiave da farsi
+# dare. Le due chiavi qui sotto te le generi da solo una volta sola (come si
+# fa e' scritto nel .env.example) e sono l'unica cosa che dice "questo
+# messaggio viene davvero da GigFlow". Come per Telegram, se mancano la
+# funzione e' spenta e l'app si comporta esattamente come prima.
+#
+# Chi consegna non lo scegliamo noi: e' il browser di chi riceve a dare
+# l'indirizzo del proprio servizio di consegna (Google per Chrome, Apple per
+# iPhone, Mozilla per Firefox) nel momento in cui l'utente concede il
+# permesso. Noi quell'indirizzo lo salviamo e ci mandiamo sopra una POST
+# cifrata: chi fa da tramite vede passare dei byte, non il testo.
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
+# Un recapito a cui i servizi di consegna scriverebbero se questo server si
+# mettesse a mandare messaggi a vanvera. Non viene verificato ne' registrato
+# da nessuno: deve solo essere un mailto: sintatticamente valido.
+VAPID_SUBJECT = (
+    os.environ.get("VAPID_SUBJECT", "").strip() or "mailto:gigflow@localhost"
+)
+# Quanto a lungo il servizio di consegna tiene da parte una notifica per un
+# telefono spento o senza rete. Mezza giornata: oltre, la cosa che voleva
+# dirti non e' piu' di oggi e farla comparire il giorno dopo confonde.
+PUSH_TTL_SECONDS = 12 * 3600
 
 
 SESSION_COOKIE = "session_id"
@@ -791,6 +829,32 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
+        -- Un dispositivo che ha detto di si' alle notifiche. Una riga per
+        -- installazione dell'app, non per persona: chi ha telefono e tablet
+        -- ne ha due, e vanno svegliati tutti e due.
+        --
+        -- endpoint e' l'indirizzo che il browser ci ha dato per svegliare
+        -- quel dispositivo, ed e' anche la sua identita': e' UNIQUE perche'
+        -- se sullo stesso telefono entra un'altra persona la riga deve
+        -- cambiare proprietario, non sdoppiarsi — la notifica segue
+        -- l'indirizzo, e arriverebbe a chi su quel telefono non c'e' piu'.
+        -- p256dh e auth sono le chiavi con cui si cifra per quel
+        -- dispositivo: senza, il messaggio non e' leggibile da nessuno.
+        --
+        -- Niente workspace_id: il permesso lo da' una persona su un
+        -- dispositivo, e resta suo anche quando cambia band.
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            user_agent TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_push_email ON push_subscriptions(email);
         CREATE INDEX IF NOT EXISTS idx_gigs_location ON gigs(location_id);
         CREATE INDEX IF NOT EXISTS idx_gigs_date ON gigs(gig_date);
         CREATE INDEX IF NOT EXISTS idx_cash_workspace ON cash_entries(workspace_id, entry_date);
@@ -1748,6 +1812,161 @@ def notify_visit(conn, email, ultimo_iso, adesso):
         nome, html.escape(email), banda,
         " · ultima volta " + quando if quando else "",
     ))
+
+
+# --- le notifiche push sul telefono -------------------------------------
+# Stesso schema di Telegram, un piano piu' in la': sotto c'e' il trasporto,
+# che vale per qualsiasi messaggio, e piu' giu' una funzione per ogni fatto.
+# Cambia il destinatario. Telegram va a chi amministra l'installazione ed e'
+# un filo solo; le push vanno a una persona della band, su tutti i
+# dispositivi da cui ha detto di si', e sono la prima cosa di GigFlow che
+# parla a chi lo usa invece che a chi lo tiene su.
+
+def push_enabled():
+    return bool(webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
+
+
+def push_send(conn, email, titolo, testo, url="/"):
+    """Manda una notifica a tutti i dispositivi di una persona e restituisce
+    a quanti e' stata affidata. Come per Telegram l'invio e' a perdere: le
+    iscrizioni si leggono qui, con la connessione di chi chiama, e poi parte
+    un thread che non puo' far fallire la richiesta dentro cui e' nato.
+    Nessuno deve vedersi rifiutare un salvataggio perche' Apple non
+    risponde."""
+    if not push_enabled() or not email or not testo:
+        return 0
+    righe = conn.execute(
+        "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE email = ?",
+        (email,),
+    ).fetchall()
+    if not righe:
+        return 0
+    iscrizioni = [dict(r) for r in righe]
+    threading.Thread(
+        target=_push_post_all, args=(iscrizioni, titolo, testo, url), daemon=True
+    ).start()
+    return len(iscrizioni)
+
+
+def _push_post_all(iscrizioni, titolo, testo, url):
+    morte = [
+        s["id"] for s in iscrizioni
+        if _push_post(s, titolo, testo, url) == "morta"
+    ]
+    if morte:
+        _push_dimentica(morte)
+
+
+def _push_post(iscrizione, titolo, testo, url):
+    """Una notifica a un dispositivo solo. Il testo viene cifrato con le
+    chiavi di quel dispositivo: il servizio di consegna inoltra byte che non
+    sa leggere."""
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": iscrizione["endpoint"],
+                "keys": {
+                    "p256dh": iscrizione["p256dh"],
+                    "auth": iscrizione["auth"],
+                },
+            },
+            data=json.dumps({"title": titolo, "body": testo, "url": url}),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            # Un dizionario nuovo a ogni invio, non una costante: la libreria
+            # ci scrive dentro la scadenza e il destinatario prima di firmare.
+            vapid_claims={"sub": VAPID_SUBJECT},
+            ttl=PUSH_TTL_SECONDS,
+            timeout=10,
+        )
+        return "ok"
+    except Exception as errore:  # rete assente, chiavi sbagliate, servizio giu'
+        stato = getattr(getattr(errore, "response", None), "status_code", None)
+        # 404 e 410 sono l'unica risposta che vuol dire qualcosa di
+        # definitivo: quel dispositivo non esiste piu' (app disinstallata,
+        # permesso revocato, iscrizione scaduta). Riprovarci all'infinito
+        # vorrebbe dire tenersi righe morte per sempre.
+        if stato in (404, 410):
+            return "morta"
+        print("[push] %s: %s" % (type(errore).__name__, errore))
+        return "errore"
+
+
+def _push_dimentica(ids):
+    """Le iscrizioni morte si cancellano da un thread suo, con una
+    connessione sua: quella di chi ha chiesto la notifica potrebbe essere
+    gia' chiusa da un pezzo."""
+    conn = get_conn()
+    try:
+        conn.executemany(
+            "DELETE FROM push_subscriptions WHERE id = ?", [(i,) for i in ids]
+        )
+        conn.commit()
+        print("[push] %s" % (
+            "dimenticata 1 iscrizione non piu' valida" if len(ids) == 1
+            else "dimenticate %d iscrizioni non piu' valide" % len(ids)
+        ))
+    except Exception as errore:
+        print("[push] ripulitura fallita: %s" % errore)
+    finally:
+        conn.close()
+
+
+def push_devices(conn, email):
+    if not email:
+        return 0
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM push_subscriptions WHERE email = ?", (email,)
+    ).fetchone()["n"]
+
+
+def push_subscribe(conn, email, body, user_agent=None):
+    """Registra il dispositivo da cui arriva la richiesta. Le tre stringhe
+    le produce il browser: noi non le interpretiamo, le rimettiamo tali e
+    quali quando c'e' da mandare qualcosa."""
+    endpoint = (body.get("endpoint") or "").strip()
+    chiavi = body.get("keys") or {}
+    p256dh = (chiavi.get("p256dh") or "").strip()
+    auth = (chiavi.get("auth") or "").strip()
+    if not endpoint or not p256dh or not auth:
+        raise ApiError(400, "Iscrizione alle notifiche incompleta")
+    adesso = now_iso()
+    conn.execute(
+        """
+        INSERT INTO push_subscriptions
+            (email, endpoint, p256dh, auth, user_agent, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(endpoint) DO UPDATE SET
+            email = excluded.email,
+            p256dh = excluded.p256dh,
+            auth = excluded.auth,
+            user_agent = excluded.user_agent,
+            updated_at = excluded.updated_at
+        """,
+        (email, endpoint, p256dh, auth, (user_agent or "")[:200], adesso, adesso),
+    )
+    conn.commit()
+    return push_devices(conn, email)
+
+
+def push_unsubscribe(conn, email, body):
+    endpoint = (body.get("endpoint") or "").strip()
+    if endpoint:
+        conn.execute(
+            "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,)
+        )
+        conn.commit()
+    return push_devices(conn, email)
+
+
+def notify_push_prova(conn, email):
+    """La notifica che parte dal link nell'Admin. Non e' un fatto dell'app:
+    serve a rispondere all'unica domanda che conta quando si monta questa
+    roba — arriva davvero sul telefono, con l'app chiusa?"""
+    return push_send(
+        conn, email, "GigFlow",
+        "Notifica di prova: se la stai leggendo, funziona.",
+        "/",
+    )
 
 
 # --- workspace (le band) e inviti ---------------------------------------
@@ -6071,7 +6290,55 @@ def _h_delete_venue_category(conn, match, query, body, ctx):
 # Slaker — nella band nuova sara' Leader.
 # Segnalare non e' modificare i dati della band: anche chi puo' solo
 # guardare deve poter dire che qualcosa non va.
-SLAKER_ALLOWED = {_h_switch_workspace, _h_create_my_band, _h_create_report}
+# --- le rotte delle notifiche push --------------------------------------
+# Iscriversi non e' modificare i dati della band: e' una cosa che uno fa sul
+# proprio telefono. Per questo stanno in SLAKER_ALLOWED — anche chi in
+# questa band puo' solo guardare ha diritto di essere avvisato.
+
+def _h_push_config(conn, match, query, body, ctx):
+    """Quello che serve alla pagina per sapere se puo' chiedere il permesso:
+    se il server e' attrezzato, con che chiave pubblica presentarsi, e
+    quanti dispositivi ha gia' registrato chi sta chiamando."""
+    return 200, {
+        "enabled": push_enabled(),
+        "public_key": VAPID_PUBLIC_KEY if push_enabled() else "",
+        "devices": push_devices(conn, ctx.email),
+    }
+
+
+def _h_push_subscribe(conn, match, query, body, ctx):
+    if not push_enabled():
+        raise ApiError(400, "Le notifiche push non sono configurate su questo server")
+    if not ctx.email:
+        raise ApiError(401, "Serve un accesso per registrare le notifiche")
+    quanti = push_subscribe(conn, ctx.email, body, body.get("user_agent"))
+    return 200, {"devices": quanti}
+
+
+def _h_push_unsubscribe(conn, match, query, body, ctx):
+    return 200, {"devices": push_unsubscribe(conn, ctx.email, body)}
+
+
+def _h_push_test(conn, match, query, body, ctx):
+    """La prova dall'Admin: la notifica arriva a chi ha toccato il link, sui
+    suoi dispositivi. Non c'e' modo di scrivere a qualcun altro da qui —
+    provare le notifiche e' una cosa che si fa addosso a se' stessi."""
+    require_admin(ctx)
+    if not push_enabled():
+        raise ApiError(400, "Le notifiche push non sono configurate su questo server")
+    quanti = notify_push_prova(conn, ctx.email)
+    if not quanti:
+        raise ApiError(
+            400,
+            "Nessun dispositivo registrato: accendi prima le notifiche su questo telefono",
+        )
+    return 200, {"devices": quanti}
+
+
+SLAKER_ALLOWED = {
+    _h_switch_workspace, _h_create_my_band, _h_create_report,
+    _h_push_subscribe, _h_push_unsubscribe, _h_push_test,
+}
 
 ROUTES = [
     ("GET", re.compile(r"^/api/locations$"), _h_list_locations),
@@ -6148,6 +6415,10 @@ ROUTES = [
     ("POST", re.compile(r"^/api/admin/templates$"), _h_create_template),
     ("PUT", re.compile(r"^/api/admin/templates/(\d+)$"), _h_update_template),
     ("DELETE", re.compile(r"^/api/admin/templates/(\d+)$"), _h_delete_template),
+    ("GET", re.compile(r"^/api/push/config$"), _h_push_config),
+    ("POST", re.compile(r"^/api/push/subscribe$"), _h_push_subscribe),
+    ("POST", re.compile(r"^/api/push/unsubscribe$"), _h_push_unsubscribe),
+    ("POST", re.compile(r"^/api/admin/push/test$"), _h_push_test),
     ("GET", re.compile(r"^/api/venue_types$"), _h_list_venue_types),
     ("POST", re.compile(r"^/api/venue_types$"), _h_create_venue_type),
     ("PUT", re.compile(r"^/api/venue_types/(\d+)$"), _h_update_venue_type),
@@ -6788,6 +7059,14 @@ def main():
         print("  Notifiche Telegram: spente da TELEGRAM_ENABLED.")
     else:
         print("  Notifiche Telegram: attive.")
+    # Stessa ragione della riga qui sopra: se le push sono spente per sbaglio
+    # non arriva nessuna notifica e nemmeno nessun errore.
+    if not webpush:
+        print("  Notifiche push: libreria pywebpush non installata.")
+    elif not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        print("  Notifiche push: chiavi VAPID non configurate.")
+    else:
+        print("  Notifiche push: attive.")
     print(f"  Su questo computer: http://localhost:{port}")
     print(f"  Da smartphone (stessa Wi-Fi): http://{local_ip()}:{port}")
     print("Premi Ctrl+C per fermare il server.")

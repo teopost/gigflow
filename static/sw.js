@@ -53,6 +53,54 @@ self.addEventListener("message", (event) => {
   }
 });
 
+// --- le notifiche push ---------------------------------------------------
+// Il service worker è l'unica cosa dell'app che il sistema tiene in vita
+// quando l'app è chiusa: una notifica arriva qui, non nella pagina. Il
+// server manda un JSON cifrato con titolo, testo e dove andare al tocco.
+self.addEventListener("push", (event) => {
+  let dati = {};
+  try {
+    dati = event.data ? event.data.json() : {};
+  } catch (err) {
+    // Un messaggio che non è JSON (una prova fatta a mano, un'altra
+    // versione del server): meglio mostrarne il testo che ingoiarlo.
+    dati = { body: event.data ? event.data.text() : "" };
+  }
+  const titolo = dati.title || "GigFlow";
+  event.waitUntil(
+    self.registration.showNotification(titolo, {
+      body: dati.body || "",
+      icon: "/icons/icon-192.png?v=2",
+      badge: "/icons/icon-192.png?v=2",
+      // Stesso tag = la notifica nuova sostituisce quella vecchia invece di
+      // impilarsi. Chi manda decide cosa può sovrascrivere cosa; senza tag
+      // esplicito tutte le notifiche di GigFlow restano una sola riga.
+      tag: dati.tag || "gigflow",
+      data: { url: dati.url || "/" },
+    })
+  );
+});
+
+// Al tocco: se l'app è già aperta da qualche parte si porta in primo piano
+// quella, invece di aprirne una seconda copia.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((finestre) => {
+        for (const finestra of finestre) {
+          if (finestra.url.startsWith(self.registration.scope) && "focus" in finestra) {
+            if ("navigate" in finestra && url !== "/") finestra.navigate(url).catch(() => {});
+            return finestra.focus();
+          }
+        }
+        return self.clients.openWindow(url);
+      })
+  );
+});
+
 function isHtmlDocument(req, url) {
   return req.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html";
 }

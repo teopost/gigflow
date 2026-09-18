@@ -1,10 +1,17 @@
 # GigFlow — gestionale live per la band.
-# Immagine minimale: l'app usa solo la libreria standard di Python,
-# quindi non serve installare nessuna dipendenza.
+# L'app usa la libreria standard di Python e una sola dipendenza esterna,
+# pywebpush, che serve alle notifiche push sul telefono (vedi
+# requirements.txt). Senza di lei l'app parte comunque, con le push spente.
 
 FROM python:3.12-slim
 
 WORKDIR /app
+
+# Prima le dipendenze e poi il codice: requirements.txt cambia una volta
+# ogni tanto, app.py dieci volte al giorno, e cosi' il livello con
+# l'installazione resta in cache fra un deploy e l'altro.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Senza questa, Python tiene lo stdout in un buffer da blocchi e "docker logs"
 # resta vuoto per ore: gli avvisi (compresi quelli delle notifiche Telegram
