@@ -205,6 +205,20 @@
      "Da pianificare" e' la parola piu' lunga e decide per tutte. */
   .view-toggle.quattro{padding:2px;gap:1px;}
   .view-toggle.quattro .view-toggle-btn{font-size:12px;padding:9px 1px;white-space:nowrap;}
+  /* ---------- le due pastiglie di "Da pianificare" ---------- */
+  /* La grafica e' quella che avevano i trimestri in Agenda: pastiglie che si
+     dividono la larghezza, col numero accanto. Il nome no — quelle si
+     chiamavano "mese-" e parlavano di mesi, queste filtrano — e un nome
+     riusato, in un foglio solo, tinge di un colore che non ti aspetti. */
+  .filtro-bar{display:flex;gap:6px;padding:10px 16px 2px;}
+  .filtro-chip{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:center;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 6px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .filtro-chip .cnt{font-size:12px;font-variant-numeric:tabular-nums;color:var(--text-tertiary);}
+  .filtro-chip.vuoto{color:var(--text-tertiary);}
+  .filtro-chip.active{background:var(--tint);color:#fff;}
+  .filtro-chip.active .cnt{color:rgba(255,255,255,.75);}
+  /* L'occhio nella riga: piccolo e nel colore dell'app, serve solo a dire
+     quali righe resterebbero accendendo il filtro Focus. */
+  .plan-focus{color:var(--tint);vertical-align:-2px;margin-right:5px;}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
   /* Il colore del segnalino e' quello dello stato, lo stesso della pastiglia
@@ -359,6 +373,11 @@
   .fav-star{flex:none;display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;background:none;border:none;color:var(--text-tertiary);cursor:pointer;}
   .fav-star.active{color:#f5a623;}
   #btnFavorite.fav-active{color:#f5a623;}
+  /* L'occhio acceso prende il colore dell'app e non l'ambra della stella:
+     sono due cose diverse e devono sembrarlo anche di sfuggita. La pupilla
+     si riempie, cosi' acceso e spento si distinguono anche in bianco e nero. */
+  #btnFocus.focus-active{color:var(--tint);}
+  #btnFocus.focus-active circle{fill:currentColor;}
   .row-chevron{flex:none;color:var(--text-tertiary);}
   .row-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
 
@@ -968,6 +987,7 @@
           <div id="recontactList"></div>
       </div>
       <div id="agendaPanePlan" hidden>
+        <div class="filtro-bar" id="planFilterBar"></div>
         <div class="scope-note">Tutti quelli che non sono più un Lead e a cui non hai ancora detto quando richiamarli: è l’arretrato. Fuori i Lead e gli archiviati. Scegliere il giorno è l’unico gesto che serve, e sposta la riga in «Da contattare».</div>
         <div id="planList"></div>
       </div>
@@ -2239,6 +2259,9 @@
         </button>
         <span class="inline-title" id="detailInlineTitle">Palcoscenico</span>
         <div class="navbar-trailing">
+          <button class="nav-btn" id="btnFocus" aria-label="Sott'occhio">
+            <svg id="btnFocusIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.2 5.2 12 5.2 22.4 12 22.4 12 18.8 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1"/></svg>
+          </button>
           <button class="nav-btn" id="btnFavorite" aria-label="Preferito">
             <svg id="btnFavoriteIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>
           </button>
@@ -2597,6 +2620,9 @@
   var CLOSING_STATUSES = ["suonato", "annullato", "rifiutata"];
   function isClosingStatus(s){ return CLOSING_STATUSES.indexOf(s) > -1; }
 
+  /* L'occhio, lo stesso della barra in alto ma piccolo: una riga in focus
+     si riconosce senza aprire niente. */
+  var OCCHIO = '<svg class="plan-focus" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.6 12S5.2 5.2 12 5.2 22.4 12 22.4 12 18.8 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1" fill="currentColor"/></svg>';
   var CHEVRON = '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>';
 
   /* ---------------- serate ----------------
@@ -5367,9 +5393,16 @@
     var i = VENUE_STATUSES.findIndex(function(x){ return x.key === k; });
     return i < 0 ? 99 : i;
   }
-  function venuesToPlan(){
+  /* Si entra da "Focus" e non da "Tutti": l'arretrato intero e' lungo, e
+     quello su cui la band ha deciso di stare e' la parte per cui apri
+     questa schermata. "Tutti" resta a un tocco, e la scelta dura finche'
+     l'app e' aperta. */
+  var planFiltro = "focus";
+  function venuesToPlan(filtro){
+    var soloFocus = (filtro || planFiltro) === "focus";
     return venues.filter(function(v){
-      return !v.deleted_at && v.status !== "lead" && !v.next_contact_date;
+      return !v.deleted_at && v.status !== "lead" && !v.next_contact_date &&
+             (!soloFocus || !!v.focus);
     }).slice().sort(function(a, b){
       var ra = statusRank(a.status), rb = statusRank(b.status);
       if(ra !== rb) return ra - rb;
@@ -5382,7 +5415,8 @@
     if(v.type) sub.push('<span class="type-tag">'+dato(v.type)+'</span>');
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
-        '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
+        '<div class="row-main"><div class="row-title">'+
+          (v.focus ? OCCHIO : '')+dato(v.name||"Senza nome")+'</div>'+
         (sub.length ? '<div class="row-sub">'+sub.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+venueStatusPill(v)+
@@ -5398,11 +5432,42 @@
      stessa cosa: e' nella stessa colonna di tutti gli altri elenchi, e una
      riga che finisce sotto l'intestazione sbagliata mentre scorri non
      dovrebbe costare una risalita per capire cos'e'. */
+  /* Due pastiglie e il loro numero: il numero e' meta' del senso, perche'
+     l'elenco filtrato da solo non puo' dire quanto resta fuori. */
+  var elPlanFilterBar = document.getElementById("planFilterBar");
+  function renderPlanFilterBar(){
+    elPlanFilterBar.innerHTML = [
+      {key: "focus", label: "Focus"},
+      {key: "tutti", label: "Tutti"}
+    ].map(function(f){
+      var n = venuesToPlan(f.key).length, attivo = f.key === planFiltro;
+      return '<button type="button" class="filtro-chip'+(attivo ? " active" : "")+
+        (n ? "" : " vuoto")+'" data-plan-filtro="'+f.key+'"'+
+        (attivo ? ' aria-current="true"' : '')+'>'+esc(f.label)+
+        (n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
+    }).join("");
+  }
+  elPlanFilterBar.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-plan-filtro]");
+    if(!btn) return;
+    var f = btn.getAttribute("data-plan-filtro");
+    if(f === planFiltro) return;
+    planFiltro = f;
+    renderRecontact();
+    document.getElementById("scrollRecontact").scrollTop = 0;
+  });
+
   function renderPlanList(){
+    renderPlanFilterBar();
     var righe = venuesToPlan();
     if(!righe.length){
-      elPlanList.innerHTML = '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
-        '<p>Ogni palcoscenico che hai già toccato ha un giorno in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p></div>';
+      elPlanList.innerHTML = '<div class="empty-state"><div class="glyph">🗒️</div>'+
+        (planFiltro === "focus" && venuesToPlan("tutti").length
+          ? '<h2>Nessuno in focus</h2>'+
+            '<p>Qui restano solo i palcoscenici che la band ha messo sott’occhio. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>'
+          : '<h2>Niente da pianificare</h2>'+
+            '<p>Ogni palcoscenico che hai già toccato ha un giorno in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p>')+
+        '</div>';
       return;
     }
     var html = "", corrente = null;
@@ -8157,6 +8222,7 @@
     renderOwnerRow(v);
     renderNotes(v);
     renderFavoriteButton(v);
+    renderFocusButton(v);
     renderTagsRow(v);
   }
 
@@ -8235,6 +8301,37 @@
         salvaTag(id, Object.keys(scelti).map(function(k){ return scelti[k]; }));
       }
     });
+  });
+
+  /* Il focus non sta in un elenco a parte come i preferiti: e' una colonna
+     del palcoscenico, quindi arriva gia' dentro v.focus e non c'e' niente da
+     caricare. La differenza e' tutta li': la stella e' di chi la mette, il
+     focus e' della band. */
+  var elBtnFocus = document.getElementById("btnFocus");
+  var elBtnFocusIcon = document.getElementById("btnFocusIcon");
+  function renderFocusButton(v){
+    elBtnFocus.classList.toggle("focus-active", !!(v && v.focus));
+    elBtnFocusIcon.setAttribute("aria-hidden", "true");
+  }
+  /* Si accende subito, come la stella: la scheda e' una bozza, questo no.
+     Se la chiamata fallisce l'occhio torna indietro, altrimenti resterebbe
+     acceso su un telefono e spento su tutti gli altri. */
+  function toggleFocusRow(id){
+    var v = venues.find(function(x){ return String(x.id) === String(id); });
+    if(!v) return;
+    var prima = !!v.focus;
+    v.focus = prima ? 0 : 1;
+    renderAll();
+    renderFocusButton(v);
+    api("PUT", "/api/locations/" + id + "/focus", {focus: prima ? 0 : 1}).catch(function(){
+      v.focus = prima ? 1 : 0;
+      renderAll();
+      renderFocusButton(v);
+      toast("Impossibile aggiornare il focus");
+    });
+  }
+  elBtnFocus.addEventListener("click", function(){
+    if(currentId) toggleFocusRow(currentId);
   });
 
   var elBtnFavorite = document.getElementById("btnFavorite");

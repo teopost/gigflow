@@ -273,6 +273,10 @@ LOCATION_FIELDS = [
     "owner_email",
     # "favorite" non c'e' piu': la stella non e' un campo del palcoscenico,
     # e' una riga di location_favorites intestata a chi l'ha messa.
+    # "focus" e' una colonna, ma non sta qui: la scheda e' una bozza che si
+    # salva con Salva, e un interruttore nella barra in alto non e' una
+    # bozza. Ha la sua chiamata, come la stella, e cosi' un Salva non puo'
+    # riscrivere un focus che nel frattempo ha cambiato qualcun altro.
 ]
 
 # --- le liste di valori configurabili --------------------------------
@@ -582,6 +586,7 @@ def init_db():
             genre TEXT,
             art_director_id INTEGER REFERENCES art_directors(id) ON DELETE SET NULL,
             status TEXT NOT NULL DEFAULT 'lead',
+            focus INTEGER NOT NULL DEFAULT 0,
             next_contact_date TEXT,
             planning_note TEXT,
             created_at TEXT NOT NULL,
@@ -893,6 +898,13 @@ def migrate_schema(conn):
         conn.execute("ALTER TABLE locations ADD COLUMN contact_name TEXT")
     if "deleted_at" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN deleted_at TEXT")
+    # Il focus e' l'opposto della stella, ed e' voluto: la stella e' uscita
+    # da questa tabella proprio perche' era della band intera e due persone
+    # non potevano averne una diversa. Il focus invece non e' un'opinione, e'
+    # una decisione presa insieme — "questi li stiamo seguendo adesso" — e
+    # deve essere la stessa per tutti quelli che aprono l'app.
+    if "focus" not in cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN focus INTEGER NOT NULL DEFAULT 0")
     # La stella era una colonna del palcoscenico, quindi della band intera:
     # la metteva uno e se la vedevano tutti, e due persone non potevano avere
     # lo stesso posto fra i preferiti senza litigarsi la casella. Adesso sta
@@ -4035,6 +4047,23 @@ def set_favorite(conn, ws, email, loc_id, on):
     return {"location_id": loc_id, "favorite": 1 if on else 0}
 
 
+def set_focus(conn, ws, loc_id, on):
+    """Il focus della band: chi si sta seguendo adesso.
+
+    Non e' la stella. La stella e' tua e nessun altro la vede; questo lo
+    mette uno e se lo trovano tutti, ed e' il punto: serve a dire alla band
+    "questi sono i posti su cui stiamo lavorando", non "questi piacciono a
+    me". Per la stessa ragione non chiede chi l'ha messo: una volta acceso
+    e' del palcoscenico, non di chi ha toccato l'occhio."""
+    loc_id = _location_di(conn, ws, loc_id)
+    conn.execute(
+        "UPDATE locations SET focus = ?, updated_at = ? WHERE id = ?",
+        (1 if on else 0, now_iso(), loc_id),
+    )
+    conn.commit()
+    return {"location_id": loc_id, "focus": 1 if on else 0}
+
+
 def tag_vocabolario(conn, ws):
     """I nomi di tag in uso nella band, con su quanti palcoscenici stanno.
 
@@ -6017,6 +6046,11 @@ def _h_set_favorite(conn, match, query, body, ctx):
                              int(match.group(1)), bool((body or {}).get("favorite")))
 
 
+def _h_set_focus(conn, match, query, body, ctx):
+    return 200, set_focus(conn, require_ws(ctx),
+                          int(match.group(1)), bool((body or {}).get("focus")))
+
+
 def _h_set_tags(conn, match, query, body, ctx):
     return 200, set_tags(conn, require_ws(ctx), ctx.email,
                          int(match.group(1)), (body or {}).get("tags"))
@@ -6460,6 +6494,7 @@ ROUTES = [
     # verbi che li cambiano.
     ("GET", re.compile(r"^/api/my/favorites$"), _h_my_favorites),
     ("PUT", re.compile(r"^/api/locations/(\d+)/favorite$"), _h_set_favorite),
+    ("PUT", re.compile(r"^/api/locations/(\d+)/focus$"), _h_set_focus),
     ("PUT", re.compile(r"^/api/locations/(\d+)/tags$"), _h_set_tags),
     ("PUT", re.compile(r"^/api/tags/rename$"), _h_rename_tag),
     ("POST", re.compile(r"^/api/tags/delete$"), _h_delete_tag),
