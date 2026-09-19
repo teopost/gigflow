@@ -1,0 +1,72 @@
+name: Anomalia
+description: Qualcosa non funziona come dovrebbe
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        La build è il campo che sembra inutile e non lo è: metà delle anomalie
+        sono già state corrette in una build più recente di quella installata
+        sul telefono. La trovi in Impostazioni, in fondo.
+
+  - type: textarea
+    id: cosa
+    attributes:
+      label: Cosa succede
+      description: Cosa ha fatto l'app, e cosa ti aspettavi che facesse.
+      placeholder: |
+        Salvo il compenso di una serata e torno indietro: in Cassa il totale
+        del mese è quello di prima. Mi aspettavo di vederlo aggiornato.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: dove
+    attributes:
+      label: Dove
+      options:
+        - Home
+        - Palcoscenici
+        - Preferiti
+        - Opportunità
+        - Agenda
+        - Cassa
+        - Bands
+        - Impostazioni
+        - Admin
+        - Notifiche
+        - Altro / più di una
+    validations:
+      required: true
+
+  - type: textarea
+    id: passi
+    attributes:
+      label: Cosa avevi fatto prima
+      description: I passaggi per rivederlo succedere, se te li ricordi.
+      placeholder: |
+        1. Opportunità → apro una serata
+        2. Scrivo 350 nel compenso, Conferma
+        3. Indietro, poi Cassa
+    validations:
+      required: false
+
+  - type: input
+    id: build
+    attributes:
+      label: In che build
+      description: Impostazioni, in fondo. Il numero o l'impronta, basta uno.
+      placeholder: "2026.09.19-1 · a3f1c0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: dispositivo
+    attributes:
+      label: Su cosa
+      options:
+        - Telefono
+        - Computer
+        - Tutti e due
+    validations:
+      required: false
