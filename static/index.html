@@ -992,6 +992,7 @@
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact" hidden>
+        <div class="filtro-bar" id="recontactFilterBar"></div>
         <div class="scope-note">Tutti i palcoscenici da richiamare, serata aperta o no, in ordine di data: prima quelli in ritardo, poi mese per mese. Fuori gli archiviati e chi non ha una data: quelli stanno in «Da pianificare».</div>
           <div id="recontactList"></div>
       </div>
@@ -5196,9 +5197,20 @@
 
      Fuori restano gli archiviati e chi la data non ce l'ha: quelli stanno
      in "Da pianificare", e i due segmenti continuano a non sovrapporsi. */
-  function venuesToRecontact(){
+  /* "Da contattare" si apre su Tutti e non su Focus, al contrario di "Da
+     pianificare". Non e' una svista: questo e' l'elenco di cosa c'e' da
+     fare oggi, e una telefonata in ritardo nascosta da un filtro e' una
+     telefonata che non fai. E' anche il numero che la mattonella in Home
+     porta qui: se la lista partisse filtrata, il numero toccato e quello
+     trovato sarebbero due. Le pastiglie restano, a un tocco. */
+  var recontactFiltro = "tutti";
+  function venuesToRecontact(filtro){
+    var f = filtro || recontactFiltro;
     return venues.filter(function(v){
-      return !v.deleted_at && v.next_contact_date;
+      if(v.deleted_at || !v.next_contact_date) return false;
+      if(f === "focus") return !!v.focus;
+      if(f === "preferiti") return sonoPreferito(v.id);
+      return true;
     })
       .map(function(v){ return {v: v, due: recontactDue(v)}; })
       .sort(function(a, b){
@@ -5212,7 +5224,9 @@
      che non hai niente da fare proprio quando sei in ritardo. */
   function daContattareEntro(giorni){
     var limite = plusDays(todayStr(), giorni);
-    return venuesToRecontact().filter(function(x){ return x.due.date <= limite; });
+    /* "tutti" scritto a mano: la Home dice quante telefonate ci sono, non
+       quante ne mostra il filtro che hai lasciato acceso ieri in Agenda. */
+    return venuesToRecontact("tutti").filter(function(x){ return x.due.date <= limite; });
   }
   /* Le righe raggruppate per mese, in ordine: "ottobre 2026" e'
      un'intestazione che si legge da sola, e senza l'anno due ottobre
@@ -5439,7 +5453,7 @@
         '<div class="row-trail">'+venueStatusPill(v)+
           '<label class="plan-date">Ricontatta'+
             '<input type="date" class="plan-date-input" data-period="'+v.id+'" aria-label="Quando richiamarli">'+
-          '</label></div>'+
+          '</label>'+CHEVRON+'</div>'+
       '</div></div>'+
     '</div>';
   }
@@ -5451,28 +5465,49 @@
      stessa cosa: e' nella stessa colonna di tutti gli altri elenchi, e una
      riga che finisce sotto l'intestazione sbagliata mentre scorri non
      dovrebbe costare una risalita per capire cos'e'. */
-  /* Due pastiglie e il loro numero: il numero e' meta' del senso, perche'
-     l'elenco filtrato da solo non puo' dire quanto resta fuori. */
-  var elPlanFilterBar = document.getElementById("planFilterBar");
-  function renderPlanFilterBar(){
-    elPlanFilterBar.innerHTML = [
-      {key: "focus", label: "Focus"},
-      {key: "preferiti", label: "Preferiti"},
-      {key: "tutti", label: "Tutti"}
-    ].map(function(f){
-      var n = venuesToPlan(f.key).length, attivo = f.key === planFiltro;
+  /* Le stesse tre pastiglie nei due segmenti dell'Agenda, disegnate qui una
+     volta sola: sono la stessa domanda — di chi mi occupo — e se un giorno
+     ne nasce una quarta deve comparire in tutti e due i posti senza che
+     nessuno se lo ricordi.
+
+     Il numero e' meta' del senso: l'elenco filtrato da solo non puo' dire
+     quanto resta fuori. */
+  var FILTRI_AGENDA = [
+    {key: "focus", label: "Focus"},
+    {key: "preferiti", label: "Preferiti"},
+    {key: "tutti", label: "Tutti"}
+  ];
+  function renderFiltroBar(el, corrente, conta){
+    el.innerHTML = FILTRI_AGENDA.map(function(f){
+      var n = conta(f.key), attivo = f.key === corrente;
       return '<button type="button" class="filtro-chip'+(attivo ? " active" : "")+
-        (n ? "" : " vuoto")+'" data-plan-filtro="'+f.key+'"'+
+        (n ? "" : " vuoto")+'" data-filtro="'+f.key+'"'+
         (attivo ? ' aria-current="true"' : '')+'>'+esc(f.label)+
         (n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
     }).join("");
   }
+  var elPlanFilterBar = document.getElementById("planFilterBar");
+  var elRecontactFilterBar = document.getElementById("recontactFilterBar");
+  function renderPlanFilterBar(){
+    renderFiltroBar(elPlanFilterBar, planFiltro, function(k){ return venuesToPlan(k).length; });
+  }
+  function renderRecontactFilterBar(){
+    renderFiltroBar(elRecontactFilterBar, recontactFiltro, function(k){ return venuesToRecontact(k).length; });
+  }
+  /* I due segmenti tengono la loro scelta separata: sono due elenchi
+     diversi, e uno che sta guardando l'arretrato in focus non vuole trovare
+     filtrato anche il lavoro di domani. */
   elPlanFilterBar.addEventListener("click", function(e){
-    var btn = e.target.closest("[data-plan-filtro]");
-    if(!btn) return;
-    var f = btn.getAttribute("data-plan-filtro");
-    if(f === planFiltro) return;
-    planFiltro = f;
+    var btn = e.target.closest("[data-filtro]");
+    if(!btn || btn.getAttribute("data-filtro") === planFiltro) return;
+    planFiltro = btn.getAttribute("data-filtro");
+    renderRecontact();
+    document.getElementById("scrollRecontact").scrollTop = 0;
+  });
+  elRecontactFilterBar.addEventListener("click", function(e){
+    var btn = e.target.closest("[data-filtro]");
+    if(!btn || btn.getAttribute("data-filtro") === recontactFiltro) return;
+    recontactFiltro = btn.getAttribute("data-filtro");
     renderRecontact();
     document.getElementById("scrollRecontact").scrollTop = 0;
   });
@@ -5620,11 +5655,18 @@
      Le intestazioni portano l'anno: senza, l'ottobre dell'anno prossimo e
      quello di quest'anno finirebbero sotto lo stesso titolo. */
   function renderRecontactList(){
+    renderRecontactFilterBar();
     var gruppi = recontactPerMese();
     if(!gruppi.length){
       elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div>'+
-        '<h2>Niente da contattare</h2>'+
-        '<p>Apri un palcoscenico e scegli il giorno in cui richiamarlo: da lì in poi ti aspetta qui, al suo posto nel calendario.</p>'+
+        (recontactFiltro !== "tutti" && venuesToRecontact("tutti").length
+          ? (recontactFiltro === "focus"
+              ? '<h2>Nessuno in focus</h2>'+
+                '<p>Qui restano solo i palcoscenici che la band ha messo sott’occhio. Il numero sulla pastiglia «Tutti» dice quante telefonate ci sono fuori.</p>'
+              : '<h2>Nessun preferito qui</h2>'+
+                '<p>Qui restano solo i tuoi preferiti — la stella è tua e non la vede nessun altro. Il numero sulla pastiglia «Tutti» dice quante telefonate ci sono fuori.</p>')
+          : '<h2>Niente da contattare</h2>'+
+            '<p>Apri un palcoscenico e scegli il giorno in cui richiamarlo: da lì in poi ti aspetta qui, al suo posto nel calendario.</p>')+
         '</div>';
       return;
     }
