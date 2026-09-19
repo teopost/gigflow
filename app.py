@@ -269,7 +269,7 @@ LOCATION_FIELDS = [
     # prima perche' la sua immagine e' grande.
     "contact_name", "landline", "phone", "email", "website", "facebook", "instagram",
     "capacity", "genre",
-    "art_director_id", "status", "recontact_period", "planning_note",
+    "art_director_id", "status", "next_contact_date", "planning_note",
     "owner_email",
     # "favorite" non c'e' piu': la stella non e' un campo del palcoscenico,
     # e' una riga di location_favorites intestata a chi l'ha messa.
@@ -477,27 +477,30 @@ TASK_STATUS_VALUES = {TASK_TODO, "declinato", "fatto"}
 TASK_ORDER = ("ORDER BY (tasks.status <> '" + TASK_TODO + "') ASC, "
               "(tasks.due_date IS NULL) ASC, tasks.due_date ASC, tasks.id ASC")
 
-# Il promemoria di ricontatto non e' una data: e' un periodo dell'anno. Un
-# locale si richiama piu' o meno quando lo si richiamava l'anno prima —
-# "PalaRubicone a ottobre" — e l'anno di quella frase non lo sa nessuno,
-# perche' sono tutti. Scriverci dentro un anno voleva dire inventarselo, e
-# poi correggerlo a ogni serata chiusa: il promemoria camminava avanti di un
-# anno per volta e finiva nel 2029. Qui dentro c'e' solo quello che sai:
-# "10" (in ottobre) oppure "10-15" (il 15 di ottobre). L'anno lo mette la
-# vista, che sa che giorno e' oggi.
-RECONTACT_PERIOD_RE = re.compile(r"^(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?$")
+# Quando richiamare un posto e' una data intera, anno compreso: "il 15
+# ottobre 2027". Dal 13 settembre 2026 era un periodo senza anno — "a
+# ottobre" — perche' chiudere una serata riscriveva il promemoria come
+# "quello di prima piu' un anno" e il promemoria camminava da solo fino al
+# 2029. Il ricalcolo automatico non c'e' piu' da allora, e senza di quello
+# l'anno torna a essere quello che era: una cosa che sai. "Ottobre" senza
+# anno non si puo' mettere in fila con le altre date, e l'Agenda non e'
+# altro che una fila.
+#
+# Stesso formato della data della serata, e per la stessa ragione: e' quello
+# che scrive <input type="date">.
+NEXT_CONTACT_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# Il 29 febbraio si puo' scrivere: ci sono anni in cui esiste, e l'occorrenza
-# lo scala al 28 dove non c'e'. Il 31 di novembre no: non esiste mai.
-GIORNI_NEL_MESE = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-
-def valid_recontact_period(value):
-    if not RECONTACT_PERIOD_RE.match(value):
+def valid_next_contact_date(value):
+    """Il 31 di novembre non esiste: la forma giusta non basta, la data deve
+    stare nel calendario."""
+    if not NEXT_CONTACT_DATE_RE.match(value):
         return False
-    if len(value) == 2:
-        return True
-    return int(value[3:]) <= GIORNI_NEL_MESE[int(value[:2]) - 1]
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
 
 
 # Il tipo di attivita' fatta sul palcoscenico. "nota" e' il default e copre
@@ -579,7 +582,7 @@ def init_db():
             genre TEXT,
             art_director_id INTEGER REFERENCES art_directors(id) ON DELETE SET NULL,
             status TEXT NOT NULL DEFAULT 'lead',
-            recontact_period TEXT,
+            next_contact_date TEXT,
             planning_note TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -1117,7 +1120,7 @@ def migrate_schema(conn):
     migrate_to_workspaces(conn)
     migrate_to_gigs(conn)
     migrate_drop_season(conn)
-    migrate_to_recontact_period(conn)
+    migrate_to_next_contact_date(conn)
     migrate_drop_rifiutato(conn)
     migrate_to_venue_lifecycle(conn)
     migrate_to_gig_opportunita(conn)
@@ -1137,7 +1140,7 @@ def migrate_schema(conn):
     # Svuotare il promemoria scriveva stringa vuota invece di NULL: due modi
     # di dire "nessun promemoria" che le query devono distinguere. Qui restano
     # in uno solo, ed e' idempotente.
-    conn.execute("UPDATE locations SET recontact_period = NULL WHERE recontact_period = ''")
+    conn.execute("UPDATE locations SET next_contact_date = NULL WHERE next_contact_date = ''")
 
 
 # Le emoji proposte alle tipologie che gia' esistono, cercate dentro il
@@ -1328,41 +1331,63 @@ def migrate_to_gig_opportunita(conn):
     print("  Stati delle serate: %d \"da contattare\" diventano opportunita'." % n)
 
 
-def migrate_to_recontact_period(conn):
-    """Il promemoria di ricontatto smette di essere una data e diventa il
-    periodo dell'anno in cui quel posto si richiama.
+def migrate_to_next_contact_date(conn):
+    """Il promemoria di ricontatto torna a essere una data intera.
 
-    L'anno li' dentro non l'aveva deciso nessuno. Chiudere una serata
-    riscriveva il promemoria come "quello di prima, piu' un anno": con tre
-    serate suonate il promemoria si trovava tre anni avanti, e infatti in
-    archivio c'era un palcoscenico suonato ad agosto 2026 da richiamare a
-    maggio 2029. Il periodo invece e' un fatto — "a ottobre" — e vale per
-    ogni anno, quindi non c'e' piu' niente da ricalcolare e niente che possa
-    camminare da solo.
+    Dal 13 settembre 2026 era un periodo senza anno: "10" per ottobre,
+    "10-15" per il 15 di ottobre. L'anno era stato tolto perche' chiudere
+    una serata lo riscriveva come "quello di prima piu' un anno", e il
+    promemoria camminava avanti da solo — in archivio c'era un palcoscenico
+    suonato ad agosto 2026 da richiamare a maggio 2029. Quel ricalcolo non
+    c'e' piu', e senza di lui l'anno e' di nuovo una cosa che sai e che
+    scrivi tu. Serve perche' un elenco in ordine di data non si puo' fare
+    con "ottobre": ottobre di quale anno viene prima?
 
-    Il rinomino gira una volta sola: al riavvio dopo la colonna si chiama
-    gia' cosi'. Dell'anno non si perde niente che valesse la pena tenere —
-    era sempre l'anno in corso piu' uno, scritto dall'app.
+    L'anno che manca lo mette questa migrazione, e non puo' indovinarlo:
+    2027 per tutti, 2026 per i sei posti che Stefano ha elencato nella issue
+    #3 — quelli che nell'anno in corso sono ancora davanti. Chi aveva scritto
+    solo il mese si ritrova il primo del mese: e' il giorno che l'occorrenza
+    gia' usava per metterli in fila.
 
-    L'indice invece si rifa' ogni volta, ed e' l'unico che non sta insieme
-    agli altri in init_db: li' verrebbe creato prima di questa funzione, su
-    una colonna che su un archivio vecchio ha ancora il nome di prima.
+    Gira una volta sola: al riavvio le date sono tutte lunghe dieci
+    caratteri e non c'e' piu' niente da espandere.
     """
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(locations)").fetchall()}
-    if "recontact_period" not in cols:
-        conn.execute("ALTER TABLE locations RENAME COLUMN next_contact_date TO recontact_period")
-        # "2027-10-15" -> "10-15": resta il giorno che avevi scelto, se
-        # l'avevi scelto. Chi aveva messo il primo del mese si ritrova "il 1
-        # di ottobre" invece di "in ottobre", ed e' giusto cosi': quella e'
-        # la data che aveva scritto, e per dire "in ottobre" bastera'
-        # togliere il giorno.
+    if "next_contact_date" not in cols:
         conn.execute(
-            "UPDATE locations SET recontact_period = substr(recontact_period, 6) "
-            "WHERE recontact_period LIKE '____-__-__'"
+            "ALTER TABLE locations RENAME COLUMN recontact_period TO next_contact_date"
         )
-    conn.execute("DROP INDEX IF EXISTS idx_locations_next_contact")
+    # I nomi arrivano dalla issue, scritti a mano e a orecchio: il confronto
+    # e' sul nome intero minuscolo, non su un "contiene", altrimenti "bar
+    # sport" prenderebbe con se' anche "Bar Sport Panighina", che e' un altro
+    # locale.
+    ANNO_VICINO = {
+        "bar sport", "bombonera", "palarubicone",
+        "red velvet coraz\u00f3n", "x-ray", "t-bone station",
+    }
+    righe = conn.execute(
+        "SELECT id, name, next_contact_date FROM locations "
+        "WHERE next_contact_date IS NOT NULL AND length(next_contact_date) < 10"
+    ).fetchall()
+    espansi = 0
+    for r in righe:
+        m = re.match(r"^(0[1-9]|1[0-2])(?:-(\d{2}))?$", r["next_contact_date"])
+        if not m:
+            # Non e' ne' una data ne' un periodo: meglio nessun promemoria di
+            # uno che nessuno sa leggere.
+            conn.execute("UPDATE locations SET next_contact_date = NULL WHERE id = ?", (r["id"],))
+            continue
+        anno = 2026 if (r["name"] or "").strip().lower() in ANNO_VICINO else 2027
+        conn.execute(
+            "UPDATE locations SET next_contact_date = ? WHERE id = ?",
+            ("%d-%s-%s" % (anno, m.group(1), m.group(2) or "01"), r["id"]),
+        )
+        espansi += 1
+    if espansi:
+        print("  Promemoria di ricontatto: %d periodi diventano date intere." % espansi)
+    conn.execute("DROP INDEX IF EXISTS idx_locations_recontact")
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_locations_recontact ON locations(recontact_period)"
+        "CREATE INDEX IF NOT EXISTS idx_locations_next_contact ON locations(next_contact_date)"
     )
 
 
@@ -3067,7 +3092,7 @@ def gig_location_id(conn, ws, gig_id):
 
 
 def update_gig(conn, ws, gig_id, body):
-    """`recontact_period` non e' un campo della serata ma del palcoscenico:
+    """`next_contact_date` non e' un campo della serata ma del palcoscenico:
     si accetta lo stesso qui perche' chiudere una serata e dire quando
     ririchiamarli sono una cosa sola, e farne due chiamate lascerebbe la
     serata chiusa senza promemoria se la seconda fallisce."""
@@ -3091,14 +3116,14 @@ def update_gig(conn, ws, gig_id, body):
         refresh_location_status(conn, loc_id)
 
     # Il pannello "Ho suonato" chiede anche quando ririchiamarli, e da li'
-    # arriva il periodo. Nessuno lo ricalcola per conto suo: "a ottobre" vale
-    # l'anno prossimo come quest'anno, non c'e' niente da spostare.
-    if "recontact_period" in body:
-        wanted = (body.get("recontact_period") or "").strip() or None
-        if wanted and not valid_recontact_period(wanted):
-            raise ApiError(400, "Periodo di ricontatto non valido")
+    # arriva la data. Nessuno la ricalcola per conto suo: quella scritta e'
+    # quella che hai scelto, e nessun anno si sposta da solo.
+    if "next_contact_date" in body:
+        wanted = (body.get("next_contact_date") or "").strip() or None
+        if wanted and not valid_next_contact_date(wanted):
+            raise ApiError(400, "Data di prossimo contatto non valida")
         conn.execute(
-            "UPDATE locations SET recontact_period = ?, updated_at = ? WHERE id = ?",
+            "UPDATE locations SET next_contact_date = ?, updated_at = ? WHERE id = ?",
             (wanted, now_iso(), loc_id),
         )
     conn.commit()
@@ -3629,13 +3654,13 @@ def clean_location_payload(body, partial):
             if value and value not in MANUAL_LOCATION_STATUSES:
                 raise ApiError(400, "Stato non valido")
             value = value or LEAD_STATUS
-        elif field == "recontact_period":
+        elif field == "next_contact_date":
             # Vuoto vuol dire "non ricontattarli": si scrive NULL, non "",
             # cosi' e' lo stesso niente con cui nasce un palcoscenico e le
             # query che cercano il promemoria non devono sapere di due vuoti.
             value = (value or "").strip() or None
-            if value and not valid_recontact_period(value):
-                raise ApiError(400, "Periodo di ricontatto non valido")
+            if value and not valid_next_contact_date(value):
+                raise ApiError(400, "Data di prossimo contatto non valida")
         elif isinstance(value, str):
             value = value.strip()
         data[field] = value
@@ -5759,13 +5784,13 @@ def export_zip(conn):
     fogli.append(("palcoscenici.csv", _csv_bytes(
         ["id", "band", "nome", "tipo", "categoria", "contesto", "stagionalita", "periodo",
          "citta", "indirizzo", "lat", "lng", "capienza", "genere", "titolare", "telefono",
-         "cellulare", "email", "sito", "facebook", "instagram", "art_director", "stato", "periodo_ricontatto",
+         "cellulare", "email", "sito", "facebook", "instagram", "art_director", "stato", "data_prossimo_contatto",
          "promemoria", "inserito_da", "archiviato_il", "creato_il", "aggiornato_il"],
         [(r["id"], r["band"], r["name"], r["type"], r["category"], r["context"], r["seasonality"],
           r["live_period"], r["city"], r["address"], r["lat"], r["lng"], r["capacity"], r["genre"],
           r["contact_name"], r["landline"], r["phone"], r["email"], r["website"],
           r["facebook"], r["instagram"], r["ad"],
-          r["status"], r["recontact_period"], r["planning_note"],
+          r["status"], r["next_contact_date"], r["planning_note"],
           r["owner_email"], r["deleted_at"],
           r["created_at"], r["updated_at"])
          for r in _query(conn,

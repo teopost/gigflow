@@ -205,27 +205,6 @@
      "Da pianificare" e' la parola piu' lunga e decide per tutte. */
   .view-toggle.quattro{padding:2px;gap:1px;}
   .view-toggle.quattro .view-toggle-btn{font-size:12px;padding:9px 1px;white-space:nowrap;}
-  /* ---------- i trimestri, in Agenda ---------- */
-  /* Quattro pastiglie che si dividono la larghezza: ci stanno tutte senza
-     scorrere, e sono bersagli larghi un quarto di schermo. Dodici mesi
-     erano una barra da far scorrere per arrivare a dicembre, e il selettore
-     costava piu' della lista.
-
-     Il numero e' quello che l'elenco di un trimestre solo non puo' dire:
-     dove c'e' da lavorare negli altri tre.
-
-     Si chiamano "mese-" e non "month-": .month-bar esiste gia' piu' sotto
-     ed e' una barra del grafico della Home, cremisi e piena. Arrivando
-     dopo nel foglio vinceva lei, e la barra era un rettangolo rosso. */
-  .mese-bar{display:flex;gap:6px;padding:0 16px 10px;}
-  /* display:flex batte [hidden]: senza questa la barra resterebbe su anche
-     negli altri due segmenti dell'Agenda. */
-  .mese-bar[hidden]{display:none;}
-  .mese-chip{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:center;gap:5px;border:none;background:var(--fill);color:var(--text);padding:8px 6px;border-radius:999px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
-  .mese-chip .cnt{font-size:12px;font-variant-numeric:tabular-nums;color:var(--text-tertiary);}
-  .mese-chip.vuoto{color:var(--text-tertiary);}
-  .mese-chip.active{background:var(--tint);color:#fff;}
-  .mese-chip.active .cnt{color:rgba(255,255,255,.75);}
   .map-view{flex:1;position:relative;z-index:0;background:var(--fill);}
   #mapCanvas{position:absolute;inset:0;}
   /* Il colore del segnalino e' quello dello stato, lo stesso della pastiglia
@@ -594,8 +573,12 @@
   /* Il pulsante in coda a una riga dell'agenda: adesso ne e' rimasto uno
      solo, "Quando?" su "Da pianificare". Il nome viene da "Riproponi", che
      stava qui prima. */
-  .renew-btn{border:none;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:9px 13px;cursor:pointer;}
-  .renew-btn:active{opacity:.7;}
+  /* Il campo data nella riga di "Da pianificare". Prende il posto di
+     .renew-btn, il pulsante "Quando?" che apriva il foglio dei mesi: con una
+     data intera il foglio sarebbe stato lungo trecentosessantacinque voci, e
+     il campo nativo fa la stessa cosa in un tocco. Stessa pastiglia di
+     prima, cosi' la colonna di destra non cambia peso. */
+  .plan-date{border:none;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:8px 10px;cursor:pointer;max-width:135px;}
   /* ---- Home: tessere e grafici. Nessuna libreria: barre in CSS, cosi'
      seguono i temi chiaro/scuro come tutto il resto e non c'e' niente da
      scaricare su un telefono in giro per locali. ---- */
@@ -978,15 +961,14 @@
           <button class="view-toggle-btn" data-agenda="gigs">Serate</button>
         </div>
       </div>
-      <div class="mese-bar" id="recontactQuarterBar" hidden></div>
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact" hidden>
-        <div class="scope-note">Solo i palcoscenici da richiamare nel trimestre scelto qui sopra, serata aperta o no, mese per mese e in ordine di giorno. Fuori gli archiviati e chi non ha un promemoria: quelli stanno in «Da pianificare».</div>
+        <div class="scope-note">Tutti i palcoscenici da richiamare, serata aperta o no, in ordine di data: prima quelli in ritardo, poi mese per mese. Fuori gli archiviati e chi non ha una data: quelli stanno in «Da pianificare».</div>
           <div id="recontactList"></div>
       </div>
       <div id="agendaPanePlan" hidden>
-        <div class="scope-note">Tutti quelli che non sono più un Lead e a cui non hai ancora detto quando richiamarli: è l’arretrato. Fuori i Lead e gli archiviati. Scegliere il mese è l’unico gesto che serve, e sposta la riga in «Da contattare».</div>
+        <div class="scope-note">Tutti quelli che non sono più un Lead e a cui non hai ancora detto quando richiamarli: è l’arretrato. Fuori i Lead e gli archiviati. Scegliere il giorno è l’unico gesto che serve, e sposta la riga in «Da contattare».</div>
         <div id="planList"></div>
       </div>
       <div id="agendaPaneTasks">
@@ -1170,7 +1152,7 @@
           </label>
         </div>
       </div>
-      <div class="section-footer">Il gesto che ricarica i dati quando trascini un elenco verso il basso. Su un elenco corto — un trimestre dell’Agenda con poche righe — il dito trova sempre la cima, e quello che volevi fosse uno scorrimento diventa un ricaricamento: se la lista sfarfalla o si aggiorna da sola, spegnilo. Vale subito, senza riaprire l’app, e solo su questo dispositivo.</div>
+      <div class="section-footer">Il gesto che ricarica i dati quando trascini un elenco verso il basso. Su un elenco corto — i compiti dell’Agenda quando sono pochi — il dito trova sempre la cima, e quello che volevi fosse uno scorrimento diventa un ricaricamento: se la lista sfarfalla o si aggiorna da sola, spegnilo. Vale subito, senza riaprire l’app, e solo su questo dispositivo.</div>
 
       <div class="section-header">NOTIFICHE PUSH</div>
       <div class="grouped-list">
@@ -2403,15 +2385,10 @@
 
       <div class="section-header">QUANDO CONTATTARE</div>
       <div class="grouped-list">
-        <div class="field-row picker" id="rowRecontactMonth">
-          <label>Periodo</label>
-          <div class="picker-value"><span id="recontactMonthValue">— nessun promemoria —</span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
-        </div>
-        <div class="field-row picker" id="rowRecontactDay" hidden>
-          <label>Giorno</label>
-          <div class="picker-value"><span id="recontactDayValue">tutto il mese</span>
-          <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
+        <div class="field-row">
+          <label for="fNextContact">Prossimo contatto</label>
+          <input type="date" id="fNextContact">
+          <button type="button" class="date-clear" data-clear-date aria-label="Togli la data" hidden>✕</button>
         </div>
         <div class="field-row stacked">
           <label for="fPlanningNote">Nota sulla pianificazione</label>
@@ -2641,131 +2618,47 @@
     var m = String(d.getMonth()+1), day = String(d.getDate());
     return d.getFullYear() + "-" + (m.length<2 ? "0"+m : m) + "-" + (day.length<2 ? "0"+day : day);
   }
-  /* Il promemoria di ricontatto e' un periodo dell'anno, non una data:
-     "10" vuol dire "in ottobre", "10-15" "il 15 di ottobre". Un locale si
-     richiama piu' o meno quando lo si richiamava l'anno prima, e l'anno di
-     quella frase non lo sa nessuno perche' sono tutti: lo mette qui la
-     vista, che sa che giorno e' oggi. Stesse regole del server (vedi
-     RECONTACT_PERIOD_RE in app.py). */
+  /* Quando richiamare un posto e' una data intera, anno compreso. Dal 13
+     settembre 2026 era un periodo senza anno — "10" per ottobre, "10-15"
+     per il 15 di ottobre — perche' chiudere una serata riscriveva il
+     promemoria come "quello di prima piu' un anno" e la data camminava
+     avanti da sola fino al 2029. Quel ricalcolo non c'e' piu' da un pezzo,
+     e senza di lui l'anno torna a essere una cosa che sai. Serviva anche
+     per un'altra ragione: un elenco in ordine di data con dentro "ottobre"
+     non si puo' mettere in fila, perche' ottobre di quale anno viene prima?
+     Stesse regole del server (vedi NEXT_CONTACT_DATE_RE in app.py). */
   var MESI = ["gennaio","febbraio","marzo","aprile","maggio","giugno",
               "luglio","agosto","settembre","ottobre","novembre","dicembre"];
-  var GIORNI_NEL_MESE = [31,29,31,30,31,30,31,31,30,31,30,31];
   function pad2(n){ return n < 10 ? "0" + n : String(n); }
-  function periodParts(p){
-    var m = /^(\d{2})(?:-(\d{2}))?$/.exec(p || "");
-    return m ? {mese: Number(m[1]), giorno: m[2] ? Number(m[2]) : 0} : null;
+  /* "il 15 ott 2027", come si legge in ogni altra riga dell'app. */
+  function nextContactPhrase(d){ return d ? "il " + fmtDateShort(d) : ""; }
+  /* La stessa data N giorni piu' in la': serve alla finestra della Home. */
+  function plusDays(dateStr, n){
+    var d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   }
-  function periodLabel(p){
-    var q = periodParts(p);
-    return q ? ((q.giorno ? q.giorno + " " : "") + MESI[q.mese - 1]) : "";
-  }
-  function periodPhrase(p){
-    var q = periodParts(p);
-    return q ? (q.giorno ? "il " + periodLabel(p) : "a " + MESI[q.mese - 1]) : "";
-  }
-  /* Il periodo in un anno preciso. Il 29 febbraio si puo' scrivere — ci sono
-     anni in cui esiste — e negli altri scala al 28: meglio un giorno buono
-     che nessuno. Senza giorno vale il primo del mese. */
-  function periodOccurrence(p, anno){
-    var q = periodParts(p);
-    if(!q) return "";
-    var ultimo = new Date(anno, q.mese, 0).getDate();
-    return anno + "-" + pad2(q.mese) + "-" + pad2(Math.min(q.giorno || 1, ultimo));
-  }
-  /* Lo stesso giorno-mese di N mesi fa: serve alla finestra degli scaduti.
-     Come periodOccurrence, se il giorno in quel mese non esiste scala
-     all'ultimo che c'e'. */
-  function monthsAgo(dateStr, n){
-    var y = Number(dateStr.slice(0, 4)), m = Number(dateStr.slice(5, 7)) - n,
-        d = Number(dateStr.slice(8, 10));
-    while(m <= 0){ m += 12; y -= 1; }
-    return y + "-" + pad2(m) + "-" + pad2(Math.min(d, new Date(y, m, 0).getDate()));
-  }
-  /* Per quanto tempo un'occorrenza mancata resta "scaduta". Passata la
-     finestra il palcoscenico torna in fila con la sua occorrenza dell'anno
-     dopo: un rosso che dura dodici mesi non e' un avviso, e' l'arredamento. */
-  var MESI_SCADUTO = 4;
   /* Quando tocca, e se e' gia' passato senza che tu abbia chiamato.
 
-     L'occorrenza in ballo e' l'ultima passata: quella di quest'anno se e'
-     gia' arrivata, altrimenti quella dell'anno scorso. Serve tenersi anche
-     quella vecchia, altrimenti un novembre mancato smetterebbe di essere in
-     ritardo il primo di gennaio — due mesi invece di quattro, e proprio nel
-     mese in cui si programma la stagione.
+     Con una data intera non c'e' piu' niente da calcolare: la data e'
+     quella scritta. Quella che era una "finestra degli scaduti" — quattro
+     mesi, oltre i quali il promemoria tornava in fila con l'occorrenza
+     dell'anno dopo — non serve piu' e non avrebbe senso: una data che
+     passa non si ripresenta l'anno prossimo da sola. Resta li', in ritardo,
+     finche' non la sposti. Ed e' quello che deve fare, perche' e' la
+     telefonata che non hai fatto.
 
      "Non l'ho chiamato" si legge sulla serata in corso, non sull'esistenza
-     di una serata. Prima qui si guardava se c'era un tentativo aperto dopo
-     l'occorrenza, e bastava quello a dire "fatto": ma una serata aperta e
-     lasciata su "Opportunita'" e' un tentativo che c'e' senza che la
-     telefonata ci sia stata, ed era esattamente il caso che questo conto
-     deve far vedere. Chi si e' mosso davvero e' passato a Contattato,
-     Interessato, Trattativa o Confermato, e quelli non sono in ritardo:
-     hanno una trattativa per le mani, non una chiamata da fare.
-
-     Questa riga leggeva v.status, che diceva la stessa cosa perche' era la
-     copia della serata. Adesso lo stato del palcoscenico dice un'altra cosa
-     (Lead, Prospect, Cliente...) e la domanda la si fa alla serata, che e'
-     dove la risposta e' sempre stata.
-
-     La data di nascita del palcoscenico continua a contare, ma solo per
-     l'occorrenza di un anno passato. Serviva a non dare dell'inadempiente a
-     chi a gennaio scrive "a ottobre": l'ottobre scorso non era suo, e quel
-     caso resta coperto. Sull'occorrenza dell'anno in corso invece non si
-     guarda piu', perche' in una rubrica importata da Excel sono nati tutti
-     lo stesso giorno — 7 settembre 2026 — e con quel metro nessun periodo
-     da gennaio ad agosto poteva essere in ritardo il primo anno: Bar sport,
-     "27 agosto", risultava scaduto undici giorni prima di esistere e finiva
-     in fondo all'elenco con la data del 2027. Il resto lo fa la finestra:
-     non chiede se il palcoscenico c'era, chiede se la data mancata e'
-     abbastanza fresca da valere ancora una telefonata. */
+     di una serata: una serata aperta e lasciata su "Opportunita'" e' un
+     tentativo che c'e' senza che la telefonata ci sia stata. Chi si e'
+     mosso davvero e' passato a Contattato, Interessato, Trattativa o
+     Confermato, e quelli non sono in ritardo: hanno una trattativa per le
+     mani, non una chiamata da fare. */
   function recontactDue(v){
-    var p = v && v.recontact_period;
-    if(!p) return null;
-    var oggi = todayStr(), anno = Number(oggi.slice(0, 4));
-    var quest = periodOccurrence(p, anno);
-    var passata = quest <= oggi ? quest : periodOccurrence(p, anno - 1);
-    var prossima = quest > oggi ? quest : periodOccurrence(p, anno + 1);
-    var suo = passata.slice(0, 4) === oggi.slice(0, 4) ||
-              (v.created_at || "").slice(0, 10) <= passata;
+    var d = v && v.next_contact_date;
+    if(!d) return null;
     var g = currentGig(v);
-    /* Chi non ha nessuna serata aperta e' in ritardo come chi ce l'ha ferma
-       su "Opportunita'": in tutti e due i casi la data e' passata e la
-       telefonata non c'e' stata. Fino al 15 settembre 2026 qui si chiedeva
-       che la serata ci fosse, e siccome "Da contattare" teneva dentro solo
-       chi ne aveva una aperta la domanda non si vedeva. Adesso che l'elenco
-       tiene tutti, chi non ha niente di aperto e' anzi il caso piu' chiaro:
-       non l'hai chiamato e non hai nemmeno cominciato. */
-    if((!g || g.status === "opportunita") && suo && passata >= monthsAgo(oggi, MESI_SCADUTO))
-      return {date: passata, late: true};
-    return {date: prossima, late: false};
-  }
-  /* Il foglio dei mesi, uguale ovunque si scelga un periodo: nella scheda e
-     nel pannello "Ho suonato". Cambiare mese non butta via il giorno che
-     avevi scelto — lo accorcia, se in quel mese non ci sta. */
-  function openMonthSheet(current, onPick){
-    var q = periodParts(current);
-    var opts = [{label:"— nessun promemoria —", destructive: !!q, onSelect:function(){ onPick(""); }}];
-    MESI.forEach(function(nome, i){
-      var mm = pad2(i + 1);
-      opts.push({label: nome, checkmark: !!q && q.mese === i + 1, onSelect: function(){
-        onPick(q && q.giorno ? mm + "-" + pad2(Math.min(q.giorno, GIORNI_NEL_MESE[i])) : mm);
-      }});
-    });
-    openSheet({title:"Quando contattare", options: opts});
-  }
-  function openDaySheet(current, onPick){
-    var q = periodParts(current);
-    if(!q) return;
-    var mm = pad2(q.mese);
-    var opts = [{label:"tutto il mese", checkmark: !q.giorno, onSelect:function(){ onPick(mm); }}];
-    for(var d = 1; d <= GIORNI_NEL_MESE[q.mese - 1]; d++){
-      (function(d){
-        opts.push({label: d + " " + MESI[q.mese - 1], checkmark: q.giorno === d, onSelect:function(){
-          onPick(mm + "-" + pad2(d));
-        }});
-      })(d);
-    }
-    openSheet({title:"Il giorno", options: opts});
+    return {date: d, late: d < todayStr() && (!g || g.status === "opportunita")};
   }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
   /* Le attivita' vere sono quelle registrate col tocco: una visita, una
@@ -3025,7 +2918,7 @@
       /* Collassando, il titolone sparisce e l'elenco guadagna la sua altezza:
          se da scorrere ce n'era meno di tanto, il browser riporta subito
          tutto in cima, la barra si riapre, e a ogni tocco si vede sfarfallare
-         (l'Agenda di un trimestre con poche righe fa esattamente questo).
+         (l'Agenda con poche righe fa esattamente questo).
          Quando non c'e' abbastanza corsa, meglio non collassare affatto. */
       var guadagno = titolone ? titolone.offsetHeight : 0;
       if(scroller.scrollTop > 8 && scroller.scrollHeight - scroller.clientHeight > guadagno + 8){
@@ -3304,11 +3197,6 @@
   function vaiDaHome(el){
     var pezzi = (el.getAttribute("data-vai") || "").split(":");
     if(!pezzi[0]) return;
-    /* La mattonella dice il numero del trimestre di oggi, quindi l'Agenda si
-       apre su quello — anche se nella sessione ne avevi scelto un altro.
-       Altrimenti il numero che hai toccato e l'elenco che ti si apre
-       parlerebbero di tre mesi diversi. */
-    if(pezzi[1] === "recontact") trimestreAgenda = trimestreDelMese(new Date().getMonth() + 1);
     apriTab(pezzi[0]);
     if(pezzi[1]) setAgendaView(pezzi[1]);
   }
@@ -3357,12 +3245,11 @@
     /* Le stesse due cose che conta l'Agenda, cosi' i numeri non litigano:
        le confermate col calendario davanti e chi va richiamato.
 
-       Il secondo e' il trimestre di oggi, lo stesso insieme che si vede
-       aprendo "Da contattare": prima erano i promemoria dei sette giorni
-       successivi, arretrati compresi, e quel numero non si ritrovava da
-       nessuna parte — toccavi la mattonella, l'Agenda si apriva sul
-       trimestre e i conti erano due. Una mattonella che porta a una
-       schermata deve dire il numero di quella schermata. */
+       Il secondo e' il prossimo mese di telefonate: la testa dell'elenco
+       che si apre toccando la mattonella. Trenta giorni e non un trimestre
+       perche' la Home dice cosa c'e' da fare adesso — un numero che tiene
+       dentro anche novembre non si traduce in nessuna giornata — e con
+       dentro gli scaduti, che sono la parte che pesa davvero. */
     var oggi = todayStr(), prossime = [];
     venues.forEach(function(v){
       if(v.deleted_at) return;
@@ -3371,8 +3258,8 @@
       });
     });
     prossime.sort(function(a, b){ return a.gig_date < b.gig_date ? -1 : 1; });
-    var trimOggi = trimestreDelMese(Number(oggi.slice(5, 7)));
-    var daFare = quantiNelTrimestre(trimOggi);
+    var entro30 = daContattareEntro(30);
+    var tardi = entro30.filter(function(x){ return x.due.late; }).length;
     var cassa = cashTotals(cashRows());
 
     /* Le due mattonelle delle serate stanno in cima e in fila: quante ne
@@ -3403,8 +3290,9 @@
         ? tileHtml(fmtEuroCent(cassa.budget), "budget", sospesoText(cassa), false, cassa.budget < 0) +
           tileHtml(fmtEuroCent(cassa.saldo), "cassa", "incassato meno speso", false, cassa.saldo < 0)
         : "") +
-      tileHtml(String(daFare), "da contattare nel trimestre",
-        trimestreFrase(trimOggi), true, false, "recontact:recontact") +
+      tileHtml(String(entro30.length), "da contattare",
+        "nei prossimi 30 giorni" + (tardi ? " · " + tardi + " in ritardo" : ""),
+        true, false, "recontact:recontact") +
     '</div>';
 
     if(!played.length){
@@ -5235,32 +5123,10 @@
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
   var elPlanList = document.getElementById("planList");
-  var elTrimestreBar = document.getElementById("recontactQuarterBar");
   /* L'Agenda si apre sui Compiti: e' la prima scheda, ed e' la domanda con
      cui si apre l'agenda al mattino — cosa devo fare oggi. Le altre tre
      restano a un tocco. */
   var agendaView = "tasks";
-  /* I quattro trimestri, con dentro i loro mesi. Non e' una divisione
-     dell'anno che c'entri con la musica — nessuno programma "il secondo
-     trimestre" — ma sono quattro bersagli invece di dodici, e dentro
-     l'elenco i mesi ci sono lo stesso, uno sotto l'altro. */
-  var TRIMESTRI = [[1,2,3], [4,5,6], [7,8,9], [10,11,12]];
-  function trimestreDelMese(m){ return Math.floor((m - 1) / 3) + 1; }
-  /* "gen-mar", non "1º trimestre": i mesi sono quello che stai cercando, e
-     su una pastiglia larga un quarto di schermo ci stanno. */
-  function trimestreLabel(t){
-    var mm = TRIMESTRI[t - 1];
-    return MESI[mm[0] - 1].slice(0, 3) + "–" + MESI[mm[2] - 1].slice(0, 3);
-  }
-  function trimestreFrase(t){
-    var mm = TRIMESTRI[t - 1];
-    return "da " + MESI[mm[0] - 1] + " a " + MESI[mm[2] - 1];
-  }
-  /* Il trimestre che stai guardando. Si parte da quello di oggi — aprendo
-     l'agenda la domanda e' chi chiamare adesso, non a gennaio — e la scelta
-     resta finche' l'app e' aperta: uno che sta programmando l'estate non
-     vuole ricominciare da capo ogni volta che passa in Serate e torna. */
-  var trimestreAgenda = trimestreDelMese(new Date().getMonth() + 1);
 
   function setAgendaView(v){
     agendaView = v;
@@ -5279,45 +5145,54 @@
     if(btn) setAgendaView(btn.getAttribute("data-agenda"));
   });
 
-  /* Ogni riga si porta dietro quando tocca: la data non e' scritta da
-     nessuna parte, si calcola dal periodo e da oggi.
+  /* Ogni riga si porta dietro la sua data, che adesso e' scritta sul
+     palcoscenico: non c'e' piu' niente da calcolare a partire da oggi.
 
-     Dentro ci va chiunque abbia un promemoria, che abbia una serata aperta
-     o no. Fino al 15 settembre 2026 ne servivi una, e l'elenco diceva una
-     cosa diversa da quella che prometteva: un palcoscenico a cui avevi
-     detto "risentiamoci a ottobre" e su cui non avevi aperto niente — il
-     caso normale dopo un no — a ottobre non compariva. Chiudere una
-     stagione lo faceva sparire dal suo mese, e il promemoria, che e' la
-     cosa che ti eri scritto, non serviva a niente.
+     Dentro ci va chiunque abbia una data, che abbia una serata aperta o no.
+     Fino al 15 settembre 2026 ne servivi una, e l'elenco diceva una cosa
+     diversa da quella che prometteva: un palcoscenico a cui avevi detto
+     "risentiamoci a ottobre" e su cui non avevi aperto niente — il caso
+     normale dopo un no — a ottobre non compariva.
 
-     Chi ha suonato non e' un'eccezione da scrivere qui: la sua serata si
-     chiude, non ne resta nessuna aperta, e col promemoria che si e' portato
-     dietro ricompare nel mese giusto, pronto per l'anno nuovo.
+     L'ordine e' quello del tempo, dal piu' vecchio al piu' nuovo: gli
+     scaduti stanno in cima da soli, senza bisogno di un riquadro che li
+     raccolga, perche' in una fila cronologica il passato viene prima. A
+     parita' di giorno l'ordine e' alfabetico.
 
-     Fuori restano gli archiviati e chi il promemoria non ce l'ha: quelli
-     stanno in "Da pianificare", e i due segmenti continuano a non
-     sovrapporsi. */
+     Fuori restano gli archiviati e chi la data non ce l'ha: quelli stanno
+     in "Da pianificare", e i due segmenti continuano a non sovrapporsi. */
   function venuesToRecontact(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.recontact_period;
+      return !v.deleted_at && v.next_contact_date;
     })
-      .map(function(v){
-        var q = periodParts(v.recontact_period);
-        return {v: v, due: recontactDue(v), mese: q ? q.mese : 0, giorno: q ? q.giorno : 0};
-      })
-      .sort(function(a, b){ return a.due.date < b.due.date ? -1 : 1; });
-  }
-  /* Quelli di un mese, in ordine di giorno: "tutto il mese" (giorno 0)
-     viene prima del giorno 1, e a parita' di giorno e' alfabetico. */
-  function recontactInMonth(m){
-    return venuesToRecontact().filter(function(x){ return x.mese === m; })
+      .map(function(v){ return {v: v, due: recontactDue(v)}; })
       .sort(function(a, b){
-        if(a.giorno !== b.giorno) return a.giorno - b.giorno;
+        if(a.due.date !== b.due.date) return a.due.date < b.due.date ? -1 : 1;
         return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
       });
   }
-  function quantiNelTrimestre(t){
-    return TRIMESTRI[t - 1].reduce(function(n, m){ return n + recontactInMonth(m).length; }, 0);
+  /* Quelli da chiamare da qui a N giorni, con dentro anche gli scaduti: la
+     telefonata che dovevi fare a settembre e' da fare adesso, esattamente
+     come quella di domani. Un conto che lasciasse fuori il passato direbbe
+     che non hai niente da fare proprio quando sei in ritardo. */
+  function daContattareEntro(giorni){
+    var limite = plusDays(todayStr(), giorni);
+    return venuesToRecontact().filter(function(x){ return x.due.date <= limite; });
+  }
+  /* Le righe raggruppate per mese, in ordine: "ottobre 2026" e'
+     un'intestazione che si legge da sola, e senza l'anno due ottobre
+     diversi finirebbero sotto lo stesso titolo. */
+  function recontactPerMese(){
+    var gruppi = [], ultimo = null;
+    venuesToRecontact().forEach(function(x){
+      var chiave = x.due.date.slice(0, 7);
+      if(!ultimo || ultimo.chiave !== chiave){
+        ultimo = {chiave: chiave, titolo: MESI[Number(chiave.slice(5, 7)) - 1] + " " + chiave.slice(0, 4), righe: []};
+        gruppi.push(ultimo);
+      }
+      ultimo.righe.push(x);
+    });
+    return gruppi;
   }
 
   /* ---------------- i COMPITI in Agenda ----------------
@@ -5494,7 +5369,7 @@
   }
   function venuesToPlan(){
     return venues.filter(function(v){
-      return !v.deleted_at && v.status !== "lead" && !v.recontact_period;
+      return !v.deleted_at && v.status !== "lead" && !v.next_contact_date;
     }).slice().sort(function(a, b){
       var ra = statusRank(a.status), rb = statusRank(b.status);
       if(ra !== rb) return ra - rb;
@@ -5511,7 +5386,7 @@
         (sub.length ? '<div class="row-sub">'+sub.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+venueStatusPill(v)+
-          '<button type="button" class="renew-btn" data-period="'+v.id+'">Quando?</button></div>'+
+          '<input type="date" class="plan-date" data-period="'+v.id+'" aria-label="Quando richiamarli"></div>'+
       '</div></div>'+
     '</div>';
   }
@@ -5527,7 +5402,7 @@
     var righe = venuesToPlan();
     if(!righe.length){
       elPlanList.innerHTML = '<div class="empty-state"><div class="glyph">🗒️</div><h2>Niente da pianificare</h2>'+
-        '<p>Ogni palcoscenico che hai già toccato ha un mese in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p></div>';
+        '<p>Ogni palcoscenico che hai già toccato ha un giorno in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p></div>';
       return;
     }
     var html = "", corrente = null;
@@ -5543,50 +5418,19 @@
     });
     elPlanList.innerHTML = html + '</div>';
   }
-  elPlanList.addEventListener("click", function(e){
-    // Un gesto solo, e la riga passa nell'altro segmento: il foglio dei mesi
-    // e' lo stesso della scheda, cosi' "a ottobre" si dice allo stesso modo
-    // da tutte e due le parti.
+  /* Un gesto solo, e la riga passa nell'altro segmento. Il campo data e' lo
+     stesso della scheda, e sta nella riga: un foglio che si apre per una
+     scelta sola sarebbe un tocco in piu' per niente. */
+  elPlanList.addEventListener("change", function(e){
     var quando = e.target.closest("[data-period]");
-    if(quando){
-      var id = quando.getAttribute("data-period");
-      openMonthSheet("", function(scelto){ if(scelto) savePeriodFor(id, scelto); });
-      return;
-    }
+    if(quando && quando.value) saveNextContact(quando.getAttribute("data-period"), quando.value);
+  });
+  elPlanList.addEventListener("click", function(e){
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
 
-  /* Dodici pastiglie, gennaio-dicembre, col numero di chi aspetta in quel
-     mese. Il numero e' la meta' del senso del selettore: l'elenco di un mese
-     solo non puo' dire dove c'e' da lavorare negli altri undici.
-
-     E' un selettore e non delle schede: dodici schede non ci stanno su un
-     telefono, e questa barra scorre. */
-  /* Quattro pastiglie e basta: non c'e' niente da scorrere e niente da
-     centrare. La barra dei dodici mesi si portava il mese scelto in mezzo, e
-     toccandone un altro la pastiglia scappava da sotto il dito. */
-  function renderTrimestreBar(){
-    elTrimestreBar.innerHTML = TRIMESTRI.map(function(mm, i){
-      var t = i + 1, n = quantiNelTrimestre(t), attivo = t === trimestreAgenda;
-      return '<button type="button" class="mese-chip'+(attivo ? " active" : "")+
-        (n ? "" : " vuoto")+'" data-trimestre="'+t+'"'+(attivo ? ' aria-current="true"' : '')+'>'+
-        esc(trimestreLabel(t))+(n ? '<span class="cnt">'+n+'</span>' : '')+'</button>';
-    }).join("");
-  }
-  elTrimestreBar.addEventListener("click", function(e){
-    var btn = e.target.closest("[data-trimestre]");
-    if(!btn) return;
-    var t = Number(btn.getAttribute("data-trimestre"));
-    if(t === trimestreAgenda) return;
-    trimestreAgenda = t;
-    renderRecontact();
-    document.getElementById("scrollRecontact").scrollTop = 0;
-  });
-
   function renderRecontact(){
-    elTrimestreBar.hidden = agendaView !== "recontact";
-    renderTrimestreBar();
     renderRecontactList();
     renderPlanList();
     renderAgendaTasks();
@@ -5599,11 +5443,15 @@
       elRecontactSub.textContent = c + (c===1 ? " compito da fare" : " compiti da fare");
     } else if(agendaView === "plan"){
       var p = venuesToPlan().length;
-      elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza periodo" : " palcoscenici senza periodo");
+      elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza data" : " palcoscenici senza data");
     } else {
-      var w = quantiNelTrimestre(trimestreAgenda);
-      elRecontactSub.textContent = w + (w===1 ? " palcoscenico " : " palcoscenici ") +
-        trimestreFrase(trimestreAgenda);
+      /* Gli scaduti si dicono a parte: sono lo stesso elenco, ma sono
+         l'unica parte che riguarda oggi. */
+      var righe = venuesToRecontact();
+      var tardi = righe.filter(function(x){ return x.due.late; }).length;
+      elRecontactSub.textContent = righe.length +
+        (righe.length === 1 ? " palcoscenico da richiamare" : " palcoscenici da richiamare") +
+        (tardi ? " · " + tardi + (tardi === 1 ? " in ritardo" : " in ritardo") : "");
     }
   }
 
@@ -5639,11 +5487,12 @@
     return statusPillHtml(st.label, {color: st.color, soft: st.soft});
   }
 
-  /* Niente conto dei giorni e niente "scaduto": il mese l'hai scelto tu, e
-     dentro a un mese la riga dice il giorno. Un elenco in cui a maggio
-     erano tutti rossi e a marzo tutti "già passato" dava un allarme al
-     posto di un'agenda — e l'allarme era sempre acceso, quindi non era un
-     allarme.
+  /* Il conto dei giorni torna, e con lui il rosso degli scaduti. Erano
+     usciti il 15 settembre 2026, quando l'elenco si sceglieva a trimestre:
+     li' erano rumore — aprendo maggio a settembre erano rossi tutti, e un
+     allarme sempre acceso non e' un allarme. In una fila cronologica invece
+     il rosso e' in cima e riguarda solo le telefonate che dovevi fare
+     davvero: sotto, il resto dell'anno e' nero.
 
      Niente pulsanti sulla riga: si tocca e si apre la scheda, che e' dove
      si chiama, si scrive com'e' andata e si apre la serata. "Riproponi" e'
@@ -5658,64 +5507,59 @@
      Senza row-actions lo scorrimento non ha dove agganciarsi e la riga
      resta ferma — la stessa regola dei preferiti. */
   function recontactRowHtml(x){
-    var v = x.v, trail = CHEVRON;
+    var v = x.v, g = daysUntil(x.due.date);
+    var tag = x.due.late ? "scaduto" : (g === 0 ? "oggi" : (g === 1 ? "domani" : "tra " + g + "g"));
+    var colore = x.due.late ? "var(--red)" : (g <= 7 ? "var(--amber)" : "var(--text-secondary)");
     return '<div class="swipe-row" data-id="'+v.id+'">'+
       '<div class="row-content"><div class="row" data-open-id="'+v.id+'">'+
         '<div class="row-main"><div class="row-title">'+dato(v.name||"Senza nome")+'</div>'+
-        '<div class="row-sub">'+esc(periodLabel(v.recontact_period))+
+        '<div class="row-sub">'+esc(fmtDateShort(x.due.date))+' · '+whenHtml(tag, colore)+
           (v.planning_note ? ' · '+dato(v.planning_note) : '')+'</div>'+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
-        '<div class="row-trail">'+venueStatusPill(v)+trail+'</div>'+
+        '<div class="row-trail">'+venueStatusPill(v)+CHEVRON+'</div>'+
       '</div></div>'+
     '</div>';
   }
-  /* Un trimestre alla volta, quello scelto nella barra qui sopra, rotto per
-     mese: il trimestre e' il modo di arrivarci in quattro tocchi invece che
-     in dodici, ma quello che si programma resta il mese, e senza le
-     intestazioni novanta giorni di righe sarebbero un elenco piatto.
+  /* Tutto l'anno in una fila sola, rotto per mese. Fino al 19 settembre 2026
+     si sceglieva un trimestre da quattro pastiglie: era il modo di guardare
+     un periodo alla volta quando il promemoria era un periodo e basta, e con
+     una data intera diventava un filtro che nascondeva meta' del lavoro —
+     un promemoria di gennaio non si vedeva finche' non era gennaio.
 
-     Un mese senza nessuno non scrive l'intestazione: un titolo con zero
-     righe sotto e' una domanda a cui nessuno ha chiesto risposta.
-
-     Fino al 15 settembre 2026 qui c'era anche un blocco "Scaduti" col bordo
-     rosso. In un elenco che si sceglie a calendario non ha senso: aprendo
-     il trimestre di maggio a settembre sono scaduti tutti, e un riquadro
-     rosso che contiene tutta la pagina non avvisa di niente. */
+     Le intestazioni portano l'anno: senza, l'ottobre dell'anno prossimo e
+     quello di quest'anno finirebbero sotto lo stesso titolo. */
   function renderRecontactList(){
-    var mesi = TRIMESTRI[trimestreAgenda - 1].map(function(m){
-      return {mese: m, righe: recontactInMonth(m)};
-    });
-    var quanti = mesi.reduce(function(n, g){ return n + g.righe.length; }, 0);
-    if(!quanti){
+    var gruppi = recontactPerMese();
+    if(!gruppi.length){
       elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div>'+
-        (venuesToRecontact().length
-          ? '<h2>Niente '+esc(trimestreFrase(trimestreAgenda))+'</h2>'+
-            '<p>Nessun palcoscenico da richiamare in questi tre mesi. I numeri sulle pastiglie dicono dove sono gli altri.</p>'
-          : '<h2>Niente da contattare</h2>'+
-            '<p>Apri un palcoscenico e scegli il periodo in cui richiamarlo — «a ottobre», «a febbraio» — e da lì in poi torna qui ogni anno da solo.</p>')+
+        '<h2>Niente da contattare</h2>'+
+        '<p>Apri un palcoscenico e scegli il giorno in cui richiamarlo: da lì in poi ti aspetta qui, al suo posto nel calendario.</p>'+
         '</div>';
       return;
     }
-    elRecontactList.innerHTML = mesi.filter(function(g){ return g.righe.length; })
-      .map(function(g){
-        return '<div class="agenda-group">'+esc(MESI[g.mese - 1])+
-          '<span class="group-count">'+g.righe.length+'</span></div>'+
-          '<div class="grouped-list">'+g.righe.map(recontactRowHtml).join("")+'</div>';
-      }).join("");
+    elRecontactList.innerHTML = gruppi.map(function(g){
+      return '<div class="agenda-group">'+esc(g.titolo)+
+        '<span class="group-count">'+g.righe.length+'</span></div>'+
+        '<div class="grouped-list">'+g.righe.map(recontactRowHtml).join("")+'</div>';
+    }).join("");
   }
   elRecontactList.addEventListener("click", function(e){
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
 
-  /* Il periodo scelto nel pannello "Ho suonato", finche' non premi il
-     pulsante. Si parte da quello che il palcoscenico ha gia'; se non ha
-     niente, dal mese della serata — se hai suonato ad agosto, ad agosto ci
-     si riprova. Solo la prima volta: da li' in poi comanda la tua scelta,
-     che deve sopravvivere ai ridisegni dell'elenco. */
-  var confPeriodo = {};
-  function proposedPeriod(v, g){
-    return v.recontact_period || (g && g.gig_date ? g.gig_date.slice(5) : "");
+  /* La data scelta nel pannello "Ho suonato", finche' non premi il
+     pulsante. Si parte da quella che il palcoscenico ha gia'; se non ha
+     niente, dalla serata appena suonata. Solo la prima volta: da li' in poi
+     comanda la tua scelta, che deve sopravvivere ai ridisegni dell'elenco. */
+  var confData = {};
+  function proposedDate(v, g){
+    if(v.next_contact_date) return v.next_contact_date;
+    /* Se hai suonato il 12 agosto, si riprova il 12 agosto dell'anno dopo:
+       e' una proposta che vedi e puoi cambiare, non un ricalcolo silenzioso
+       come quello che nel 2026 aveva spinto un promemoria fino al 2029. */
+    if(g && g.gig_date) return (Number(g.gig_date.slice(0, 4)) + 1) + g.gig_date.slice(4);
+    return "";
   }
 
   /* La coda dice lo stato, come in ogni altro elenco. Quanto manca sta
@@ -5771,7 +5615,7 @@
     // Meglio chiederlo che cambiare lo stato al posto tuo.
     var toConfirm = past.filter(function(x){ return x.g.status === "confermato"; });
     toConfirm.forEach(function(x){
-      if(confPeriodo[x.g.id] === undefined) confPeriodo[x.g.id] = proposedPeriod(x.v, x.g);
+      if(confData[x.g.id] === undefined) confData[x.g.id] = proposedDate(x.v, x.g);
     });
     var html = "";
     if(toConfirm.length){
@@ -5789,10 +5633,9 @@
           '<div class="gig-panel">'+
             '<div class="field-row stacked"><label>Com\'è andata</label>'+
               '<textarea rows="2" id="conf-note-'+x.g.id+'" placeholder="es. serata piena, ci richiamano">'+esc(x.g.outcome_note || "")+'</textarea></div>'+
-            '<div class="field-row picker" data-conf-period="'+x.g.id+'"><label>Quando contattarli</label>'+
-              '<div class="picker-value"><span>'+
-                (confPeriodo[x.g.id] ? esc(periodLabel(confPeriodo[x.g.id])) : "— nessun promemoria —")+
-              '</span><svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div></div>'+
+            '<div class="field-row"><label>Quando contattarli</label>'+
+              '<input type="date" data-conf-period="'+x.g.id+'" value="'+esc(confData[x.g.id] || "")+'">'+
+              dateClearHtml(confData[x.g.id])+'</div>'+
           '</div>'+
           '<div class="gig-confirm">'+
             '<button type="button" class="yes" data-played="'+x.g.id+'">Ho suonato</button>'+
@@ -5860,16 +5703,18 @@
     }
     elAgendaGigs.innerHTML = html;
   }
-  elAgendaGigs.addEventListener("click", function(e){
+  /* La data scelta qui non si salva finche' non premi il pulsante: si
+     ricorda in confData, che sopravvive ai ridisegni dell'elenco. La ✕
+     manda "input" e non "change", quindi valgono tutti e due. */
+  elAgendaGigs.addEventListener("change", function(e){
     var per = e.target.closest("[data-conf-period]");
-    if(per){
-      var pid = per.getAttribute("data-conf-period");
-      openMonthSheet(confPeriodo[pid], function(scelto){
-        confPeriodo[pid] = scelto;
-        renderAgendaGigs();
-      });
-      return;
-    }
+    if(per) confData[per.getAttribute("data-conf-period")] = per.value;
+  });
+  elAgendaGigs.addEventListener("input", function(e){
+    var per = e.target.closest("[data-conf-period]");
+    if(per && !per.value) confData[per.getAttribute("data-conf-period")] = "";
+  });
+  elAgendaGigs.addEventListener("click", function(e){
     var yes = e.target.closest("[data-played]");
     var no = yes ? null : e.target.closest("[data-cancelled]");
     if(yes || no){
@@ -5881,14 +5726,14 @@
       // si archivia dalla sua riga.
       var payload = {status: yes ? "suonato" : "annullato"};
       if(noteEl) payload.outcome_note = noteEl.value;
-      // Anche se e' vuoto: "— nessun promemoria —" vuol dire non richiamarli.
-      payload.recontact_period = confPeriodo[gigId] || "";
+      // Anche se e' vuoto: nessuna data vuol dire non richiamarli.
+      payload.next_contact_date = confData[gigId] || "";
       api("PUT", "/api/gigs/" + gigId, payload).then(function(updated){
         applyUpdatedVenue(updated);
         renderAll();
         renderRecontactRows(updated);
         toast((yes ? "Segnata come suonata" : "Segnata come annullata") +
-          (updated.recontact_period ? " · li richiami " + periodPhrase(updated.recontact_period) : ""));
+          (updated.next_contact_date ? " · li richiami " + nextContactPhrase(updated.next_contact_date) : ""));
       }).catch(function(err){ toast(err.message); });
       return;
     }
@@ -6611,40 +6456,36 @@
      mese c'e' — "il 15 di niente" non vuol dire niente — e il salvataggio e'
      immediato, non a 350ms come i campi di testo: qui non stai digitando,
      hai scelto. */
-  var elRowRecontactMonth = document.getElementById("rowRecontactMonth"),
-      elRowRecontactDay = document.getElementById("rowRecontactDay"),
-      elRecontactMonthValue = document.getElementById("recontactMonthValue"),
-      elRecontactDayValue = document.getElementById("recontactDayValue");
+  var elNextContact = document.getElementById("fNextContact");
 
   function renderRecontactRows(v){
     if(!v || String(v.id) !== String(currentId)) return;
-    var q = periodParts(v.recontact_period);
-    elRecontactMonthValue.textContent = q ? MESI[q.mese - 1] : "— nessun promemoria —";
-    elRowRecontactDay.hidden = !q;
-    elRecontactDayValue.textContent = q && q.giorno ? String(q.giorno) : "tutto il mese";
+    elNextContact.value = v.next_contact_date || "";
+    var x = elNextContact.parentNode.querySelector("[data-clear-date]");
+    if(x) x.hidden = !elNextContact.value;
   }
   /* Il periodo si sceglie da due posti: la scheda del palcoscenico e la riga
      di "Da pianificare". Il salvataggio e' lo stesso, e non passa da
      patchVenue perche' quello scrive sempre sulla scheda aperta — che in
      Agenda non c'e'. */
-  function savePeriodFor(id, p){
-    return api("PUT", "/api/locations/" + id, {recontact_period: p}).then(function(updated){
+  function saveNextContact(id, d){
+    return api("PUT", "/api/locations/" + id, {next_contact_date: d}).then(function(updated){
       applyUpdatedVenue(updated);
       renderRecontactRows(updated);
       renderAll();
-      toast(p ? "Li contatti " + periodPhrase(p) : "Promemoria tolto");
+      toast(d ? "Li contatti " + nextContactPhrase(d) : "Promemoria tolto");
     }).catch(function(err){ toast(err.message); });
   }
-  function saveRecontactPeriod(p){
-    if(currentId) savePeriodFor(currentId, p);
-  }
-  elRowRecontactMonth.addEventListener("click", function(){
-    var v = currentVenue();
-    if(v) openMonthSheet(v.recontact_period, saveRecontactPeriod);
+  /* Si salva quando la data e' scelta, non mentre la si scrive: "change"
+     arriva a scelta fatta. La ✕ invece svuota il campo da fuori — non ci sei
+     dentro col dito — e quello e' l'unico "input" che qui vale un
+     salvataggio: senza, togliere il promemoria non lo toglierebbe davvero. */
+  elNextContact.addEventListener("change", function(){
+    if(currentId) saveNextContact(currentId, elNextContact.value);
   });
-  elRowRecontactDay.addEventListener("click", function(){
-    var v = currentVenue();
-    if(v) openDaySheet(v.recontact_period, saveRecontactPeriod);
+  elNextContact.addEventListener("input", function(){
+    if(currentId && !elNextContact.value && document.activeElement !== elNextContact)
+      saveNextContact(currentId, "");
   });
 
   function renderPhotosStrip(v){
