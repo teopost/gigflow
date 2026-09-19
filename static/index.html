@@ -592,12 +592,21 @@
   /* Il pulsante in coda a una riga dell'agenda: adesso ne e' rimasto uno
      solo, "Quando?" su "Da pianificare". Il nome viene da "Riproponi", che
      stava qui prima. */
-  /* Il campo data nella riga di "Da pianificare". Prende il posto di
-     .renew-btn, il pulsante "Quando?" che apriva il foglio dei mesi: con una
-     data intera il foglio sarebbe stato lungo trecentosessantacinque voci, e
-     il campo nativo fa la stessa cosa in un tocco. Stessa pastiglia di
-     prima, cosi' la colonna di destra non cambia peso. */
-  .plan-date{border:none;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:8px 10px;cursor:pointer;max-width:135px;}
+  /* Il pulsante "Ricontatta" nella riga di "Da pianificare": una pastiglia
+     con su scritto cosa fa, e il calendario del telefono steso sopra,
+     trasparente. Il campo data nudo era la cosa sbagliata due volte —
+     vuoto sembrava un pulsante rosso senza scritta, e il tocco passava
+     sotto e apriva la scheda invece del calendario.
+
+     Prende il posto di .renew-btn, il pulsante "Quando?" che apriva il
+     foglio dei mesi: con una data intera quel foglio sarebbe stato lungo
+     trecentosessantacinque voci. */
+  .plan-date{position:relative;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--tint-soft);color:var(--tint);font-size:13px;font-weight:600;font-family:inherit;padding:9px 13px;cursor:pointer;white-space:nowrap;}
+  .plan-date:active{opacity:.7;}
+  /* Trasparente ma sopra a tutto: il dito lo prende lui, e il calendario si
+     apre da solo. Senza inset:0 il bersaglio sarebbe il rettangolino del
+     campo, che su iPhone e' meta' della pastiglia. */
+  .plan-date-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;background:none;padding:0;cursor:pointer;-webkit-appearance:none;appearance:none;}
   /* ---- Home: tessere e grafici. Nessuna libreria: barre in CSS, cosi'
      seguono i temi chiaro/scuro come tutto il resto e non c'e' niente da
      scaricare su un telefono in giro per locali. ---- */
@@ -5395,14 +5404,22 @@
   }
   /* Si entra da "Focus" e non da "Tutti": l'arretrato intero e' lungo, e
      quello su cui la band ha deciso di stare e' la parte per cui apri
-     questa schermata. "Tutti" resta a un tocco, e la scelta dura finche'
-     l'app e' aperta. */
+     questa schermata. Gli altri due restano a un tocco, e la scelta dura
+     finche' l'app e' aperta.
+
+     Le tre pastiglie non dicono la stessa cosa in tre modi: Focus e' la
+     band — l'ha acceso qualcuno per tutti — Preferiti sei tu soltanto, e
+     nessuno degli altri li vede. Uno dei due e' una decisione presa
+     insieme, l'altro un appunto tuo, e in mezzo alla stessa barra bisogna
+     ricordarselo. */
   var planFiltro = "focus";
   function venuesToPlan(filtro){
-    var soloFocus = (filtro || planFiltro) === "focus";
+    var f = filtro || planFiltro;
     return venues.filter(function(v){
-      return !v.deleted_at && v.status !== "lead" && !v.next_contact_date &&
-             (!soloFocus || !!v.focus);
+      if(v.deleted_at || v.status === "lead" || v.next_contact_date) return false;
+      if(f === "focus") return !!v.focus;
+      if(f === "preferiti") return sonoPreferito(v.id);
+      return true;
     }).slice().sort(function(a, b){
       var ra = statusRank(a.status), rb = statusRank(b.status);
       if(ra !== rb) return ra - rb;
@@ -5420,7 +5437,9 @@
         (sub.length ? '<div class="row-sub">'+sub.join(" · ")+'</div>' : '')+
         (v.city ? '<div class="row-sub">'+dato(v.city)+'</div>' : '')+'</div>'+
         '<div class="row-trail">'+venueStatusPill(v)+
-          '<input type="date" class="plan-date" data-period="'+v.id+'" aria-label="Quando richiamarli"></div>'+
+          '<label class="plan-date">Ricontatta'+
+            '<input type="date" class="plan-date-input" data-period="'+v.id+'" aria-label="Quando richiamarli">'+
+          '</label></div>'+
       '</div></div>'+
     '</div>';
   }
@@ -5438,6 +5457,7 @@
   function renderPlanFilterBar(){
     elPlanFilterBar.innerHTML = [
       {key: "focus", label: "Focus"},
+      {key: "preferiti", label: "Preferiti"},
       {key: "tutti", label: "Tutti"}
     ].map(function(f){
       var n = venuesToPlan(f.key).length, attivo = f.key === planFiltro;
@@ -5462,9 +5482,12 @@
     var righe = venuesToPlan();
     if(!righe.length){
       elPlanList.innerHTML = '<div class="empty-state"><div class="glyph">🗒️</div>'+
-        (planFiltro === "focus" && venuesToPlan("tutti").length
-          ? '<h2>Nessuno in focus</h2>'+
-            '<p>Qui restano solo i palcoscenici che la band ha messo sott’occhio. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>'
+        (planFiltro !== "tutti" && venuesToPlan("tutti").length
+          ? (planFiltro === "focus"
+              ? '<h2>Nessuno in focus</h2>'+
+                '<p>Qui restano solo i palcoscenici che la band ha messo sott’occhio, con l’occhio in alto nella scheda. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>'
+              : '<h2>Nessun preferito qui</h2>'+
+                '<p>Qui restano solo i tuoi preferiti — la stella è tua e non la vede nessun altro. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>')
           : '<h2>Niente da pianificare</h2>'+
             '<p>Ogni palcoscenico che hai già toccato ha un giorno in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p>')+
         '</div>';
@@ -5491,6 +5514,9 @@
     if(quando && quando.value) saveNextContact(quando.getAttribute("data-period"), quando.value);
   });
   elPlanList.addEventListener("click", function(e){
+    // Il pulsante sta dentro la riga: senza questa riga il calendario si
+    // aprirebbe insieme alla scheda del palcoscenico.
+    if(e.target.closest(".plan-date")) return;
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
