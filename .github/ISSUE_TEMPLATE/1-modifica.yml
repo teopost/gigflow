@@ -1,5 +1,5 @@
-name: Modifica all'app
-description: Una cosa da cambiare, aggiungere o sistemare in GigFlow
+name: App change
+description: Something to change, add or fix in GigFlow
 labels: []
 body:
   - type: markdown

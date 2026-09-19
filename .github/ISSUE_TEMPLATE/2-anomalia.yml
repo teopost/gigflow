@@ -1,5 +1,5 @@
-name: Anomalia
-description: Qualcosa non funziona come dovrebbe
+name: Bug report
+description: 'Something isn''t working as it should'
 labels: ["bug"]
 body:
   - type: markdown
