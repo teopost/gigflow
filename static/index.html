@@ -2260,7 +2260,7 @@
         <span class="inline-title" id="detailInlineTitle">Palcoscenico</span>
         <div class="navbar-trailing">
           <button class="nav-btn" id="btnFocus" aria-label="Sott'occhio">
-            <svg id="btnFocusIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.2 5.2 12 5.2 22.4 12 22.4 12 18.8 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1"/></svg>
+            <svg id="btnFocusIcon" aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.2 5.2 12 5.2 22.4 12 22.4 12 18.8 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1"/></svg>
           </button>
           <button class="nav-btn" id="btnFavorite" aria-label="Preferito">
             <svg id="btnFavoriteIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>
@@ -8308,10 +8308,8 @@
      caricare. La differenza e' tutta li': la stella e' di chi la mette, il
      focus e' della band. */
   var elBtnFocus = document.getElementById("btnFocus");
-  var elBtnFocusIcon = document.getElementById("btnFocusIcon");
   function renderFocusButton(v){
     elBtnFocus.classList.toggle("focus-active", !!(v && v.focus));
-    elBtnFocusIcon.setAttribute("aria-hidden", "true");
   }
   /* Si accende subito, come la stella: la scheda e' una bozza, questo no.
      Se la chiamata fallisce l'occhio torna indietro, altrimenti resterebbe
