@@ -5451,8 +5451,13 @@
      stessa cosa: e' nella stessa colonna di tutti gli altri elenchi, e una
      riga che finisce sotto l'intestazione sbagliata mentre scorri non
      dovrebbe costare una risalita per capire cos'e'. */
-  /* Tre pastiglie e il loro numero: il numero e' meta' del senso, perche'
+  /* Le pastiglie e il loro numero: il numero e' meta' del senso, perche'
      l'elenco filtrato da solo non puo' dire quanto resta fuori.
+
+     "Preferiti" c'e' ma non si vede: il filtro funziona — venuesToPlan lo
+     sa fare, lo stato vuoto sa cosa dire — solo la pastiglia non viene
+     disegnata. Per rimetterlo basta togliergli "nascosto" qui sotto, senza
+     riscrivere niente.
 
      Stanno solo qui, in "Da pianificare". Per un giro le ha avute anche "Da
      contattare", e sono durate poco: li' l'elenco e' cosa c'e' da fare
@@ -5462,9 +5467,9 @@
   function renderPlanFilterBar(){
     elPlanFilterBar.innerHTML = [
       {key: "focus", label: "Focus"},
-      {key: "preferiti", label: "Preferiti"},
+      {key: "preferiti", label: "Preferiti", nascosto: true},
       {key: "tutti", label: "Tutti"}
-    ].map(function(f){
+    ].filter(function(f){ return !f.nascosto; }).map(function(f){
       var n = venuesToPlan(f.key).length, attivo = f.key === planFiltro;
       return '<button type="button" class="filtro-chip'+(attivo ? " active" : "")+
         (n ? "" : " vuoto")+'" data-filtro="'+f.key+'"'+
