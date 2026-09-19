@@ -380,6 +380,11 @@
   #btnFocus.focus-active circle{fill:currentColor;}
   .row-chevron{flex:none;color:var(--text-tertiary);}
   .row-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
+  /* La pastiglia dello stato e, sotto, i segni: incolonnati a destra e
+     allineati al bordo, cosi' in un elenco che scorre stanno tutti sulla
+     stessa verticale. */
+  .trail-stack{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+  .trail-segni{display:flex;align-items:center;gap:4px;line-height:0;}
 
   /* Il plettro e' il marchio di GigFlow: e' quello che sta nell'icona
      dell'app, ed e' quello che deve comparire dove prima c'era un
@@ -2223,6 +2228,29 @@
         </div>
       </div>
 
+      <!-- Due interruttori e non una tendina a tre voci: sono due domande
+           separate — "quelli che seguo io" e "quelli che segue la band" — e
+           accesi insieme chiedono l'incrocio, che e' una cosa che ha senso
+           chiedere. -->
+      <div class="section-header">SEGNI</div>
+      <div class="grouped-list">
+        <div class="field-row" id="rowFilterFav">
+          <label for="filterFavToggle" style="flex:1;">Solo i miei preferiti</label>
+          <label class="ios-switch">
+            <input type="checkbox" id="filterFavToggle">
+            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+          </label>
+        </div>
+        <div class="field-row">
+          <label for="filterFocusToggle" style="flex:1;">Solo in focus</label>
+          <label class="ios-switch">
+            <input type="checkbox" id="filterFocusToggle">
+            <span class="ios-switch-track"><span class="ios-switch-thumb"></span></span>
+          </label>
+        </div>
+      </div>
+      <div class="section-footer">La stella è tua e non la vede nessun altro; il focus è della band, e chi lo accende lo accende per tutti.</div>
+
       <div class="section-header">POSIZIONE</div>
       <div class="grouped-list">
         <div class="field-row">
@@ -2860,6 +2888,10 @@
   function filterTagsAttivi(){ return filterTags.length > 0; }
   var owners = [];
   var searchText = "";
+  /* Due filtri che non stanno nella riga dei dati del palcoscenico: la
+     stella e' di chi guarda, il focus e' della band. */
+  var filterSoloPreferiti = false;
+  var filterSoloFocus = false;
   var nearMeEnabled = false;
   var nearMeRadiusKm = 30;
   var nearMeCoords = null;
@@ -3772,13 +3804,15 @@
 
   function filtriVuoti(){
     return {status:"all", type:"all", category:"all", owner:"all", regione:"all", provincia:"all",
-            tags:[], nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
+            tags:[], soloPreferiti:false, soloFocus:false,
+            nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
   }
   function snapshotFiltri(){
     var liste = {};
     VENUE_LISTS.forEach(function(L){ liste[L.key] = L.filter; });
     return {status:filterStatus, type:filterType, category:filterCategory, owner:filterOwner,
             regione:filterRegione, provincia:filterProvincia, tags:filterTags.slice(),
+            soloPreferiti:filterSoloPreferiti, soloFocus:filterSoloFocus,
             nearMe:nearMeEnabled, nearMeKm:nearMeRadiusKm, nearMeCoords:nearMeCoords,
             liste:liste, sortBy:sortBy};
   }
@@ -3788,6 +3822,7 @@
     // Una copia, se no le due schermate si ritroverebbero lo stesso elenco
     // e spuntare un tag di qua lo spunterebbe anche di la'.
     filterTags = (snap.tags || []).slice();
+    filterSoloPreferiti = !!snap.soloPreferiti; filterSoloFocus = !!snap.soloFocus;
     nearMeEnabled = snap.nearMe; nearMeRadiusKm = snap.nearMeKm; nearMeCoords = snap.nearMeCoords;
     VENUE_LISTS.forEach(function(L){ L.filter = snap.liste[L.key] || "all"; });
     sortBy = snap.sortBy;
@@ -3800,7 +3835,8 @@
     if(!snap) return false;
     var liste = snap.liste || {};
     return snap.status !== "all" || snap.type !== "all" || snap.category !== "all" || snap.owner !== "all"
-        || snap.regione !== "all" || snap.provincia !== "all" || (snap.tags || []).length || snap.nearMe
+        || snap.regione !== "all" || snap.provincia !== "all" || (snap.tags || []).length
+        || snap.soloPreferiti || snap.soloFocus || snap.nearMe
         || Object.keys(liste).some(function(k){ return liste[k] !== "all"; });
   }
   /* Il passaggio di consegne fra le due schermate: quella che lasci si
@@ -3935,6 +3971,25 @@
     });
     openSheet({title:"Filtra per proprietario", searchable: owners.length > 6, searchPlaceholder:"Cerca proprietario…", options:opts});
   });
+  var elFilterFavToggle = document.getElementById("filterFavToggle");
+  var elFilterFocusToggle = document.getElementById("filterFocusToggle");
+  function renderSegniRows(){
+    elFilterFavToggle.checked = filterSoloPreferiti;
+    elFilterFocusToggle.checked = filterSoloFocus;
+    /* Nei Preferiti "solo i miei preferiti" e' gia' vero per costruzione:
+       un interruttore che non cambia niente e' peggio che non averlo. La
+       stessa regola della sezione dell'archivio, qui sotto. */
+    document.getElementById("rowFilterFav").hidden = (filterScope === "favorites");
+  }
+  elFilterFavToggle.addEventListener("change", function(){
+    filterSoloPreferiti = elFilterFavToggle.checked;
+    renderList(); renderFavorites(); updateFilterActiveDot();
+  });
+  elFilterFocusToggle.addEventListener("change", function(){
+    filterSoloFocus = elFilterFocusToggle.checked;
+    renderList(); renderFavorites(); updateFilterActiveDot();
+  });
+
   var RADIUS_PRESETS_KM = [5, 10, 20, 30, 50, 100];
   var elNearMeToggle = document.getElementById("nearMeToggle");
   var elRowNearMeRadius = document.getElementById("rowNearMeRadius");
@@ -4018,6 +4073,7 @@
     // La riga dei tag c'e' solo se ne hai: senza tag e' una riga che dice
     // "Tutti" e non apre niente.
     document.getElementById("rowFilterTag").hidden = !tagVocabolario().length;
+    renderSegniRows();
     renderNearMeRow();
     renderShowDeletedRow();
     document.getElementById("filtersArchiveSection").hidden = (filterScope === "favorites");
@@ -4041,8 +4097,9 @@
     filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all"; filterTags = [];
     resetVenueListFilters();
     resetGeoFilters();
+    filterSoloPreferiti = false; filterSoloFocus = false;
     nearMeEnabled = false; nearMeCoords = null; nearMeRadiusKm = 30;
-    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderGeoFilterRows(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderFilterTagRow(); renderNearMeRow(); renderAll();
+    renderFilterStatusRow(); renderFilterTypeRow(); renderFilterCategoryRow(); renderGeoFilterRows(); renderVenueListFilterRows(); renderFilterOwnerRow(); renderFilterTagRow(); renderSegniRows(); renderNearMeRow(); renderAll();
     if(!opts.tieniArchiviati && showDeletedEnabled){ showDeletedEnabled = false; renderShowDeletedRow(); renderAll(); }
   }
   document.getElementById("btnFiltersReset").addEventListener("click", function(){
@@ -4077,6 +4134,8 @@
     if(!venueMatchesVenueLists(v)) return false;
     if(!venueMatchesGeo(v)) return false;
     if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
+    if(filterSoloPreferiti && !sonoPreferito(v.id)) return false;
+    if(filterSoloFocus && !v.focus) return false;
     // Basta che ne abbia uno di quelli chiesti: due tag spuntati allargano
     // l'elenco, non lo stringono. "Anni 80 oppure estivi" e' la domanda che
     // uno si fa; "anni 80 e anche estivi" quasi mai, e per quella c'e' la
@@ -4149,6 +4208,15 @@
        quello con cui lo scorri. Senza row-actions lo scorrimento non ha
        dove agganciarsi e la riga resta ferma; le due azioni restano dove
        si lavora davvero, nell'elenco dei palcoscenici e nella scheda. */
+    /* Sotto la pastiglia dello stato, a destra: due segni piccoli che
+       dicono "questo e' mio" e "questo lo sta seguendo la band". Non si
+       toccano — la stella si accende da quella grande qui a sinistra o
+       dalla scheda, l'occhio dalla scheda — qui servono solo a farsi
+       riconoscere scorrendo l'elenco. */
+    var segni = [];
+    if(stellato) segni.push('<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color:#f5a623;"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>');
+    if(v.focus) segni.push('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--tint);"><path d="M1.6 12S5.2 5.2 12 5.2 22.4 12 22.4 12 18.8 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1" fill="currentColor"/></svg>');
+    var segniHtml = segni.length ? '<span class="trail-segni" aria-hidden="true">'+segni.join("")+'</span>' : "";
     var noSwipe = !!(opts && opts.noSwipe);
     // Due azioni: quella reversibile in grigio, quella definitiva in rosso.
     var actionHtml = v.deleted_at
@@ -4166,7 +4234,7 @@
         (showLastContact ? '<div class="row-sub" style="color:var(--text-tertiary);">'+esc(ultimoContattoLabel(v))+'</div>' : '')+
         tagsHtml+'</div>'+
         '<div class="row-trail">'+
-          badgeHtml+
+          '<span class="trail-stack">'+badgeHtml+segniHtml+'</span>'+
           '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg>'+
         '</div>'+
       '</div></div>'+
@@ -4258,7 +4326,7 @@
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
     var sorted = filtered.slice().sort(venueSorter());
     if(sorted.length === 0){
-      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !searchText;
+      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !filterSoloPreferiti && !filterSoloFocus && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
           ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
