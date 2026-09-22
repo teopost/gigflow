@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """Cancella le serate aperte per sbaglio, che non sono mai cominciate.
 
-Fino alla build 260912.2156 ogni palcoscenico nuovo apriva subito una serata
+Fino alla build 260912.2156 ogni palco nuovo apriva subito una serata
 per la stagione in corso: bastava trascrivere un indirizzo perche' l'app lo
 dichiarasse da contattare e aprisse un tentativo che nessuno aveva deciso di
-fare (quello stato oggi si chiama "opportunita'"). Quella riga adesso non c'e' piu' — un palcoscenico nuovo nasce lead e
-la serata nasce quando decidi di provarci — ma i palcoscenici gia' in
+fare (quello stato oggi si chiama "opportunita'"). Quella riga adesso non c'e' piu' — un palco nuovo nasce lead e
+la serata nasce quando decidi di provarci — ma i palchi gia' in
 archivio si portano dietro la serata fantasma di allora.
 
-Qui si ripuliscono: se tutte le serate di un palcoscenico sono ancora
+Qui si ripuliscono: se tutte le serate di un palco sono ancora
 "opportunita'" e sono vuote — niente data, niente compenso, niente scritto su
 com'e' andata, nessuna attivita' appesa — allora quel tentativo non e' mai
 cominciato. Le serate si cancellano, e chi restava "inattivo" solo per colpa
 loro torna lead.
 
 Non tocca niente che sia successo davvero: le note restano attaccate al
-palcoscenico (perdono solo il legame con il ciclo che non c'e' piu', come
+palco (perdono solo il legame con il ciclo che non c'e' piu', come
 quando si elimina una serata dalla scheda), il promemoria di ricontatto
-resta dov'e', e un palcoscenico con anche una sola serata vera non viene
+resta dov'e', e un palco con anche una sola serata vera non viene
 nemmeno guardato.
 
 NON e' una migrazione e non gira da sola all'avvio, apposta: la stessa
@@ -51,8 +51,8 @@ SERATA_VERA = """
 """
 
 # Chi guardare: quelli che una serata ce l'hanno ma non e' mai cominciata.
-# Prima la domanda si faceva allo stato del palcoscenico ("da contattare"),
-# che era la copia della serata; dal 15 settembre 2026 il palcoscenico dice
+# Prima la domanda si faceva allo stato del palco ("da contattare"),
+# che era la copia della serata; dal 15 settembre 2026 il palco dice
 # un'altra cosa e la domanda si fa alle serate, che e' dove la risposta e'
 # sempre stata.
 DA_SCREMARE = """
@@ -77,7 +77,7 @@ def main():
         print("Niente da scremare: nessuna serata rimasta vuota sul nascere.")
         return
 
-    print("%d palcoscenici perdono la serata mai cominciata:\n" % len(righe))
+    print("%d palchi perdono la serata mai cominciata:\n" % len(righe))
     for r in righe:
         segni = []
         if r["next_contact_date"]:
@@ -113,7 +113,7 @@ def main():
             "UPDATE locations SET status = 'lead', updated_at = ? "
             "WHERE status = 'inattivo' AND id IN (%s)" % segna,
             [ts] + ids)
-    print("Fatto: %d serate mai cominciate cancellate su %d palcoscenici."
+    print("Fatto: %d serate mai cominciate cancellate su %d palchi."
           % (serate, len(ids)))
 
 

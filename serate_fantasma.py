@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Le serate che erano contatti tornano a essere contatti.
 
-Fino al 15 settembre 2026 registrare un'attivita' su un palcoscenico senza
+Fino al 15 settembre 2026 registrare un'attivita' su un palco senza
 serate aperte ne apriva una, in stato "contattato". E l'import dell'archivio
 di partenza ha fatto la stessa cosa in grande: lo stato del CRM vecchio
 ("Inviata Mail", "Inviato Whatsapp") e' diventato una serata.
@@ -21,14 +21,14 @@ Qui si rimette ogni cosa al suo posto:
   3. l'attivita' porta la data del file da cui arrivano quei contatti
      (28 agosto 2026): a quel giorno erano gia' partiti, ed e' piu' vero del
      giorno in cui sono stati importati;
-  4. il palcoscenico che era "inattivo" torna "lead": ci abbiamo scritto e
+  4. il palco che era "inattivo" torna "lead": ci abbiamo scritto e
      non ci hanno risposto, e questo e' esattamente un lead contattato.
      Prospect e Lead restano dove sono — quelli li ha decisi una persona.
 
 Non tocca niente che sia successo davvero: una serata con una data, un
 compenso, una nota sull'esito o uno stato diverso da "contattato" non viene
 nemmeno guardata. Chi ha gia' un'attivita' registrata non ne riceve una
-doppia. Le attivita' appese alla serata cancellata restano sul palcoscenico
+doppia. Le attivita' appese alla serata cancellata restano sul palco
 e perdono solo il legame con il ciclo, come quando si elimina una serata a
 mano.
 
@@ -55,7 +55,7 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "crm.
 # spostare il giorno dai fusi orari.
 DATA_CONTATTO = "2026-08-28T12:00:00+00:00"
 
-# Le serate da guardare: una sola per palcoscenico, "contattato", e vuota.
+# Le serate da guardare: una sola per palco, "contattato", e vuota.
 DA_RIPULIRE = """
     SELECT l.id, l.name, l.city, l.status,
            (SELECT g.id FROM gigs g WHERE g.location_id = l.id) AS gig_id,
@@ -126,9 +126,9 @@ def main():
     print("  attivita' che nascono:")
     print("    %4d email inviate" % conti["email"])
     print("    %4d messaggi inviati" % conti["messaggio"])
-    print("    %4d palcoscenici hanno gia' un'attivita' segnata: nessun doppione"
+    print("    %4d palchi hanno gia' un'attivita' segnata: nessun doppione"
           % conti["gia_segnate"])
-    print("  palcoscenici che tornano lead: %d (gli altri %d restano come sono)"
+    print("  palchi che tornano lead: %d (gli altri %d restano come sono)"
           % (conti["a_lead"], len(righe) - conti["a_lead"]))
     print("  data delle attivita': %s\n" % DATA_CONTATTO[:10])
 
@@ -158,7 +158,7 @@ def main():
                     (r["id"], kind, TESTI[kind], DATA_CONTATTO),
                 )
                 scritte += 1
-            # Le attivita' appese alla serata restano sul palcoscenico.
+            # Le attivita' appese alla serata restano sul palco.
             conn.execute("UPDATE notes SET gig_id = NULL WHERE gig_id = ?", (r["gig_id"],))
             conn.execute("DELETE FROM gigs WHERE id = ?", (r["gig_id"],))
             cancellate += 1
@@ -169,7 +169,7 @@ def main():
                 )
                 spostati += 1
 
-    print("Fatto: %d serate cancellate, %d attivita' scritte, %d palcoscenici tornati lead."
+    print("Fatto: %d serate cancellate, %d attivita' scritte, %d palchi tornati lead."
           % (cancellate, scritte, spostati))
 
 

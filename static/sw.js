@@ -1,4 +1,4 @@
-// Service worker per Palcoscenici: mette in cache la "shell" statica
+// Service worker per Palchi: mette in cache la "shell" statica
 // dell'app (HTML/manifest/icone) per superare i requisiti di installabilità
 // di Chrome/Android e per avere un fallback quando il server non è
 // raggiungibile. Le chiamate a /api/ non vengono MAI messe in cache: i dati
@@ -21,7 +21,7 @@
 // reinstallare per vedere le novità.
 
 const BUILD = "__BUILD__";
-const CACHE_NAME = "palcoscenici-shell-" + BUILD;
+const CACHE_NAME = "palchi-shell-" + BUILD;
 // Il registro delle push arrivate (vedi annotaPush): non è la shell di una
 // versione, è una traccia di quello che è successo su questo telefono, e
 // deve sopravvivere agli aggiornamenti — altrimenti sparirebbe proprio nel

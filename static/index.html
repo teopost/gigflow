@@ -488,7 +488,7 @@
      non crescono, altrimenti i titoli delle righe con e senza foto non
      sarebbero più incolonnati. */
   .row-cover{flex:none;width:48px;height:48px;border-radius:8px;object-fit:cover;background:var(--fill);}
-  /* Palcoscenici e preferiti: un pixel in meno sopra e sotto, e la copertina
+  /* Palchi e preferiti: un pixel in meno sopra e sotto, e la copertina
      due pixel piu' vicina al bordo. Sono le uniche righe che cominciano con
      un'immagine, e con l'incolonnamento di tutte le altre restava troppo
      staccata dal bordo della cella. */
@@ -590,7 +590,7 @@
      Filtrarli non sta qui — e' una riga del foglio dei filtri come le altre. */
   /* Nella cella i tag stanno sotto le altre righe e non le spingono fuori:
      vanno a capo invece di allargare la riga, che a quel punto taglierebbe
-     il nome del palcoscenico. */
+     il nome del palco. */
   .mytag-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;}
   .mytag-mini{flex:none;border-radius:999px;background:var(--fill);color:var(--text-secondary);font-size:11px;font-weight:600;padding:2px 8px;white-space:nowrap;}
 
@@ -792,7 +792,7 @@
 
 <div id="app">
 
-  <!-- ============ TAB: PALCOSCENICI ============ -->
+  <!-- ============ TAB: PALCHI ============ -->
   <!-- ============ TAB: HOME ============
        La prima cosa che vedi aprendo l'app: come sta andando la stagione.
        Si calcola tutto dalle serate che arrivano dentro /api/locations, come
@@ -822,7 +822,7 @@
     <header class="navbar" id="navList">
       <div class="navbar-row">
         <span class="nav-btn nav-btn-spacer"></span>
-        <span class="inline-title">Palcoscenici</span>
+        <span class="inline-title">Palchi</span>
         <div class="navbar-trailing">
           <button class="nav-btn" id="btnSort" aria-label="Ordina" title="Ordina">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="15" y2="7"/><line x1="4" y1="12" x2="12" y2="12"/><line x1="4" y1="17" x2="9" y2="17"/><polyline points="17 14 20 17 23 14"/><line x1="20" y1="6" x2="20" y2="17"/></svg>
@@ -832,14 +832,14 @@
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 4 21 4 14 12.5 14 19.5 10 21.5 10 12.5"/></svg>
             <span class="filter-dot" id="filterActiveDot" hidden></span>
           </button>
-          <button class="nav-btn" id="fabAdd" aria-label="Aggiungi palcoscenico">
+          <button class="nav-btn" id="fabAdd" aria-label="Aggiungi palco">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
       </div>
       <div class="large-title-wrap">
-        <h1 class="large-title">Palcoscenici</h1>
-        <div class="subtitle-count" id="countSub">0 palcoscenici</div>
+        <h1 class="large-title">Palchi</h1>
+        <div class="subtitle-count" id="countSub">0 palchi</div>
       </div>
       <div class="searchbar-wrap">
         <div class="searchbar">
@@ -914,7 +914,7 @@
   </section>
 
   <!-- ============ TAB: OPPORTUNITA' ============
-       Ogni tentativo di ogni palcoscenico, di ogni stagione, con la data o
+       Ogni tentativo di ogni palco, di ogni stagione, con la data o
        senza. Il tab si chiama "Opportunita'" (15 settembre 2026) perche' e'
        quello che una serata e' finche' non e' successa: un'occasione a cui
        si sta lavorando. Le righe restano serate — l'entita' non cambia nome,
@@ -952,7 +952,7 @@
       <div class="searchbar-wrap">
         <div class="searchbar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="gigsSearchInput" type="text" placeholder="Cerca per palcoscenico o città…" autocomplete="off">
+          <input id="gigsSearchInput" type="text" placeholder="Cerca per palco o città…" autocomplete="off">
           <button class="clear-btn" id="gigsSearchClearBtn" type="button" aria-label="Cancella ricerca" hidden>✕</button>
         </div>
       </div>
@@ -997,7 +997,7 @@
     </header>
     <div class="screen-scroll" id="scrollRecontact">
       <div id="agendaPaneRecontact" hidden>
-        <div class="scope-note">Tutti i palcoscenici da richiamare, serata aperta o no, in ordine di data: prima quelli in ritardo, poi mese per mese. Fuori gli archiviati e chi non ha una data: quelli stanno in «Da pianificare».</div>
+        <div class="scope-note">Tutti i palchi da richiamare, serata aperta o no, in ordine di data: prima quelli in ritardo, poi mese per mese. Fuori gli archiviati e chi non ha una data: quelli stanno in «Da pianificare».</div>
           <div id="recontactList"></div>
       </div>
       <div id="agendaPanePlan" hidden>
@@ -1006,11 +1006,11 @@
         <div id="planList"></div>
       </div>
       <div id="agendaPaneTasks">
-        <div class="scope-note">I compiti ancora da fare, di tutti i palcoscenici, in ordine di scadenza: prima quelli in ritardo, poi mese per mese, in fondo quelli senza una data. Scorri la riga per segnarne uno come fatto o declinato. Fuori i palcoscenici archiviati.</div>
+        <div class="scope-note">I compiti ancora da fare, di tutti i palchi, in ordine di scadenza: prima quelli in ritardo, poi mese per mese, in fondo quelli senza una data. Scorri la riga per segnarne uno come fatto o declinato. Fuori i palchi archiviati.</div>
         <div id="agendaTasksList"></div>
       </div>
       <div id="agendaPaneGigs" hidden>
-        <div class="scope-note">Le serate con una data, di ogni stagione, comprese quelle dei palcoscenici archiviati: una sera in cui hai suonato è successa lo stesso. Quelle senza data stanno in Opportunità.</div>
+        <div class="scope-note">Le serate con una data, di ogni stagione, comprese quelle dei palchi archiviati: una sera in cui hai suonato è successa lo stesso. Quelle senza data stanno in Opportunità.</div>
         <div id="agendaGigsList"></div>
       </div>
     </div>
@@ -1053,7 +1053,7 @@
        lunga non ci stava piu': gli art director sono l'elenco che si apre
        piu' di rado — si guarda quando si prepara un contatto, non tutti i
        giorni — ed e' uscito lui, come aveva gia' fatto l'Admin. Si apre da
-       una voce in Impostazioni; dalla scheda del palcoscenico ci si arriva
+       una voce in Impostazioni; dalla scheda del palco ci si arriva
        come prima. -->
   <section class="screen pushed" id="adScreen" hidden>
     <header class="navbar">
@@ -1160,7 +1160,7 @@
         <div class="field-row"><label style="flex:1;">Senza posizione</label><span id="geoTodo">0</span></div>
         <div class="field-row"><label style="flex:1;">Già sulla mappa</label><span id="geoDone">0</span></div>
       </div>
-      <div class="section-footer">Cerca il punto partendo dal nome del locale, dall’indirizzo e dalla città, e lo salva: da lì il palcoscenico compare sulla mappa e nella sua scheda arriva il pulsante Mappa. Si può chiedere una posizione al secondo, quindi ci vuole qualche minuto: si può fermare quando vuoi, e quello che è passato resta fatto. Chi ha già un punto non viene toccato.</div>
+      <div class="section-footer">Cerca il punto partendo dal nome del locale, dall’indirizzo e dalla città, e lo salva: da lì il palco compare sulla mappa e nella sua scheda arriva il pulsante Mappa. Si può chiedere una posizione al secondo, quindi ci vuole qualche minuto: si può fermare quando vuoi, e quello che è passato resta fatto. Chi ha già un punto non viene toccato.</div>
       <div class="grouped-list" id="geoStartWrap">
         <div class="field-row picker" id="rowGeoStart"><span class="link-action">Trova le posizioni mancanti</span></div>
       </div>
@@ -1217,7 +1217,7 @@
           </div>
         </div>
       </div>
-      <div class="section-footer">Un file <code>.zip</code> con un foglio per tipo di dato — palcoscenici, serate, note, art director, band, segnalazioni — di <strong>tutte</strong> le band, non solo la tua. I CSV hanno il punto e virgola come separatore e la codifica che Excel in italiano si aspetta: basta un doppio clic. Restano fuori sessioni e inviti, che contengono i codici di accesso.</div>
+      <div class="section-footer">Un file <code>.zip</code> con un foglio per tipo di dato — palchi, serate, note, art director, band, segnalazioni — di <strong>tutte</strong> le band, non solo la tua. I CSV hanno il punto e virgola come separatore e la codifica che Excel in italiano si aspetta: basta un doppio clic. Restano fuori sessioni e inviti, che contengono i codici di accesso.</div>
 
       <div class="section-footer">Nei modelli WhatsApp <code>{band}</code>, <code>{genere}</code> e <code>{nome}</code> vengono sostituiti con i dati della band al momento della creazione, una volta sola. I segnaposto dei modelli email (<code>{mio_nome}</code>, <code>{titolare}</code>…) restano scritti così e si riempiono a ogni invio. Quello che scrivi fra parentesi quadre resta com'è, da compilare a mano.</div>
 
@@ -1307,7 +1307,7 @@
       </div>
       <div class="section-footer">Il tema è memorizzato in questo browser, non nell'account: su un altro telefono o computer riparte da «Automatico», che segue l'impostazione del sistema.</div>
 
-      <div class="section-header">PALCOSCENICI</div>
+      <div class="section-header">PALCHI</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsTypes">
           <div class="row-main"><div class="row-title">Tipologie</div>
@@ -1341,13 +1341,13 @@
         </div>
         <div class="row" id="rowSettingsTags">
           <div class="row-main"><div class="row-title">Tag</div>
-          <div class="row-sub">Le etichette libere sui palcoscenici, di tutta la band</div></div>
+          <div class="row-sub">Le etichette libere sui palchi, di tutta la band</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsTagsCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <div class="row" id="rowSettingsAd">
           <div class="row-main"><div class="row-title">Art director</div>
-          <div class="row-sub">I referenti booking da associare ai palcoscenici</div></div>
+          <div class="row-sub">I referenti booking da associare ai palchi</div></div>
           <div class="row-trail"><span class="row-badge" id="settingsAdCount" style="background:var(--fill);color:var(--text-secondary);"></span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
@@ -1382,7 +1382,7 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
-      <div class="section-footer">I dati sono separati per band: chi entra con il tuo link vede i palcoscenici della band attiva, chi si iscrive da solo parte da zero.</div>
+      <div class="section-footer">I dati sono separati per band: chi entra con il tuo link vede i palchi della band attiva, chi si iscrive da solo parte da zero.</div>
       <div class="section-header">MESSAGGI</div>
       <div class="grouped-list">
         <div class="row" id="rowSettingsWaTemplates">
@@ -1437,7 +1437,7 @@
         <div class="field-row"><label style="flex:1;">Senza copertina, con un profilo social</label><span id="bulkCoverTodo">0</span></div>
         <div class="field-row"><label style="flex:1;">Copertine già a posto</label><span id="bulkCoverDone">0</span></div>
       </div>
-      <div class="section-footer">Prende l’immagine del profilo dal link che sta nel campo <strong>Facebook</strong> — e se manca, da quello <strong>Instagram</strong>: da Facebook quella quadrata (non la copertina larga), da Instagram la foto del profilo — più piccola, 150 pixel, perché più grande Instagram non la dà. La mette come copertina del palcoscenico. Tocca solo chi non ha nessuna foto: quelle che avete messo voi restano dove sono. Ci vuole qualche minuto, e si può fermare quando vuoi: quello che è passato resta fatto.</div>
+      <div class="section-footer">Prende l’immagine del profilo dal link che sta nel campo <strong>Facebook</strong> — e se manca, da quello <strong>Instagram</strong>: da Facebook quella quadrata (non la copertina larga), da Instagram la foto del profilo — più piccola, 150 pixel, perché più grande Instagram non la dà. La mette come copertina del palco. Tocca solo chi non ha nessuna foto: quelle che avete messo voi restano dove sono. Ci vuole qualche minuto, e si può fermare quando vuoi: quello che è passato resta fatto.</div>
 
       <div class="grouped-list" id="bulkCoverStartWrap">
         <div class="field-row picker" id="rowBulkCoverStart"><span class="link-action">Prendi le copertine</span></div>
@@ -1471,7 +1471,7 @@
       </div>
     </header>
     <div class="screen-scroll">
-      <div class="section-header">TIPOLOGIE PALCOSCENICO</div>
+      <div class="section-header">TIPOLOGIE PALCO</div>
       <div class="grouped-list" id="typesList"></div>
       <div class="grouped-list" style="margin-top:10px;">
         <div class="add-note-row">
@@ -1479,7 +1479,7 @@
           <button id="btnAddType">Aggiungi</button>
         </div>
       </div>
-      <div class="section-footer">Tocca una tipologia per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome indica quanti palcoscenici la usano — una tipologia in uso non può essere eliminata, ma rinominandola si aggiornano automaticamente tutti i palcoscenici che la usano.</div>
+      <div class="section-footer">Tocca una tipologia per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome indica quanti palchi la usano — una tipologia in uso non può essere eliminata, ma rinominandola si aggiornano automaticamente tutti i palchi che la usano.</div>
     </div>
   </section>
 
@@ -1523,7 +1523,7 @@
       </div>
     </header>
     <div class="screen-scroll">
-      <div class="section-header">CATEGORIE PALCOSCENICO</div>
+      <div class="section-header">CATEGORIE PALCO</div>
       <div class="grouped-list" id="categoriesList"></div>
       <div class="grouped-list" style="margin-top:10px;">
         <div class="add-note-row">
@@ -1531,7 +1531,7 @@
           <button id="btnAddCategory">Aggiungi</button>
         </div>
       </div>
-      <div class="section-footer">Tocca una categoria per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome indica quanti palcoscenici la usano — una categoria in uso non può essere eliminata, ma rinominandola si aggiornano automaticamente tutti i palcoscenici che la usano.</div>
+      <div class="section-footer">Tocca una categoria per rinominarla, scorri a sinistra per eliminarla. Il numero accanto al nome indica quanti palchi la usano — una categoria in uso non può essere eliminata, ma rinominandola si aggiornano automaticamente tutti i palchi che la usano.</div>
     </div>
   </section>
 
@@ -1640,8 +1640,8 @@
   </section>
 
   <!-- ============ PUSHED: CATEGORIE DI SPESA ============
-       Schermata sua e non quella generica delle liste del palcoscenico: li'
-       dentro il numero accanto al nome conta i palcoscenici che usano quel
+       Schermata sua e non quella generica delle liste del palco: li'
+       dentro il numero accanto al nome conta i palchi che usano quel
        valore, e qui deve contare i movimenti di cassa. -->
   <section class="screen pushed" id="costCatScreen" hidden>
     <header class="navbar">
@@ -1693,7 +1693,7 @@
   </section>
 
   <!-- ============ PUSHED: MODIFICA CATEGORIA DI SPESA ============
-       La stessa schermata che rinomina una categoria del palcoscenico o un
+       La stessa schermata che rinomina una categoria del palco o un
        valore di lista: il nome sta in un campo, si corregge e si salva.
        Prima di qui si apriva un foglio di scelta con zero voci da scegliere
        e la casella di ricerca usata come campo di scrittura: il nome vecchio
@@ -1717,10 +1717,10 @@
   </section>
 
   <!-- ============ PUSHED: TAG ============
-       Schermata sua e non quella generica delle liste del palcoscenico: i
+       Schermata sua e non quella generica delle liste del palco: i
        valori di quelle si scelgono da un elenco chiuso che qualcuno cura,
        i tag nascono scrivendoli sulla scheda e qui si possono solo
-       rinominare o togliere. Il numero accanto conta i palcoscenici su cui
+       rinominare o togliere. Il numero accanto conta i palchi su cui
        quel tag e' scritto. -->
   <section class="screen pushed" id="tagsScreen" hidden>
     <header class="navbar">
@@ -1736,7 +1736,7 @@
     <div class="screen-scroll">
       <div class="section-header">TAG DELLA BAND</div>
       <div class="grouped-list" id="tagsItems"></div>
-      <div class="section-footer">I tag si mettono dalla scheda del palcoscenico, nella riga «Tag», e sono di tutta la band: li scrive uno e li vedono tutti. Qui si rinominano e si tolgono, dovunque siano scritti. Togliere un tag non tocca i palcoscenici, che restano dove sono — e restano nei preferiti di chi ce li aveva messi.</div>
+      <div class="section-footer">I tag si mettono dalla scheda del palco, nella riga «Tag», e sono di tutta la band: li scrive uno e li vedono tutti. Qui si rinominano e si tolgono, dovunque siano scritti. Togliere un tag non tocca i palchi, che restano dove sono — e restano nei preferiti di chi ce li aveva messi.</div>
     </div>
   </section>
 
@@ -1851,14 +1851,14 @@
           <div class="row-title" style="color:var(--tint);font-weight:600;">Crea un nuovo link</div>
         </div>
       </div>
-      <div class="section-footer">Ogni volta che apri questa schermata trovi un link nuovo, valido 3 ore e utilizzabile da più persone. Chi lo apre entra in <span id="inviteBandName">questa band</span> e vede gli stessi palcoscenici che vedi tu. Passate le 3 ore smette di funzionare da solo.</div>
+      <div class="section-footer">Ogni volta che apri questa schermata trovi un link nuovo, valido 3 ore e utilizzabile da più persone. Chi lo apre entra in <span id="inviteBandName">questa band</span> e vede gli stessi palchi che vedi tu. Passate le 3 ore smette di funzionare da solo.</div>
 
       <div class="section-header">MEMBRI</div>
       <div class="grouped-list" id="membersList"></div>
       <div class="section-footer">
         <div class="role-help">
           <div><b>Leader</b> — gestisce la band: manda gli inviti, cambia i ruoli, rimuove le persone. Serve almeno un Leader per band.</div>
-          <div><b>Member</b> — lavora sui dati: aggiunge e modifica palcoscenici, note, foto e contatti.</div>
+          <div><b>Member</b> — lavora sui dati: aggiunge e modifica palchi, note, foto e contatti.</div>
           <div><b>Slaker</b> — consulta e basta: vede tutto quello che vedono gli altri, ma non può modificare niente.</div>
         </div>
         Scorri a sinistra su una persona per cambiarle ruolo o toglierla dalla band. Solo un Leader può farlo, e sulla tua riga non succede niente.
@@ -1887,7 +1887,7 @@
           <button id="btnAddWaTemplate">Aggiungi</button>
         </div>
       </div>
-      <div class="section-footer">Tocca un modello per scrivere il testo del messaggio, scorri a sinistra per eliminarlo. Quando invii un messaggio dal dettaglio di un palcoscenico potrai scegliere quale modello usare.</div>
+      <div class="section-footer">Tocca un modello per scrivere il testo del messaggio, scorri a sinistra per eliminarlo. Quando invii un messaggio dal dettaglio di un palco potrai scegliere quale modello usare.</div>
     </div>
   </section>
 
@@ -1936,7 +1936,7 @@
           <button id="btnAddMailTemplate">Aggiungi</button>
         </div>
       </div>
-      <div class="section-footer">Tocca un modello per scrivere oggetto e testo, scorri a sinistra per eliminarlo. Quando invii una mail dal dettaglio di un palcoscenico o di un art director potrai scegliere quale modello usare.</div>
+      <div class="section-footer">Tocca un modello per scrivere oggetto e testo, scorri a sinistra per eliminarlo. Quando invii una mail dal dettaglio di un palco o di un art director potrai scegliere quale modello usare.</div>
     </div>
   </section>
 
@@ -2007,7 +2007,7 @@
       <div class="section-header">DATI</div>
       <div class="grouped-list">
         <div class="row" style="cursor:default;">
-          <div class="row-main"><div class="row-title">Palcoscenici</div></div>
+          <div class="row-main"><div class="row-title">Palchi</div></div>
           <div class="row-trail"><span id="aboutCountVenues" class="row-badge" style="background:var(--fill);color:var(--text-secondary);"></span></div>
         </div>
         <div class="row" style="cursor:default;">
@@ -2133,7 +2133,7 @@
     </button>
     <button class="tab" data-tab="list">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
-      <span class="tab-label">Palcoscenici</span>
+      <span class="tab-label">Palchi</span>
     </button>
     <button class="tab" data-tab="favorites">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 3.5 14.85 9.3 21.25 10.23 16.62 14.74 17.7 21.08 12 18.08 6.3 21.08 7.38 14.74 2.75 10.23 9.15 9.3"/></svg>
@@ -2167,7 +2167,7 @@
       <div class="navbar-row">
         <button class="nav-btn" id="btnFiltersBack">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Palcoscenici
+          Palchi
         </button>
         <span class="inline-title">Filtri</span>
         <button class="nav-btn" id="btnFiltersReset">Reimposta</button>
@@ -2266,7 +2266,7 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
-      <div class="section-footer" id="nearMeFooter">Usa la posizione del telefono per mostrare solo i palcoscenici entro il raggio scelto. Funzionano solo i palcoscenici con coordinate geografiche già impostate.</div>
+      <div class="section-footer" id="nearMeFooter">Usa la posizione del telefono per mostrare solo i palchi entro il raggio scelto. Funzionano solo i palchi con coordinate geografiche già impostate.</div>
 
       <!-- Fuori dai Preferiti: li' gli archiviati non compaiono mai, e un
            interruttore che non fa niente e' peggio che non averlo. -->
@@ -2281,20 +2281,20 @@
             </label>
           </div>
         </div>
-        <div class="section-footer">I palcoscenici archiviati non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli, oppure eliminarli definitivamente.</div>
+        <div class="section-footer">I palchi archiviati non compaiono nella lista, a meno di attivare questa opzione. Da qui puoi ripristinarli, oppure eliminarli definitivamente.</div>
       </div>
     </div>
   </section>
 
-  <!-- ============ PUSHED: DETTAGLIO PALCOSCENICO ============ -->
+  <!-- ============ PUSHED: DETTAGLIO PALCO ============ -->
   <section class="screen pushed" id="detail" hidden>
     <header class="navbar">
       <div class="navbar-row">
         <button class="nav-btn" id="btnBack">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Palcoscenici
+          Palchi
         </button>
-        <span class="inline-title" id="detailInlineTitle">Palcoscenico</span>
+        <span class="inline-title" id="detailInlineTitle">Palco</span>
         <div class="navbar-trailing">
           <button class="nav-btn" id="btnFocus" aria-label="Sott'occhio">
             <svg id="btnFocusIcon" aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.2 5.2 12 5.2 22.4 12 22.4 12 18.8 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1"/></svg>
@@ -2311,7 +2311,7 @@
     </header>
     <div class="screen-scroll">
       <div class="d-title-name">
-        <input id="fName" placeholder="Nome del palcoscenico" />
+        <input id="fName" placeholder="Nome del palco" />
       </div>
 
       <div class="photos-strip" id="photosStrip"></div>
@@ -2328,7 +2328,7 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
         <!-- I tag sono l'unica riga di questa scheda che non e' del
-             palcoscenico ma tua. Sta qui in mezzo alle altre, e non in una
+             palco ma tua. Sta qui in mezzo alle altre, e non in una
              sezione sua, perche' e' li' che la si cerca: si legge come le
              altre etichette del posto. -->
         <div class="field-row picker" id="rowTags">
@@ -2366,7 +2366,7 @@
       </div>
       <div class="section-footer">Tocca <strong>Cerca posizione</strong> e il punto si ricava dal nome, dall’indirizzo e dalla città scritti qui sopra: le coordinate compaiono nella riga e non si scrivono a mano. Toccandola di nuovo la cerca da capo, utile se hai appena corretto l’indirizzo.</div>
 
-      <div class="section-header">INFO PALCOSCENICO</div>
+      <div class="section-header">INFO PALCO</div>
       <div class="grouped-list">
         <div class="field-row"><label for="fCapacity">Capienza</label><input id="fCapacity" type="number" inputmode="numeric" placeholder="150"></div>
         <div class="field-row picker" id="rowFGenre">
@@ -2401,19 +2401,19 @@
         <div class="field-row"><label for="fContactName">Titolare</label><input id="fContactName" type="text" placeholder="Nome di chi gestisce il posto"></div>
         <div class="field-row"><label for="fLandline">Telefono</label><input id="fLandline" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fPhone">Cellulare</label><input id="fPhone" type="tel" placeholder="+39…"></div>
-        <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palcoscenico.it"></div>
+        <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palco.it"></div>
         <div class="field-row"><label for="fWebsite">Sito</label><input id="fWebsite" type="text" placeholder="www.locale.it"></div>
         <div class="field-row"><label for="fFacebook">Facebook</label><input id="fFacebook" type="text" placeholder="facebook.com/…"></div>
         <div class="field-row"><label for="fInstagram">Instagram</label><input id="fInstagram" type="text" placeholder="instagram.com/…"></div>
         <div class="field-row picker" id="rowSocialCover" hidden><span class="link-action" id="socialCoverLabel">Copertina dal profilo Facebook</span></div>
         <div class="field-row picker" id="rowIgSearch" hidden><span class="link-action" id="igSearchLabel">Cerca il profilo Instagram</span></div>
       </div>
-      <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palcoscenici. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
+      <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palchi. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
 
       <div class="section-header">STATO</div>
       <div class="grouped-list">
         <div class="field-row picker" id="rowVenueStatus">
-          <label>Palcoscenico</label>
+          <label>Palco</label>
           <div class="picker-value"><span class="dot" id="venueStatusDot"></span><span id="venueStatusValue">Lead</span>
           <svg class="row-chevron" id="venueStatusChevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
@@ -2422,7 +2422,7 @@
           <div class="picker-value"><span class="dot" id="statusDot"></span><span id="statusValue">Opportunità</span></div>
         </div>
       </div>
-      <div class="section-footer" id="venueStatusFoot">Due cose diverse. Il <strong>palcoscenico</strong> dice che rapporto c'è con questo posto e lo scegli tu: <strong>Lead</strong> è un nome in rubrica, <strong>Prospect</strong> uno su cui stai puntando, <strong>Inattivo</strong> uno dove ci hai provato senza suonarci. <strong>Cliente</strong> si accende da solo la prima volta che una serata diventa «Suonato». L'<strong>opportunità</strong> dice invece come sta andando il tentativo di quest'anno, e si cambia sulla sua riga qui sotto.</div>
+      <div class="section-footer" id="venueStatusFoot">Due cose diverse. Il <strong>palco</strong> dice che rapporto c'è con questo posto e lo scegli tu: <strong>Lead</strong> è un nome in rubrica, <strong>Prospect</strong> uno su cui stai puntando, <strong>Inattivo</strong> uno dove ci hai provato senza suonarci. <strong>Cliente</strong> si accende da solo la prima volta che una serata diventa «Suonato». L'<strong>opportunità</strong> dice invece come sta andando il tentativo di quest'anno, e si cambia sulla sua riga qui sotto.</div>
 
       <div class="section-header" id="gigsHeader">OPPORTUNITÀ</div>
       <div class="grouped-list" id="gigsList"></div>
@@ -2455,7 +2455,7 @@
           <input id="fPlanningNote" type="text" placeholder="es. Pianificano il cartellone a feb/mar" style="text-align:left;">
         </div>
       </div>
-      <div class="section-footer">Il periodo vale ogni anno: «ottobre» torna ogni ottobre, e non c'è nessun anno da correggere. Il giorno mettilo solo se conta davvero. In Agenda il palcoscenico si accende quando il periodo arriva e si spegne quando apri la serata — perché riprovarci è proprio quello.</div>
+      <div class="section-footer">Il periodo vale ogni anno: «ottobre» torna ogni ottobre, e non c'è nessun anno da correggere. Il giorno mettilo solo se conta davvero. In Agenda il palco si accende quando il periodo arriva e si spegne quando apri la serata — perché riprovarci è proprio quello.</div>
 
       <div class="section-header">PROPRIETARIO</div>
       <div class="grouped-list">
@@ -2465,7 +2465,7 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
-      <div class="section-footer">Chi in GigFlow gestisce questo palcoscenico nel gestionale — diverso dal titolare del locale indicato sopra.</div>
+      <div class="section-footer">Chi in GigFlow gestisce questo palco nel gestionale — diverso dal titolare del locale indicato sopra.</div>
 
       <div class="section-header">ATTIVITÀ</div>
       <div class="grouped-list">
@@ -2512,10 +2512,10 @@
         <div class="field-row"><label for="adPhone">Telefono</label><input id="adPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="adEmail">Email</label><input id="adEmail" type="email" placeholder="nome@mail.it"></div>
       </div>
-      <div class="section-header">PALCOSCENICI PER CUI LAVORA</div>
+      <div class="section-header">PALCHI PER CUI LAVORA</div>
       <div class="grouped-list" id="adVenuesList"></div>
       <div class="grouped-list" style="margin-top:10px;">
-        <button class="add-note-row" id="btnAdAddVenue" style="width:100%;justify-content:center;border:none;background:none;color:var(--tint);font-size:15px;font-weight:600;cursor:pointer;padding:12px 16px;">+ Aggiungi palcoscenico</button>
+        <button class="add-note-row" id="btnAdAddVenue" style="width:100%;justify-content:center;border:none;background:none;color:var(--tint);font-size:15px;font-weight:600;cursor:pointer;padding:12px 16px;">+ Aggiungi palco</button>
       </div>
 
       <div class="section-header">NOTE</div>
@@ -2592,14 +2592,14 @@
   "use strict";
 
   /* Due liste che non si somigliano piu' (15 settembre 2026). Il
-     palcoscenico e' un posto, e il suo stato dice che rapporto c'e' fra la
+     palco e' un posto, e il suo stato dice che rapporto c'e' fra la
      band e quel posto: un nome in rubrica (Lead), uno su cui stai puntando
      (Prospect), uno dove hai gia' suonato (Cliente), uno dove ci hai provato
      e non e' successo (Inattivo), uno messo via (Archiviato). La serata e' il
      tentativo di suonarci in una stagione, e il suo stato dice come sta
      andando quel tentativo.
 
-     Prima erano la stessa lista, perche' lo stato del palcoscenico era la
+     Prima erano la stessa lista, perche' lo stato del palco era la
      copia di quello della sua serata in corso: l'elenco diceva "Contattato"
      perche' lo diceva la serata. Adesso a che punto e' la trattativa lo
      racconta la serata, e lo racconta dove la serata si vede — nella scheda,
@@ -2607,7 +2607,7 @@
 
      I nomi delle serate sono cambiati il 15 settembre 2026: "Da contattare"
      e' diventato "Opportunita'" (si chiamava come il primo segmento
-     dell'Agenda, che e' un'altra cosa: li' ci sono i palcoscenici da
+     dell'Agenda, che e' un'altra cosa: li' ci sono i palchi da
      richiamare adesso), "In trattativa" e' diventato "Trattativa", ed e'
      entrato "Interessato" fra Contattato e Trattativa — hanno detto che gli
      interessa, che e' piu' di una telefonata fatta e meno di una trattativa
@@ -2652,7 +2652,7 @@
      detto di no. Chiudere vuol dire che quella stagione li' e' andata come
      e' andata: quella serata li' non si tocca piu', e per riprovarci l'anno
      prossimo se ne apre una nuova dalla scheda, senza cancellare com'e'
-     finita questa. Il palcoscenico intanto resta in Agenda, nel mese del
+     finita questa. Il palco intanto resta in Agenda, nel mese del
      suo promemoria. Stessa lista di CLOSING_STATUSES in app.py. */
   var CLOSING_STATUSES = ["suonato", "annullato", "rifiutata"];
   function isClosingStatus(s){ return CLOSING_STATUSES.indexOf(s) > -1; }
@@ -2665,7 +2665,7 @@
   /* ---------------- serate ----------------
      Una serata e' un tentativo di suonare in quel posto: se va a buon fine
      ha una data, se sfuma resta la riga con quello che ci hai scritto. Lo
-     stato mostrato sul palcoscenico e' quello della serata in corso — e
+     stato mostrato sul palco e' quello della serata in corso — e
      aperta ce n'e' una sola per volta — per questo ripartire l'anno dopo
      non cancella niente. */
   var NOTE_KIND_META = {
@@ -2753,7 +2753,7 @@
     if(mesi < 24) return "ultimo contatto " + mesi + " mesi fa";
     return "ultimo contatto " + Math.floor(mesi / 12) + " anni fa";
   }
-  /* La serata in corso, se c'e'. Da quando lo stato del palcoscenico ha
+  /* La serata in corso, se c'e'. Da quando lo stato del palco ha
      smesso di copiarla, e' l'unico posto dove sta scritto a che punto sei
      quest'anno: chi prima leggeva v.status per saperlo, adesso legge qui. */
   function currentGig(v){
@@ -2883,12 +2883,12 @@
      gli estivi", non uno dei due. Elenco vuoto vuol dire "tutti", cosi' il
      caso normale non ha bisogno di niente.
      E' anche l'unico filtro personale: gli altri guardano dentro il
-     palcoscenico, questo dentro le tue etichette. */
+     palco, questo dentro le tue etichette. */
   var filterTags = [];
   function filterTagsAttivi(){ return filterTags.length > 0; }
   var owners = [];
   var searchText = "";
-  /* Due filtri che non stanno nella riga dei dati del palcoscenico: la
+  /* Due filtri che non stanno nella riga dei dati del palco: la
      stella e' di chi guarda, il focus e' della band. */
   var filterSoloPreferiti = false;
   var filterSoloFocus = false;
@@ -2896,7 +2896,7 @@
   var nearMeRadiusKm = 30;
   var nearMeCoords = null;
   var showDeletedEnabled = false;
-  /* Palcoscenici e Preferiti hanno le stesse due schermate — Ordina e
+  /* Palchi e Preferiti hanno le stesse due schermate — Ordina e
      Filtri — ma non la stessa risposta: nei Preferiti cerchi fra venti
      posti, nell'elenco fra duecento. Tenere un solo set di filtri voleva
      dire che restringere i Preferiti ti svuotava l'elenco senza che tu te
@@ -2913,7 +2913,7 @@
   var filterScope = "list";
   var currentId = null;
   var currentAdId = null;
-  var returnToPalcoscenicoAfterAd = null;
+  var returnToPalcoAfterAd = null;
 
   var elToast = document.getElementById("toast");
   function toast(msg){
@@ -3121,7 +3121,7 @@
     {key:"costi_anno",   label:"Costi per anno",        sub:"Quanto è uscito, stagione per stagione"},
     {key:"netto_anno",   label:"Netto per anno",        sub:"Incassato meno speso, stagione per stagione"},
     {key:"dove_soldi",   label:"Dove vanno i soldi",    sub:"I costi dell'anno divisi per categoria"},
-    {key:"dove_suonato", label:"Dove hai suonato di più", sub:"La classifica dei palcoscenici"}
+    {key:"dove_suonato", label:"Dove hai suonato di più", sub:"La classifica dei palchi"}
   ];
   function homePrefs(){ return (me && me.home_prefs) || {}; }
   function vedoInHome(key){ return homePrefs()[key] !== false; }
@@ -3181,7 +3181,7 @@
   });
 
   /* Dove abbiamo suonato, anno per anno. La provincia non e' un campo: si
-     ricava dalla citta' del palcoscenico, che e' scritta "Comune (PR)", e
+     ricava dalla citta' del palco, che e' scritta "Comune (PR)", e
      ci pensa venueProvincia() — lo stesso conto che sta dietro al filtro
      Provincia, quindi i due posti dicono lo stesso numero.
 
@@ -3230,7 +3230,7 @@
       '<tbody>'+righe+totale+'</tbody></table></div>'+
       '<div class="chart-note">'+
         (quante === 1 ? "Una sola provincia finora." : quante + " province finora.") +
-        ' La provincia arriva dalla città del palcoscenico, scritta come «Comune (PR)».'+
+        ' La provincia arriva dalla città del palco, scritta come «Comune (PR)».'+
       '</div></div>';
   }
 
@@ -3365,7 +3365,7 @@
     if(!played.length){
       el.innerHTML = html + '<div class="empty-state"><div class="glyph">📈</div>'+
         '<h2>Ancora nessuna serata suonata</h2>'+
-        '<p>Quando segni una serata come suonata — dall\'Agenda o dalla scheda del palcoscenico — qui vedi quante ne hai fatte, quanto hai incassato e in che mesi dell\'anno.</p></div>';
+        '<p>Quando segni una serata come suonata — dall\'Agenda o dalla scheda del palco — qui vedi quante ne hai fatte, quanto hai incassato e in che mesi dell\'anno.</p></div>';
       return;
     }
 
@@ -3700,7 +3700,7 @@
 
   /* ---------------- load ----------------
      Un solo elenco completo caricato dal server; filtro di stato e ricerca
-     sono applicati lato client così i tab "Palcoscenici" e "Ricontatta" restano
+     sono applicati lato client così i tab "Palchi" e "Ricontatta" restano
      sempre coerenti tra loro, senza round-trip di rete ad ogni tocco. */
   /* Gli archiviati arrivano SEMPRE, anche con il lettore spento: e' la
      vista a nasconderli (matchesFilter), non il server a non mandarli.
@@ -3718,25 +3718,25 @@
   }
 
   /* ---------------- la stella, che e' tua ----------------
-     Il palcoscenico e' della band — nome, indirizzo, serate, e da oggi anche
+     Il palco e' della band — nome, indirizzo, serate, e da oggi anche
      i tag — ma che ti interessi o no lo decidi tu. Per questo la stella non
      arriva dentro /api/locations insieme al resto: sta qui accanto, letta da
      /api/my/favorites, e lo stesso locale puo' essere segnato da te e da
      Viciguerra senza che uno cancelli l'altro.
 
-     Tenerla fuori dall'oggetto palcoscenico non e' pignoleria:
+     Tenerla fuori dall'oggetto palco non e' pignoleria:
      applyUpdatedVenue lo riscrive intero ogni volta che si salva una riga, e
      se la stella stesse li' dentro basterebbe un salvataggio che non la
      include per cancellarla sotto gli occhi. */
   var mieiPreferiti = {};   /* id -> true */
   function sonoPreferito(id){ return mieiPreferiti[String(id)] === true; }
-  /* I tag invece sono del palcoscenico, come il tipo: si leggono da li'. */
+  /* I tag invece sono del palco, come il tipo: si leggono da li'. */
   function tagDi(id){
     var v = venues.find(function(x){ return String(x.id) === String(id); });
     return (v && v.tags) || [];
   }
   /* Il vocabolario della band non e' un elenco a parte da tenere in pari:
-     e' quello che c'e' scritto sui palcoscenici, contato al volo. Due grafie
+     e' quello che c'e' scritto sui palchi, contato al volo. Due grafie
      dello stesso nome contano per una, e vince quella che si incontra prima. */
   function tagVocabolario(){
     var per_chiave = {};
@@ -3767,7 +3767,7 @@
     renderAllGigs();
     renderRecontact();
     renderCash();
-    // Il conto dei tag si legge dai palcoscenici: cambia quando cambiano
+    // Il conto dei tag si legge dai palchi: cambia quando cambiano
     // loro, non quando qualcuno apre le impostazioni.
     updateTagsCount();
   }
@@ -3854,7 +3854,7 @@
     renderSortRow();
   }
 
-  /* ---------------- PALCOSCENICI tab ---------------- */
+  /* ---------------- PALCHI tab ---------------- */
   var elCountSub = document.getElementById("countSub");
   var elSearch = document.getElementById("searchInput");
   var elList = document.getElementById("list");
@@ -4091,7 +4091,7 @@
      che hai trovato per nome e' proprio quello che i filtri stanno
      nascondendo. Da li' pero' gli archiviati non si toccano: spegnere quel
      lettore ricarica l'elenco e potrebbe portarsi via proprio il
-     palcoscenico che stavi andando a vedere. */
+     palco che stavi andando a vedere. */
   function azzeraFiltri(opts){
     opts = opts || {};
     filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all"; filterTags = [];
@@ -4117,7 +4117,7 @@
   }
 
   /* Filtri e ricerca non sono la stessa cosa, e la mappa lo dimostra. I
-     filtri dicono quali palcoscenici ti interessano adesso, ed e' esattamente
+     filtri dicono quali palchi ti interessano adesso, ed e' esattamente
      quello che la mappa deve disegnare. La ricerca invece serve a trovarne
      uno: applicarla alla mappa la svuotava fino a lasciarci un pallino solo,
      e un pallino solo non e' una mappa — mentre stai cercando un posto per
@@ -4164,7 +4164,7 @@
     // quella riga e' la differenza fra "qualcuno ci sta lavorando" e "ci
     // devo pensare io". Altrove sarebbe una riga in piu' sempre uguale.
     var showOwner = !!(opts && opts.showOwner);
-    // Da quanto non lo senti: sta nell'elenco dei palcoscenici, che e' dove
+    // Da quanto non lo senti: sta nell'elenco dei palchi, che e' dove
     // si decide chi chiamare. Altrove sarebbe una riga in piu' da leggere
     // per una domanda che non ti stai facendo.
     var showLastContact = !!(opts && opts.showLastContact);
@@ -4207,7 +4207,7 @@
        pollice, e Archivia ed Elimina stavano a un gesto di distanza da
        quello con cui lo scorri. Senza row-actions lo scorrimento non ha
        dove agganciarsi e la riga resta ferma; le due azioni restano dove
-       si lavora davvero, nell'elenco dei palcoscenici e nella scheda. */
+       si lavora davvero, nell'elenco dei palchi e nella scheda. */
     /* Sotto la pastiglia dello stato, a destra: due segni piccoli che
        dicono "questo e' mio" e "questo lo sta seguendo la band". Non si
        toccano — la stella si accende da quella grande qui a sinistra o
@@ -4292,7 +4292,7 @@
       }
       var ka = (o.get(a) || "").toString(), kb = (o.get(b) || "").toString();
       // Chi non ha quel dato finisce in fondo: in cima nasconderebbe
-      // proprio i palcoscenici che stai cercando di raggruppare.
+      // proprio i palchi che stai cercando di raggruppare.
       if(!ka !== !kb) return ka ? -1 : 1;
       return ka.localeCompare(kb, "it", {sensitivity:"base"}) || perNome(a, b);
     };
@@ -4323,13 +4323,13 @@
     // Prima di ogni uscita: l'elenco vuoto esce subito qui sotto, e la
     // mappa non deve restare con i segnalini di prima.
     renderMapMarkers();
-    elCountSub.textContent = filtered.length + (filtered.length===1 ? " palcoscenico" : " palcoscenici");
+    elCountSub.textContent = filtered.length + (filtered.length===1 ? " palco" : " palchi");
     var sorted = filtered.slice().sort(venueSorter());
     if(sorted.length === 0){
       var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !filterSoloPreferiti && !filterSoloFocus && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
-          ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palcoscenico ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
+          ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palco ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
           : '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare filtro o termine di ricerca.</p>')+
         '</div>';
       return;
@@ -4357,7 +4357,7 @@
         return String(x.id) === String(id) ? Object.assign({}, x, {deleted_at: new Date().toISOString()}) : x;
       });
       renderAll();
-      toast("Palcoscenico archiviato");
+      toast("Palco archiviato");
     });
   }
   function purgeVenueRow(id, dopo){
@@ -4370,14 +4370,14 @@
     // L'archiviazione si annulla, questa no: va detto prima, con dentro
     // cosa si porta via.
     confirmDestructive(
-      "Eliminare definitivamente " + (v && v.name ? v.name : "questo palcoscenico") +
+      "Eliminare definitivamente " + (v && v.name ? v.name : "questo palco") +
         (extra.length ? ", con " + extra.join(" e ") : "") + "? Non si torna indietro.",
       function(){
         api("DELETE", "/api/locations/" + id + "/permanent").then(function(){
           venues = venues.filter(function(x){ return String(x.id) !== String(id); });
           if(dopo) dopo();
           renderAll();
-          toast("Palcoscenico eliminato definitivamente");
+          toast("Palco eliminato definitivamente");
         }).catch(function(err){ toast(err.message); });
       }
     );
@@ -4386,7 +4386,7 @@
     api("POST", "/api/locations/" + id + "/restore").then(function(updated){
       venues = venues.map(function(x){ return String(x.id) === String(id) ? updated : x; });
       renderAll();
-      toast("Palcoscenico ripristinato");
+      toast("Palco ripristinato");
     });
   }
 
@@ -4396,7 +4396,7 @@
   var leafletMap = null;
   var mapMarkersLayer = null;
   var mapPinIcons = {};
-  var mapMarkers = {};        /* id del palcoscenico -> segnalino, per ritrovarlo dalla ricerca */
+  var mapMarkers = {};        /* id del palco -> segnalino, per ritrovarlo dalla ricerca */
   var mapUserIcon = null;
   var mapUserMarker = null;
   var mapUserCircle = null;
@@ -4439,7 +4439,7 @@
     });
     return mapPinIcons[chiave];
   }
-  /* L'icona sta sulla tipologia, non sul palcoscenico: si sceglie una volta
+  /* L'icona sta sulla tipologia, non sul palco: si sceglie una volta
      in Impostazioni e vale per i centoventisei stabilimenti balneari
      insieme, compresi quelli che aggiungerai domani. */
   function typeIcon(nome){
@@ -4451,7 +4451,7 @@
      posto: su iPhone quello vuol dire Mappe di Apple, che e' l'app che la
      gente ha davvero sul telefono, altrove Google Maps. In entrambi i casi
      si parte da dove sei, la destinazione sono le coordinate del
-     palcoscenico e il mezzo e' l'auto — al furgone con dentro gli ampli non
+     palco e il mezzo e' l'auto — al furgone con dentro gli ampli non
      interessano le indicazioni a piedi. */
   function isAppleDevice(){
     return /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -4495,7 +4495,7 @@
      che saranno mute ma sono giuste.
 
      E il pulsante compare anche a chi ha l'indirizzo ma non ha ancora il
-     punto sulla mappa: sono centoventisette palcoscenici, e per aprirli in
+     punto sulla mappa: sono centoventisette palchi, e per aprirli in
      Maps le coordinate non servono. */
   function mapsHref(v){
     return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(directionsDest(v));
@@ -4642,7 +4642,7 @@
       bounds.push([v.lat, v.lng]);
     });
     mapVenueBounds = bounds;
-    /* il fit sui palcoscenici serve solo se non stiamo centrando sulla posizione dell'utente */
+    /* il fit sui palchi serve solo se non stiamo centrando sulla posizione dell'utente */
     if(!mapUserCoords && !nearMeCoords && !mapLocating) fitMapToVenues();
   }
   /* ---------------- la ricerca in mappa ----------------
@@ -4722,7 +4722,7 @@
     if(currentViewMode !== "map" || !searchText.trim()){ hideMapSearchResults(); return; }
     var righe = mapSearchMatches();
     if(!righe.length){
-      elMapSearchResults.innerHTML = '<div class="msr-note">Nessun palcoscenico con questo nome</div>';
+      elMapSearchResults.innerHTML = '<div class="msr-note">Nessun palco con questo nome</div>';
       elMapSearchResults.hidden = false;
       return;
     }
@@ -4749,7 +4749,7 @@
     if(!matchesFilter(v)){
       azzeraFiltri({tieniArchiviati:true});
       renderMapMarkers(true);
-      toast("Filtri azzerati per mostrarti " + (v.name || "il palcoscenico"));
+      toast("Filtri azzerati per mostrarti " + (v.name || "il palco"));
     }
     focusVenueOnMap(v);
   });
@@ -4825,7 +4825,7 @@
       // tre manda a cercare una stella che hai gia' messo.
       var vuoto;
       if(!stellati.length){
-        vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palcoscenico per aggiungerlo qui. La stella è tua: la vedi solo tu, e lo stesso posto può stare anche fra i preferiti di un altro.</p>';
+        vuoto = '<div class="glyph">⭐</div><h2>Nessun preferito</h2><p>Tocca la stella su un palco per aggiungerlo qui. La stella è tua: la vedi solo tu, e lo stesso posto può stare anche fra i preferiti di un altro.</p>';
       } else if(favSearchText){
         vuoto = '<div class="glyph">🔍</div><h2>Nessun risultato</h2><p>Prova a cambiare termine di ricerca.</p>';
       } else if(filterTagsAttivi()){
@@ -4857,7 +4857,7 @@
   });
 
   /* ---------------- SERATE tab ----------------
-     Le serate di tutti i palcoscenici, di ogni stagione: e' l'archivio
+     Le serate di tutti i palchi, di ogni stagione: e' l'archivio
      dei tentativi, non una coda di lavoro — per quella c'e' l'Agenda.
 
      Quelle senza data ci sono come le altre, ed e' il motivo per cui questo
@@ -4865,9 +4865,9 @@
      giorno finche' non te lo danno) e fino a ieri non c'era nessun posto in
      cui vederle tutte insieme. Il segmento "Serate" dell'Agenda tiene solo
      quelle con una data, perche' li' si lavora a calendario; la scheda del
-     palcoscenico mostra solo le sue.
+     palco mostra solo le sue.
 
-     Niente endpoint nuovo: le serate arrivano gia' dentro ogni palcoscenico
+     Niente endpoint nuovo: le serate arrivano gia' dentro ogni palco
      in /api/locations, come per l'Agenda, la Home e la Cassa. Gli archiviati
      ci sono, con la loro etichetta: quella sera ci hai suonato lo stesso. */
   var elAllGigs = document.getElementById("allGigsList");
@@ -4890,8 +4890,8 @@
      gli stati veri, non un riassunto: chi legge deve poter ritrovare nelle
      pastiglie delle righe quello che c'e' scritto qui. */
   var GIG_SCOPE_NOTE = {
-    aperte: "Le trattative ancora in ballo: Opportunità, Contattato, Interessato, Trattativa. Fuori i palcoscenici archiviati.",
-    chiuse: "Le serate arrivate a un esito: Confermato, Rifiutata, Suonato, Annullato. Una confermata sta qui perché non c’è più niente da trattare, anche se deve ancora essere suonata. Fuori i palcoscenici archiviati.",
+    aperte: "Le trattative ancora in ballo: Opportunità, Contattato, Interessato, Trattativa. Fuori i palchi archiviati.",
+    chiuse: "Le serate arrivate a un esito: Confermato, Rifiutata, Suonato, Annullato. Una confermata sta qui perché non c’è più niente da trattare, anche se deve ancora essere suonata. Fuori i palchi archiviati.",
   };
   function isGigChiusa(k){ return GIG_CHIUSE.indexOf(k) > -1; }
   /* Gli stati che ha senso filtrare qui dentro: quelli della scheda aperta.
@@ -4910,10 +4910,10 @@
     });
     return out;
   }
-  /* Le serate dei palcoscenici archiviati restano fuori da tutte e due le
+  /* Le serate dei palchi archiviati restano fuori da tutte e due le
      schede: un posto messo via non e' lavoro in corso. Fino al 15 settembre
      2026 si ritrovavano in "Tutte"; adesso che quella scheda non c'e' piu'
-     si leggono dalla scheda del palcoscenico, e quelle con una data anche
+     si leggono dalla scheda del palco, e quelle con una data anche
      dal segmento Serate dell'Agenda, che gli archiviati li tiene dentro. */
   function gigsInScope(){
     return allGigRows().filter(function(x){
@@ -4923,7 +4923,7 @@
   }
   /* Due stati per riga, e sono due cose diverse: la pastiglia a destra dice
      a che punto e' questa serata, quella piccola sotto il nome dice che
-     rapporto c'e' col palcoscenico. "Trattativa su un Lead" e "Trattativa su
+     rapporto c'e' col palco. "Trattativa su un Lead" e "Trattativa su
      un Cliente" non sono la stessa telefonata. */
   /* Senza data non si scriveva niente di utile ("Data da fissare" e' vero
      per tutte finche' non sono confermate). Al suo posto la cosa che serve
@@ -4931,7 +4931,7 @@
   /* In coda alla cella la nota della serata — il campo "Note" della scheda,
      quello in cui scrivi gli accordi presi o perche' ti hanno detto di no.
      E' l'unica cosa che distingue due tentativi che dall'esterno si
-     leggono uguali: tre "Rifiutata" senza data sullo stesso palcoscenico
+     leggono uguali: tre "Rifiutata" senza data sullo stesso palco
      sono tre righe identiche finche' non si vede cosa c'era scritto.
 
      Una riga sola, tagliata con i puntini: .row-sub lo fa gia' per tutte le
@@ -5087,7 +5087,7 @@
     var gruppi = {};
     righe.forEach(function(x){ (gruppi[x.g.status] = gruppi[x.g.status] || []).push(x); });
     return ordine.filter(function(k){ return gruppi[k]; }).map(function(k){
-      return {titolo: gigStatusInfo(k).label, righe: gruppi[k].sort(perNomePalcoscenico)};
+      return {titolo: gigStatusInfo(k).label, righe: gruppi[k].sort(perNomePalco)};
     });
   }
   function gruppiPerAnno(righe){
@@ -5102,13 +5102,13 @@
     }).map(function(k){
       return {
         titolo: k === "" ? "Senza data" : k,
-        righe: gruppi[k].sort(k === "" ? perNomePalcoscenico : function(a, b){
+        righe: gruppi[k].sort(k === "" ? perNomePalco : function(a, b){
           return a.g.gig_date < b.g.gig_date ? 1 : -1;
         })
       };
     });
   }
-  function perNomePalcoscenico(a, b){
+  function perNomePalco(a, b){
     return String(a.v.name || "").localeCompare(String(b.v.name || ""), "it");
   }
   function renderAllGigs(){
@@ -5140,7 +5140,7 @@
       var vuoto;
       if(!allGigRows().length){
         vuoto = '<div class="glyph">🎸</div><h2>Nessuna serata</h2>'+
-          '<p>Una serata nasce sulla scheda del palcoscenico, quando decidi di provarci: da quel momento la ritrovi qui, con o senza una data.</p>';
+          '<p>Una serata nasce sulla scheda del palco, quando decidi di provarci: da quel momento la ritrovi qui, con o senza una data.</p>';
       } else if(!ambito.length){
         vuoto = gigsScope === "aperte"
           ? '<div class="glyph">✅</div><h2>Niente in ballo</h2><p>Nessuna trattativa aperta: le serate che hai sono tutte chiuse. Le trovi nella scheda accanto.</p>'
@@ -5212,7 +5212,7 @@
 
   /* ---------------- AGENDA tab ----------------
      Tre segmenti: quando chiamare (il periodo), a chi manca la serata
-     aperta, e cosa ne e' uscito (le serate con una data). I palcoscenici
+     aperta, e cosa ne e' uscito (le serate con una data). I palchi
      archiviati restano fuori dai primi due, che sono code di lavoro: in
      agenda ci va solo quello su cui si lavora davvero. Nel terzo ci sono,
      perche' li' c'e' il calendario di quello che e' successo — il motivo
@@ -5221,7 +5221,7 @@
      Sotto le schede, una riga che dice cosa entra in quel segmento e cosa
      no: sono regole (serata aperta, periodo, data) che dalle righe non si
      vedono, e senza quella riga l'unico modo di sapere perche' un
-     palcoscenico non c'e' e' indovinarlo. Stessa cosa in Opportunita'. */
+     palco non c'e' e' indovinarlo. Stessa cosa in Opportunita'. */
   var elRecontactList = document.getElementById("recontactList");
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
@@ -5249,11 +5249,11 @@
   });
 
   /* Ogni riga si porta dietro la sua data, che adesso e' scritta sul
-     palcoscenico: non c'e' piu' niente da calcolare a partire da oggi.
+     palco: non c'e' piu' niente da calcolare a partire da oggi.
 
      Dentro ci va chiunque abbia una data, che abbia una serata aperta o no.
      Fino al 15 settembre 2026 ne servivi una, e l'elenco diceva una cosa
-     diversa da quella che prometteva: un palcoscenico a cui avevi detto
+     diversa da quella che prometteva: un palco a cui avevi detto
      "risentiamoci a ottobre" e su cui non avevi aperto niente — il caso
      normale dopo un no — a ottobre non compariva.
 
@@ -5301,12 +5301,12 @@
   /* ---------------- i COMPITI in Agenda ----------------
      Gli stessi compiti che stanno nelle schede, tutti insieme e in ordine di
      scadenza: e' la domanda "cosa devo fare adesso", che dentro un
-     palcoscenico per volta non si puo' fare. Sta prima di Serate perche' e'
+     palco per volta non si puo' fare. Sta prima di Serate perche' e'
      una coda di lavoro come le prime due, e Serate e' il calendario di
      quello che e' successo.
 
      Qui ci sono solo quelli da fare: un compito fatto ha finito di essere
-     un'agenda, e resta dov'e' nato — nella scheda del palcoscenico, in
+     un'agenda, e resta dov'e' nato — nella scheda del palco, in
      fondo all'elenco. Fuori gli archiviati, come nelle altre due code.
 
      Quelli senza scadenza non spariscono: stanno in fondo, sotto la loro
@@ -5378,8 +5378,8 @@
       // manda a cercare un elenco che non esiste.
       var nessuno = !venues.some(function(v){ return venueTasks(v).length; });
       elAgendaTasks.innerHTML = '<div class="empty-state">'+(nessuno
-        ? '<div class="glyph">🗒️</div><h2>Nessun compito</h2><p>I compiti si scrivono nella scheda di un palcoscenico, sotto le opportunità: «mandare il preventivo», «richiamare lunedì». Da lì arrivano qui, in ordine di scadenza.</p>'
-        : '<div class="glyph">✅</div><h2>Niente da fare</h2><p>I compiti che avevi sono chiusi, fatti o declinati. Restano nelle schede dei palcoscenici, in fondo al loro elenco.</p>')+'</div>';
+        ? '<div class="glyph">🗒️</div><h2>Nessun compito</h2><p>I compiti si scrivono nella scheda di un palco, sotto le opportunità: «mandare il preventivo», «richiamare lunedì». Da lì arrivano qui, in ordine di scadenza.</p>'
+        : '<div class="glyph">✅</div><h2>Niente da fare</h2><p>I compiti che avevi sono chiusi, fatti o declinati. Restano nelle schede dei palchi, in fondo al loro elenco.</p>')+'</div>';
       return;
     }
     elAgendaTasks.innerHTML = gruppiCompiti(righe).map(function(g){
@@ -5403,14 +5403,14 @@
     var cosa = "«" + (x.t.description || "questo compito") + "»";
     var domanda = stato === "fatto"
       ? "Segnare " + cosa + " come fatto?"
-      : "Declinare " + cosa + "? Resta nella scheda del palcoscenico, segnato come declinato.";
+      : "Declinare " + cosa + "? Resta nella scheda del palco, segnato come declinato.";
     openSheet({
       title: domanda,
       options: [{label: "Conferma", onSelect: function(){
         api("PUT", "/api/tasks/" + taskId, {status: stato}).then(function(updated){
           applyUpdatedVenue(updated);
           renderAll();
-          // Se la scheda di quel palcoscenico e' aperta dietro, si aggiorna
+          // Se la scheda di quel palco e' aperta dietro, si aggiorna
           // anche lei: il compito ci sta dentro, barrato.
           var cv = currentVenue();
           if(cv && String(cv.id) === String(updated.id)) renderTasks(updated);
@@ -5446,7 +5446,7 @@
   }
 
   /* Tutti quelli su cui hai messo le mani e di cui non hai mai detto
-     quando richiamarli. Senza periodo un palcoscenico non compare in "Da
+     quando richiamarli. Senza periodo un palco non compare in "Da
      contattare", che va a calendario, e quindi non torna a galla mai piu':
      una trattativa aperta due mesi fa e poi lasciata li' non la ritrova
      nessuno. E' l'arretrato, ed e' la parte piu' grossa della rubrica.
@@ -5463,7 +5463,7 @@
 
      Fino al 15 settembre 2026 qui ci voleva una serata aperta, e l'elenco
      conteneva una riga in tutto: chiudere una trattativa faceva sparire il
-     palcoscenico da tutte e due i segmenti dell'Agenda, e un Prospect
+     palco da tutte e due i segmenti dell'Agenda, e un Prospect
      sentito a marzo e poi lasciato li' non lo ritrovava piu' nessuno.
      Adesso sono 61. */
   function statusRank(k){
@@ -5561,11 +5561,11 @@
         (planFiltro !== "tutti" && venuesToPlan("tutti").length
           ? (planFiltro === "focus"
               ? '<h2>Nessuno in focus</h2>'+
-                '<p>Qui restano solo i palcoscenici che la band ha messo sott’occhio, con l’occhio in alto nella scheda. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>'
+                '<p>Qui restano solo i palchi che la band ha messo sott’occhio, con l’occhio in alto nella scheda. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>'
               : '<h2>Nessun preferito qui</h2>'+
                 '<p>Qui restano solo i tuoi preferiti — la stella è tua e non la vede nessun altro. Il numero sulla pastiglia «Tutti» dice quanti ne aspettano fuori.</p>')
           : '<h2>Niente da pianificare</h2>'+
-            '<p>Ogni palcoscenico che hai già toccato ha un giorno in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p>')+
+            '<p>Ogni palco che hai già toccato ha un giorno in cui richiamarlo. Senza, non comparirebbe in Da contattare — che va a calendario — e non tornerebbe a galla da solo.</p>')+
         '</div>';
       return;
     }
@@ -5591,7 +5591,7 @@
   });
   elPlanList.addEventListener("click", function(e){
     // Il pulsante sta dentro la riga: senza questa riga il calendario si
-    // aprirebbe insieme alla scheda del palcoscenico.
+    // aprirebbe insieme alla scheda del palco.
     if(e.target.closest(".plan-date")) return;
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
@@ -5610,25 +5610,25 @@
       elRecontactSub.textContent = c + (c===1 ? " compito da fare" : " compiti da fare");
     } else if(agendaView === "plan"){
       var p = venuesToPlan().length;
-      elRecontactSub.textContent = p + (p===1 ? " palcoscenico senza data" : " palcoscenici senza data");
+      elRecontactSub.textContent = p + (p===1 ? " palco senza data" : " palchi senza data");
     } else {
       /* Gli scaduti si dicono a parte: sono lo stesso elenco, ma sono
          l'unica parte che riguarda oggi. */
       var righe = venuesToRecontact();
       var tardi = righe.filter(function(x){ return x.due.late; }).length;
       elRecontactSub.textContent = righe.length +
-        (righe.length === 1 ? " palcoscenico da richiamare" : " palcoscenici da richiamare") +
+        (righe.length === 1 ? " palco da richiamare" : " palchi da richiamare") +
         (tardi ? " · " + tardi + (tardi === 1 ? " in ritardo" : " in ritardo") : "");
     }
   }
 
-  /* Le stesse due azioni dell'elenco palcoscenici, con gli stessi colori:
+  /* Le stesse due azioni dell'elenco palchi, con gli stessi colori:
      archiviare e' reversibile e sta in grigio, eliminare no e sta in rosso.
      Qui servono perche' l'agenda e' il posto dove ci si accorge che un
      promemoria non ha piu' senso — e fin qui l'unico modo di toglierlo era
-     aprire la scheda. Un palcoscenico archiviato esce da solo dall'elenco:
+     aprire la scheda. Un palco archiviato esce da solo dall'elenco:
      venuesToRecontact() salta chi ha deleted_at. */
-  /* La pastiglia dello stato, la stessa dell'elenco palcoscenici, e nello
+  /* La pastiglia dello stato, la stessa dell'elenco palchi, e nello
      stesso posto: in coda alla riga, a destra. Lo stato si legge sempre
      nella stessa colonna, in qualunque elenco tu sia.
 
@@ -5643,8 +5643,8 @@
   function whenHtml(tag, color){
     return '<span style="color:'+color+';">'+esc(tag)+'</span>';
   }
-  /* Lo stato di un palcoscenico e' quello che sta su locations: la stessa
-     riga che leggono l'elenco palcoscenici e i preferiti, quindi la stessa
+  /* Lo stato di un palco e' quello che sta su locations: la stessa
+     riga che leggono l'elenco palchi e i preferiti, quindi la stessa
      pastiglia ovunque. Dal 15 settembre 2026 e' una cosa sua (Lead,
      Prospect, Cliente...) e non piu' la copia della serata, quindi qui non
      c'e' piu' niente da ricalcolare: le righe delle serate mostrano lo stato
@@ -5670,7 +5670,7 @@
      E nemmeno lo scorrimento, in tutte e due le sezioni dell'Agenda (17
      settembre 2026): Archivia ed Elimina stavano a un gesto di distanza da
      quello con cui si scorre una coda di lavoro lunga, e qui si scorre
-     tutto il tempo. Restano nell'elenco dei palcoscenici e nella scheda.
+     tutto il tempo. Restano nell'elenco dei palchi e nella scheda.
      Senza row-actions lo scorrimento non ha dove agganciarsi e la riga
      resta ferma — la stessa regola dei preferiti. */
   function recontactRowHtml(x){
@@ -5700,7 +5700,7 @@
     if(!gruppi.length){
       elRecontactList.innerHTML = '<div class="empty-state"><div class="glyph">🗓️</div>'+
         '<h2>Niente da contattare</h2>'+
-        '<p>Apri un palcoscenico e scegli il giorno in cui richiamarlo: da lì in poi ti aspetta qui, al suo posto nel calendario.</p>'+
+        '<p>Apri un palco e scegli il giorno in cui richiamarlo: da lì in poi ti aspetta qui, al suo posto nel calendario.</p>'+
         '</div>';
       return;
     }
@@ -5716,7 +5716,7 @@
   });
 
   /* La data scelta nel pannello "Ho suonato", finche' non premi il
-     pulsante. Si parte da quella che il palcoscenico ha gia'; se non ha
+     pulsante. Si parte da quella che il palco ha gia'; se non ha
      niente, dalla serata appena suonata. Solo la prima volta: da li' in poi
      comanda la tua scelta, che deve sopravvivere ai ridisegni dell'elenco. */
   var confData = {};
@@ -5733,12 +5733,12 @@
      accanto alla data, che e' la cosa a cui si riferisce. Fra le gia'
      passate non c'e' nessun conto da fare: "tra -400g" non serve a niente.
 
-     Tre righe come le celle dei palcoscenici — nome, quando, dove e quanto —
+     Tre righe come le celle dei palchi — nome, quando, dove e quanto —
      invece di una riga sola lunga il doppio dello schermo.
 
      Fino al 15 settembre 2026 su una serata suonata lo scorrimento scopriva
      "Riproponi". Adesso la serata dell'anno dopo si apre dalla scheda del
-     palcoscenico, dove si vede cosa si sta aprendo: la riga di qui si tocca
+     palco, dove si vede cosa si sta aprendo: la riga di qui si tocca
      e porta li'. */
   function gigAgendaRowHtml(x, tag, tagColor){
     var quando = [fmtDateShort(x.g.gig_date)];
@@ -5770,7 +5770,7 @@
     var rows = datedGigRows();
     if(!rows.length){
       elAgendaGigs.innerHTML = '<div class="empty-state"><div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessuna serata in calendario</h2>'+
-        '<p>Quando un locale ti dà una data, scrivila nella serata dalla scheda del palcoscenico: da qui vedi tutte quelle fissate e tutte quelle già suonate.</p></div>';
+        '<p>Quando un locale ti dà una data, scrivila nella serata dalla scheda del palco: da qui vedi tutte quelle fissate e tutte quelle già suonate.</p></div>';
       return;
     }
     var today = todayStr();
@@ -5928,7 +5928,7 @@
      cambiarlo vuol dire scrivere sulla serata, che e' dove quel numero
      abita. Data e descrizione non si toccano perche' non sono roba della
      cassa: la data e' quella della serata, e la descrizione e' il nome del
-     palcoscenico, che segue il palcoscenico anche quando lo rinomini. */
+     palco, che segue il palco anche quando lo rinomini. */
   /* Quello che arriva da /api/cash: solo i movimenti scritti a mano. I
      compensi delle serate non stanno in quell'elenco, li mette cashRows()
      qui sotto leggendo le serate. */
@@ -5967,7 +5967,7 @@
      composti qui a ogni lettura dalle serate che stanno dentro `venues`.
 
      Comporli qui e non sul server e' quello che tiene insieme le due
-     schermate: correggere il compenso dalla scheda del palcoscenico
+     schermate: correggere il compenso dalla scheda del palco
      aggiorna `venues`, e la Cassa si rifa' dalla stessa riga senza dover
      sapere niente e senza ricaricare. Finche' il server mandava anche i
      compensi, il telefono teneva due elenchi della stessa cifra e la Cassa
@@ -5979,7 +5979,7 @@
      arrivare — contano come "da incassare", quindi nel budget e non in
      cassa). "Suonato" senza cifra vuol dire che non l'hai segnata, non che
      hai suonato gratis, e una riga da zero euro non dice niente a nessuno.
-     I palcoscenici archiviati ci sono: quei soldi li hai presi davvero. */
+     I palchi archiviati ci sono: quei soldi li hai presi davvero. */
   function cashRows(){
     var out = cashManual.slice();
     venues.forEach(function(v){
@@ -6116,7 +6116,7 @@
       '</div>';
     /* Il compenso di una serata non ha il gesto per cancellarlo: quella riga
        non esiste in cassa, e toglierla vorrebbe dire cancellare la serata —
-       cosa che si fa dalla scheda del palcoscenico, dove si vede cosa si sta
+       cosa che si fa dalla scheda del palco, dove si vede cosa si sta
        buttando via. */
     var html = daSerata
       ? '<div class="swipe-row"><div class="row-content">'+corpo+'</div></div>'
@@ -6171,7 +6171,7 @@
         'Questo è il compenso della serata: l\'importo che scrivi qui finisce sulla serata stessa. '+
         'Data e descrizione si cambiano da lì.</div></div>'+
       '<div class="add-note-row" style="justify-content:space-between;gap:18px;">'+
-        '<button type="button" data-cash-open="'+esc(m.location_id)+'" style="color:var(--tint);">Apri il palcoscenico</button>'+
+        '<button type="button" data-cash-open="'+esc(m.location_id)+'" style="color:var(--tint);">Apri il palco</button>'+
         '<span><button type="button" id="btnCashCancel" style="color:var(--text-secondary);margin-right:18px;">Annulla</button>'+
         '<button type="button" id="btnCashSave" data-cash-id="'+esc(m.id)+'">Salva</button></span>'+
       '</div>'+
@@ -6377,7 +6377,7 @@
     if(e.target.closest("[data-cash-gig]")){
       readCashDraft();
       if(!cashDraft) return;
-      openSheet({title:"Di quale serata", searchable:true, searchPlaceholder:"Cerca un palcoscenico…",
+      openSheet({title:"Di quale serata", searchable:true, searchPlaceholder:"Cerca un palco…",
         options: cashGigOptions(cashDraft.gig_id, function(id){
           cashDraft.gig_id = id;
           var trovato = null;
@@ -6515,7 +6515,7 @@
     }
     if(e.target.closest("#newCashGig")){
       readNewCashFields();
-      openSheet({title:"Di quale serata", searchable:true, searchPlaceholder:"Cerca un palcoscenico…",
+      openSheet({title:"Di quale serata", searchable:true, searchPlaceholder:"Cerca un palco…",
         options: cashGigOptions(newCashDraft.gig_id, function(id){
           newCashDraft.gig_id = id;
           var trovato = null;
@@ -6564,7 +6564,7 @@
     renderCash();
   });
 
-  /* ---------------- PUSHED SCREEN: palcoscenico detail ---------------- */
+  /* ---------------- PUSHED SCREEN: palco detail ---------------- */
   var elDetail = document.getElementById("detail");
   var elSaveIndicatorTitle = document.getElementById("detailInlineTitle");
   var fName = document.getElementById("fName"),
@@ -6598,7 +6598,7 @@
       // alto non deve tornare indietro al nome di prima.
       setDato(elSaveIndicatorTitle,
               elDetail.hidden ? updated.name : fName.value,
-              "Nuovo palcoscenico");
+              "Nuovo palco");
     }
   }
   /* I campi che si scrivono sono una bozza: restano nella pagina finche' non
@@ -6615,7 +6615,7 @@
     el.addEventListener("input", function(){ venueDirty = true; });
   });
   fName.addEventListener("input", function(){
-    setDato(elSaveIndicatorTitle, fName.value, "Nuovo palcoscenico");
+    setDato(elSaveIndicatorTitle, fName.value, "Nuovo palco");
   });
 
   /* Il periodo si sceglie da un foglio, non si digita: i mesi sono dodici e
@@ -6631,7 +6631,7 @@
     var x = elNextContact.parentNode.querySelector("[data-clear-date]");
     if(x) x.hidden = !elNextContact.value;
   }
-  /* Il periodo si sceglie da due posti: la scheda del palcoscenico e la riga
+  /* Il periodo si sceglie da due posti: la scheda del palco e la riga
      di "Da pianificare". Il salvataggio e' lo stesso, e non passa da
      patchVenue perche' quello scrive sempre sulla scheda aperta — che in
      Agenda non c'e'. */
@@ -6781,7 +6781,7 @@
   document.getElementById("photoFileInputLibrary").addEventListener("change", handlePhotoFileSelected);
 
   /* ---------------- copertina dal profilo social ----------------
-     Due terzi dei palcoscenici in archivio hanno una pagina Facebook al
+     Due terzi dei palchi in archivio hanno una pagina Facebook al
      posto del sito, e la sua immagine del profilo e' quasi sempre
      l'insegna del locale: la riga sotto i due campi la prende e la mette in
      copertina.
@@ -6858,7 +6858,7 @@
     return null;
   }
   /* Il link da cui prendere la copertina, fra i due campi di una scheda o
-     fra i due campi di un palcoscenico salvato: Facebook e poi Instagram. */
+     fra i due campi di un palco salvato: Facebook e poi Instagram. */
   function socialCoverUrl(v){
     if(facebookPageId(v.facebook)) return v.facebook;
     if(instagramUser(v.instagram)) return v.instagram;
@@ -6922,7 +6922,7 @@
      Instagram: i locali su Instagram si chiamano come si chiamano nella
      realta' — tutto attaccato, coi punti, senza la parola "bar" davanti,
      a volte con la citta' in coda — e per ognuno di quei nomi la pagina
-     pubblica dice se esiste e com'e' la foto. Su tredici palcoscenici presi
+     pubblica dice se esiste e com'e' la foto. Su tredici palchi presi
      a caso ne ha trovati nove.
 
      L'ultima voce del foglio apre comunque il motore di ricerca sul telefono,
@@ -7103,7 +7103,7 @@
     {key:"{mio_nome}",    hint:"il tuo nome"},
     {key:"{mio_cognome}", hint:"il tuo cognome"},
     {key:"{mia_band}",    hint:"il nome della band"},
-    {key:"{titolare}",    hint:"il referente del palcoscenico"},
+    {key:"{titolare}",    hint:"il referente del palco"},
     {key:"{art_nome}",    hint:"il nome dell\u2019art director"},
     {key:"{art_cognome}", hint:"il cognome dell\u2019art director"}
   ];
@@ -7152,9 +7152,9 @@
     if(body) q.push("body=" + encodeURIComponent(body));
     return "mailto:" + email + (q.length ? "?" + q.join("&") : "");
   }
-  /* target: {email, venue} dalla scheda del palcoscenico, {email, ad} da
+  /* target: {email, venue} dalla scheda del palco, {email, ad} da
      quella dell'art director. L'attivita' si registra solo nel primo caso:
-     e' il palcoscenico ad avere un diario. */
+     e' il palco ad avere un diario. */
   function openMailPicker(target){
     function send(subject, body, modello){
       window.location.href = buildMailtoUrl(target.email, subject, body);
@@ -7183,8 +7183,8 @@
     return url;
   }
   /* Stessa forma del selettore della posta: {phone, venue} dalla scheda del
-     palcoscenico, {phone, ad} da quella dell'art director. L'attivita' si
-     registra solo nel primo caso — il diario ce l'ha il palcoscenico. */
+     palco, {phone, ad} da quella dell'art director. L'attivita' si
+     registra solo nel primo caso — il diario ce l'ha il palco. */
   function openWhatsAppPicker(target){
     function send(text, modello){
       var url = buildWhatsAppUrl(target.phone, text);
@@ -7235,7 +7235,7 @@
       }});
     });
     openSheet({
-      title:"Tipo di palcoscenico",
+      title:"Tipo di palco",
       searchable:true,
       searchPlaceholder:"Cerca o scrivi un tipo personalizzato…",
       freeText:true,
@@ -7251,7 +7251,7 @@
      e' che non c'era niente da imparare. Finche' la lista e' vuota la riga
      non c'e'.
 
-     L'eccezione e' il palcoscenico che quel valore ce l'ha gia' scritto —
+     L'eccezione e' il palco che quel valore ce l'ha gia' scritto —
      importato da fuori, o rimasto dopo che qualcuno ha svuotato la lista:
      nascondere la riga vorrebbe dire nascondere un dato, e per giunta uno
      che non si potrebbe piu' togliere. */
@@ -7284,7 +7284,7 @@
       }});
     });
     openSheet({
-      title:"Categoria del palcoscenico",
+      title:"Categoria del palco",
       searchable:true,
       searchPlaceholder:"Cerca o scrivi una categoria personalizzata…",
       freeText:true,
@@ -7323,10 +7323,10 @@
 
   /* Le due righe stanno insieme perche' dicono due cose diverse: sopra che
      rapporto c'e' con quel posto, sotto come sta andando la stagione. Prima
-     erano la stessa cosa scritta due volte — lo stato del palcoscenico era
+     erano la stessa cosa scritta due volte — lo stato del palco era
      la copia della serata — e infatti la riga di sopra si nascondeva.
 
-     Lo stato del palcoscenico si sceglie qui, ed e' l'unico posto che lo
+     Lo stato del palco si sceglie qui, ed e' l'unico posto che lo
      scrive. Quello della serata si legge qui e si scrive sulla riga della
      sua serata, dove si vede sempre quale si sta muovendo. In archivio la
      riga di sopra dice "Archiviato" e non si apre: per cambiare stato si
@@ -7351,8 +7351,8 @@
   }
   document.getElementById("rowVenueStatus").addEventListener("click", function(){
     var v = currentVenue(); if(!v) return;
-    if(v.deleted_at){ toast("Questo palcoscenico è in archivio: ripristinalo per cambiargli stato."); return; }
-    openSheet({title:"Stato del palcoscenico", options: MANUAL_VENUE_STATUSES.map(function(sv){
+    if(v.deleted_at){ toast("Questo palco è in archivio: ripristinalo per cambiargli stato."); return; }
+    openSheet({title:"Stato del palco", options: MANUAL_VENUE_STATUSES.map(function(sv){
       return {label:sv.label, color:sv.color, checkmark: v.status === sv.key, onSelect:function(){
         if(v.status === sv.key) return;
         patchVenue("status", sv.key).then(function(updated){
@@ -7506,7 +7506,7 @@
     var del = e.target.closest("[data-gig-del]");
     if(del){
       var delId = del.getAttribute("data-gig-del");
-      // Come per l'eliminazione definitiva di un palcoscenico: dire prima
+      // Come per l'eliminazione definitiva di un palco: dire prima
       // quale serata si porta via, perche' non si annulla.
       var dv = currentVenue();
       var dg = dv ? venueGigs(dv).filter(function(x){ return String(x.id) === String(delId); })[0] : null;
@@ -7665,7 +7665,7 @@
 
 
   /* ---------------- COMPITI nella scheda ----------------
-     Le cose da fare su questo palcoscenico: mandare il preventivo,
+     Le cose da fare su questo palco: mandare il preventivo,
      richiamare lunedi', passare a vedere il palco. Sono fatti come le
      opportunita' qui sopra — riga che si apre in un pannello, quello che
      scrivi e' una bozza finche' non tocchi Salva, lo scorrimento scopre
@@ -7674,7 +7674,7 @@
 
      Dove invece non si somigliano: di compiti ce ne stanno quanti ne vuoi
      tutti insieme (una serata aperta e' una sola, e aprirne un'altra chiude
-     quella di prima), e un compito non tocca lo stato del palcoscenico.
+     quella di prima), e un compito non tocca lo stato del palco.
      Mandare un preventivo non cambia il rapporto con il locale: quello lo
      dice l'opportunita'.
 
@@ -7695,7 +7695,7 @@
   }
   function venueTasks(v){ return (v && v.tasks) ? v.tasks : []; }
   /* Chi lo fa e' uno della band, e si sceglie dalla stessa lista da cui si
-     sceglie il proprietario di un palcoscenico (owners, cioe' i membri del
+     sceglie il proprietario di un palco (owners, cioe' i membri del
      workspace): un compito assegnato a un indirizzo scritto a mano sarebbe
      un nome che non ritrova piu' nessuno. */
   function personaHtml(email){
@@ -8012,7 +8012,7 @@
       }});
     });
     opts.push({label:"+ Nuovo art director", onSelect:function(){
-      returnToPalcoscenicoAfterAd = currentId;
+      returnToPalcoAfterAd = currentId;
       api("POST", "/api/art_directors", {name:""}).then(function(created){
         artDirectors.push(created);
         openAdDetail(created.id);
@@ -8304,13 +8304,13 @@
     fInstagram.value = v.instagram || "";
     renderRecontactRows(v);
     fPlanningNote.value = v.planning_note || "";
-    setDato(elSaveIndicatorTitle, v.name, "Nuovo palcoscenico");
+    setDato(elSaveIndicatorTitle, v.name, "Nuovo palco");
     venueDirty = false;
     renderPhotosStrip(v);
     renderQuickActions(v);
     renderSocialCoverRow();
     // Il verso torna su "Noi" a ogni scheda aperta: e' il caso di quasi
-    // sempre, e restare su "Loro" da un palcoscenico all'altro vorrebbe dire
+    // sempre, e restare su "Loro" da un palco all'altro vorrebbe dire
     // segnare la telefonata di domani dalla parte sbagliata. Per la stessa
     // ragione i pannelli delle attivita' non si portano dietro niente: quello
     // che stavi scrivendo era di un altro posto.
@@ -8331,12 +8331,12 @@
   /* ---------------- la riga dei tag nella scheda ----------------
      I tag si salvano da soli appena chiudi il foglio, come il tipo o la
      citta': li' stai scegliendo, non scrivendo, e non c'entrano niente con
-     il Salva della scheda, che e' la bozza del palcoscenico.
+     il Salva della scheda, che e' la bozza del palco.
 
      Sono della band: quello che scrivi qui lo vedono tutti, e chiunque puo'
      toglierlo. Il vocabolario di nomi che l'autocompletamento propone non e'
      un elenco da nessuna parte — e' quello che c'e' scritto sugli altri
-     palcoscenici. */
+     palchi. */
   var elTagsValue = document.getElementById("tagsValue");
   function chiaveTag(t){ return (t || "").trim().toLowerCase(); }
   function renderTagsRow(v){
@@ -8352,7 +8352,7 @@
     if(String(currentId) === key) renderTagsRow(currentVenue());
     renderAll();
     api("PUT", "/api/locations/" + id + "/tags", {tags: lista}).then(function(updated){
-      // Torna il palcoscenico intero, con i tag come li ha scritti il
+      // Torna il palco intero, con i tag come li ha scritti il
       // server: se "anni80-90" nella band c'era gia', quella che si tiene e'
       // la grafia di chi e' arrivato prima.
       applyUpdatedVenue(updated);
@@ -8406,7 +8406,7 @@
   });
 
   /* Il focus non sta in un elenco a parte come i preferiti: e' una colonna
-     del palcoscenico, quindi arriva gia' dentro v.focus e non c'e' niente da
+     del palco, quindi arriva gia' dentro v.focus e non c'e' niente da
      caricare. La differenza e' tutta li': la stella e' di chi la mette, il
      focus e' della band. */
   var elBtnFocus = document.getElementById("btnFocus");
@@ -8473,7 +8473,7 @@
   document.getElementById("btnSave").addEventListener("click", function(){
     if(!currentId) return;
     withButtonBusy(this, saveVenueNow).then(function(){
-      toast("Palcoscenico salvato");
+      toast("Palco salvato");
       closeDetail();
     }).catch(function(err){ toast(err.message); });
   });
@@ -8493,7 +8493,7 @@
   }
   /* Il "+" crea la riga sul server prima che tu abbia scritto qualcosa —
      serve un id per attaccarci foto e note — quindi aprire la scheda e
-     tornare indietro senza toccare niente lascerebbe un palcoscenico vuoto.
+     tornare indietro senza toccare niente lascerebbe un palco vuoto.
      Chiudendo si porta via, ma solo se e' rimasto esattamente com'e' nato:
      "vuoto" si verifica su tutto quello che la scheda sa scrivere e non su
      quattro campi scelti a mano, altrimenti basta una foto o un indirizzo
@@ -8539,17 +8539,17 @@
        transizione): aperto subito verrebbe chiuso dalla stessa scelta che
        lo ha appena aperto. Stessa attesa delle serate. */
     function poi(fn){ setTimeout(fn, 300); }
-    openSheet({title: v.name || "Questo palcoscenico", titleDato: !!v.name, options: [
+    openSheet({title: v.name || "Questo palco", titleDato: !!v.name, options: [
       {label: "Archivia", onSelect: function(){
         poi(function(){
           confirmDestructive(
-            "Archiviare " + (v.name || "questo palcoscenico") + "? Sparisce dagli elenchi ma resta in archivio: " +
+            "Archiviare " + (v.name || "questo palco") + "? Sparisce dagli elenchi ma resta in archivio: " +
               "si rivede con «Mostra archiviati» e si può rimettere a posto.",
             function(){
               api("DELETE", "/api/locations/" + v.id).then(function(){
                 venues = venues.filter(function(x){ return x.id !== v.id; });
                 closeDetail();
-                toast("Palcoscenico archiviato");
+                toast("Palco archiviato");
               }).catch(function(err){ toast(err.message); });
             }
           );
@@ -8578,7 +8578,7 @@
   var elAdInlineTitle = document.getElementById("adDetailInlineTitle");
 
   function currentAd(){ return artDirectors.find(function(a){ return a.id === currentAdId; }); }
-  // Bozza anche qui, per la stessa ragione della scheda del palcoscenico.
+  // Bozza anche qui, per la stessa ragione della scheda del palco.
   var adDirty = false;
   [adName, adPhone, adEmail, adNotes].forEach(function(el){
     el.addEventListener("input", function(){ adDirty = true; });
@@ -8589,7 +8589,7 @@
   adPhone.addEventListener("input", function(){ renderAdQuickActions(collectAdPayload()); });
   adEmail.addEventListener("input", function(){ renderAdQuickActions(collectAdPayload()); });
 
-  /* Le stesse tre azioni della scheda del palcoscenico e nello stesso
+  /* Le stesse tre azioni della scheda del palco e nello stesso
      ordine: un art director si contatta come si contatta un locale, e
      WhatsApp e' spesso l'unico canale a cui risponde davvero. */
   function renderAdQuickActions(ad){
@@ -8607,8 +8607,8 @@
   }
   /* Anche qui si passa dai modelli, ed e' il caso in cui {art_nome} e
      {art_cognome} valgono davvero: l'art director e' la persona a cui stai
-     scrivendo, non un contatto del palcoscenico. Nessuna attivita' da
-     registrare: il diario ce l'ha il palcoscenico, non lui. */
+     scrivendo, non un contatto del palco. Nessuna attivita' da
+     registrare: il diario ce l'ha il palco, non lui. */
   document.getElementById("adQuickActions").addEventListener("click", function(e){
     var ad = currentAd() || {name: adName.value, phone: adPhone.value, email: adEmail.value};
     if(e.target.closest("[data-qa-whatsapp]")){
@@ -8625,7 +8625,7 @@
     var assigned = venues.filter(function(v){ return v.art_director_id === ad.id; })
       .slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||"", "it", {sensitivity:"base"}); });
     if(!assigned.length){
-      elAdVenues.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun palcoscenico associato ancora.</div>';
+      elAdVenues.innerHTML = '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun palco associato ancora.</div>';
       return;
     }
     elAdVenues.innerHTML = assigned.map(function(v){
@@ -8643,7 +8643,7 @@
       applyUpdatedVenue(updated);
       var ad = currentAd();
       if(ad) renderAdVenues(ad);
-      toast("Palcoscenico rimosso");
+      toast("Palco rimosso");
     });
   });
   document.getElementById("btnAdAddVenue").addEventListener("click", function(){
@@ -8655,12 +8655,12 @@
           api("PUT", "/api/locations/" + v.id, {art_director_id: ad.id}).then(function(updated){
             applyUpdatedVenue(updated);
             renderAdVenues(ad);
-            toast("Palcoscenico aggiunto");
+            toast("Palco aggiunto");
           });
         }};
       });
-    if(!options.length){ toast("Nessun altro palcoscenico disponibile"); return; }
-    openSheet({title:"Aggiungi palcoscenico", searchable:true, searchPlaceholder:"Cerca per nome o città…", options:options});
+    if(!options.length){ toast("Nessun altro palco disponibile"); return; }
+    openSheet({title:"Aggiungi palco", searchable:true, searchPlaceholder:"Cerca per nome o città…", options:options});
   });
 
   function openAdDetail(id){
@@ -8701,8 +8701,8 @@
     elAdDetail.classList.remove("in");
     setTimeout(function(){ elAdDetail.hidden = true; }, 320);
     var wasEmpty = ad && !ad.name && !ad.phone && !ad.email && !ad.notes;
-    var goBackId = returnToPalcoscenicoAfterAd;
-    returnToPalcoscenicoAfterAd = null;
+    var goBackId = returnToPalcoAfterAd;
+    returnToPalcoAfterAd = null;
     var finish = function(){
       loadArtDirectors().then(function(){
         if(goBackId != null){
@@ -8770,7 +8770,7 @@
   function renderAdList(){
     var elAdList = document.getElementById("adList");
     if(!artDirectors.length){
-      elAdList.innerHTML = '<div class="empty-state"><div class="glyph">🎨</div><h2>Nessun art director</h2><p>Tocca + in alto per aggiungere il primo referente booking, da associare poi ai palcoscenici.</p></div>';
+      elAdList.innerHTML = '<div class="empty-state"><div class="glyph">🎨</div><h2>Nessun art director</h2><p>Tocca + in alto per aggiungere il primo referente booking, da associare poi ai palchi.</p></div>';
       return;
     }
     var sorted = artDirectors.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
@@ -8816,7 +8816,7 @@
     });
   }
   function currentBand(){ return bands.find(function(b){ return b.id === currentBandId; }); }
-  // Bozza anche qui, per la stessa ragione della scheda del palcoscenico.
+  // Bozza anche qui, per la stessa ragione della scheda del palco.
   var bandDirty = false;
   [bandName, bandFacebook, bandFollowers, bandBase, bandContact, bandGigs, bandNotes].forEach(function(el){
     el.addEventListener("input", function(){ bandDirty = true; });
@@ -8919,7 +8919,7 @@
   function renderBandList(){
     var elBandList = document.getElementById("bandList");
     if(!bands.length){
-      elBandList.innerHTML = '<div class="empty-state"><div class="glyph">🎸</div><h2>Nessuna band</h2><p>Tocca + in alto per aggiungere la prima band — utile per tenere traccia di chi gira negli stessi giri e negli stessi palcoscenici.</p></div>';
+      elBandList.innerHTML = '<div class="empty-state"><div class="glyph">🎸</div><h2>Nessuna band</h2><p>Tocca + in alto per aggiungere la prima band — utile per tenere traccia di chi gira negli stessi giri e negli stessi palchi.</p></div>';
       return;
     }
     var sorted = bands.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
@@ -9047,8 +9047,8 @@
     renderTypeEditIcon();
     var count = typeUsageCount(t.name);
     document.getElementById("typeEditUsage").textContent = count
-      ? ("Usata da " + count + (count===1 ? " palcoscenico. Rinominandola si aggiorna anche lui." : " palcoscenici. Rinominandola si aggiornano anche loro."))
-      : "Non ancora usata da nessun palcoscenico.";
+      ? ("Usata da " + count + (count===1 ? " palco. Rinominandola si aggiorna anche lui." : " palchi. Rinominandola si aggiornano anche loro."))
+      : "Non ancora usata da nessun palco.";
     elTypeEditScreen.hidden = false;
     requestAnimationFrame(function(){ elTypeEditScreen.classList.add("in"); });
     setTimeout(function(){ document.getElementById("typeEditName").focus(); }, 260);
@@ -9076,7 +9076,7 @@
       renderList();
       renderMapMarkers(true);
       toast(updated.affected_locations
-        ? ("Tipologia rinominata (" + updated.affected_locations + " palcoscenici aggiornati)")
+        ? ("Tipologia rinominata (" + updated.affected_locations + " palchi aggiornati)")
         : "Tipologia rinominata");
       closeTypeEditScreen();
     }).catch(function(err){ toast(err.message); });
@@ -9097,7 +9097,7 @@
 
   /* ---------------- copertine da Facebook, tutte insieme ----------------
      La riga nelle Impostazioni porta gia' il numero: quante copertine
-     mancano fra i palcoscenici che hanno una pagina Facebook o un profilo
+     mancano fra i palchi che hanno una pagina Facebook o un profilo
      Instagram scritti nella scheda. E' un numero che si legge di sfuggita e
      dice se c'e' lavoro da fare, senza entrare.
 
@@ -9288,8 +9288,8 @@
     document.getElementById("categoryEditName").value = c.name;
     var count = categoryUsageCount(c.name);
     document.getElementById("categoryEditUsage").textContent = count
-      ? ("Usata da " + count + (count===1 ? " palcoscenico. Rinominandola si aggiorna anche lui." : " palcoscenici. Rinominandola si aggiornano anche loro."))
-      : "Non ancora usata da nessun palcoscenico.";
+      ? ("Usata da " + count + (count===1 ? " palco. Rinominandola si aggiorna anche lui." : " palchi. Rinominandola si aggiornano anche loro."))
+      : "Non ancora usata da nessun palco.";
     elCategoryEditScreen.hidden = false;
     requestAnimationFrame(function(){ elCategoryEditScreen.classList.add("in"); });
     setTimeout(function(){ document.getElementById("categoryEditName").focus(); }, 260);
@@ -9315,7 +9315,7 @@
       renderCategoriesList();
       renderFilterCategoryRow();
       toast(updated.affected_locations
-        ? ("Categoria rinominata (" + updated.affected_locations + " palcoscenici aggiornati)")
+        ? ("Categoria rinominata (" + updated.affected_locations + " palchi aggiornati)")
         : "Categoria rinominata");
       closeCategoryEditScreen();
     }).catch(function(err){ toast(err.message); });
@@ -9350,7 +9350,7 @@
 
   /* ---------------- provincia e regione, senza inserirle ----------------
      Nessun campo nuovo e nessun modulo da compilare: la citta' di un
-     palcoscenico e' gia' scritta come "Comune (PR)", e province.json dice a
+     palco e' gia' scritta come "Comune (PR)", e province.json dice a
      quale provincia e regione appartiene ogni sigla. Dove la sigla manca si
      cerca il comune per nome. Il legame resta sotteso: si vede solo nei
      filtri. */
@@ -9447,7 +9447,7 @@
   }
 
   /* Nei menu compaiono solo le regioni e le province che hai davvero, con
-     accanto quanti palcoscenici: scorrere 107 province per trovarne otto
+     accanto quanti palchi: scorrere 107 province per trovarne otto
      usate non serve a niente. */
   function contaPer(estrai){
     var m = {};
@@ -9589,13 +9589,13 @@
     return venues.filter(function(v){ return v[L.field] === name; }).length;
   }
   function venueListUsageText(L, count){
-    if(!count) return L.g.nonUsato + " da nessun palcoscenico.";
+    if(!count) return L.g.nonUsato + " da nessun palco.";
     return L.g.usato + " da " + count + (count === 1
-      ? " palcoscenico. " + L.g.rinominandolo + " si aggiorna anche lui."
-      : " palcoscenici. " + L.g.rinominandolo + " si aggiornano anche loro.");
+      ? " palco. " + L.g.rinominandolo + " si aggiorna anche lui."
+      : " palchi. " + L.g.rinominandolo + " si aggiornano anche loro.");
   }
 
-  /* --- la riga nella scheda del palcoscenico --- */
+  /* --- la riga nella scheda del palco --- */
   function renderVenueListPickerRow(L, v){
     setDato(L.ids.value, v[L.field], L.g.nessuno);
     mostraSeHaSenso(L.ids.row, v[L.field], {caricata: L.caricata, valori: L.values});
@@ -9617,7 +9617,7 @@
           onSelect:function(){ scegli(item.name); }});
       });
       openSheet({
-        title: L.label + " del palcoscenico",
+        title: L.label + " del palco",
         searchable: true,
         searchPlaceholder: "Cerca o scrivi " + L.g.un + " " + L.lower + " " + L.g.personalizzato + "…",
         freeText: true,
@@ -9691,10 +9691,10 @@
   function openVenueListScreen(L){
     currentVenueList = L;
     document.getElementById("venueListTitle").textContent = L.label;
-    document.getElementById("venueListHeader").textContent = (L.label + " del palcoscenico").toUpperCase();
+    document.getElementById("venueListHeader").textContent = (L.label + " del palco").toUpperCase();
     document.getElementById("newVenueListInput").placeholder = "Nuov" + (L.genere === "f" ? "a" : "o") + " " + L.lower + "…";
     document.getElementById("venueListFooter").textContent = L.hint +
-      " Tocca un valore per rinominarlo, scorri a sinistra per eliminarlo. Il numero accanto al nome indica quanti palcoscenici lo usano — un valore in uso non può essere eliminato, ma rinominandolo si aggiornano automaticamente tutti i palcoscenici che lo usano.";
+      " Tocca un valore per rinominarlo, scorri a sinistra per eliminarlo. Il numero accanto al nome indica quanti palchi lo usano — un valore in uso non può essere eliminato, ma rinominandolo si aggiornano automaticamente tutti i palchi che lo usano.";
     renderVenueListItems();
     elVenueListScreen.hidden = false;
     requestAnimationFrame(function(){ elVenueListScreen.classList.add("in"); });
@@ -9775,7 +9775,7 @@
       return api("PUT", "/api/venue_lists/" + L.key + "/" + id, {name:name}).then(function(updated){
         var i = L.values.findIndex(function(x){ return x.id === updated.id; });
         if(i > -1) L.values[i] = updated;
-        // Il rinomina si propaga sui palcoscenici lato server: qui li
+        // Il rinomina si propaga sui palchi lato server: qui li
         // ricarichiamo solo se ne ha toccato davvero qualcuno.
         return updated.affected_locations ? loadVenues().then(function(){ return updated; }) : updated;
       });
@@ -9783,7 +9783,7 @@
       renderVenueListItems();
       renderVenueListFilterRow(L);
       toast(updated.affected_locations
-        ? (L.label + " " + L.g.rinominato + " (" + updated.affected_locations + " palcoscenici aggiornati)")
+        ? (L.label + " " + L.g.rinominato + " (" + updated.affected_locations + " palchi aggiornati)")
         : (L.label + " " + L.g.rinominato));
       closeVenueListEditScreen();
     }).catch(function(err){ toast(err.message); });
@@ -9791,7 +9791,7 @@
 
   /* ---------------- Impostazioni: categorie di spesa ----------------
      Schermata a parte e non quella generica delle liste: qui il numero
-     accanto al nome conta i movimenti di cassa, non i palcoscenici, e il
+     accanto al nome conta i movimenti di cassa, non i palchi, e il
      rinomina si propaga sui movimenti. Il resto del gesto e' lo stesso —
      tocca per rinominare, scorri a sinistra per eliminare. */
   var elCostCatScreen = document.getElementById("costCatScreen");
@@ -9859,7 +9859,7 @@
   });
 
   /* Rinominare e' una schermata con dentro il nome, come per le categorie
-     del palcoscenico e per i valori di lista. Prima era un foglio di scelta
+     del palco e per i valori di lista. Prima era un foglio di scelta
      senza niente da scegliere: il nome vecchio faceva da titolo, la casella
      di ricerca da campo di scrittura, e per cambiare una lettera bisognava
      riscrivere tutto. */
@@ -9910,11 +9910,11 @@
 
   /* ---------------- Impostazioni: i tag della band ----------------
      Rinominare e togliere. Mettere no: un tag si mette dove lo si usa, cioe'
-     sulla scheda del palcoscenico — un tag creato qui dentro non sarebbe
+     sulla scheda del palco — un tag creato qui dentro non sarebbe
      ancora su niente, e resterebbe un nome in un elenco.
 
      Quello che si fa qui vale per la band intera: i tag sono del
-     palcoscenico come il tipo, e rinominarne uno lo rinomina dovunque sia
+     palco come il tipo, e rinominarne uno lo rinomina dovunque sia
      scritto. Per questo la conferma dice quanti posti tocca. */
   var elTagsScreen = document.getElementById("tagsScreen");
   var elTagEditScreen = document.getElementById("tagEditScreen");
@@ -9932,7 +9932,7 @@
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+t.usi+'</span>'+
         '<svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>'+
       '</div></div><div class="row-actions"><button data-tag-del="'+esc(t.tag)+'">Togli da tutti</button></div></div>';
-    }).join("") : '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun tag ancora. Si mettono dalla scheda di un palcoscenico.</div>';
+    }).join("") : '<div class="field-row" style="color:var(--text-secondary);font-size:14px;">Nessun tag ancora. Si mettono dalla scheda di un palco.</div>';
   }
   document.getElementById("rowSettingsTags").addEventListener("click", function(){
     renderTagsItems();
@@ -9950,7 +9950,7 @@
       var tag = del.getAttribute("data-tag-del");
       var quanti = (tagVocabolario().filter(function(t){ return chiaveTag(t.tag) === chiaveTag(tag); })[0] || {}).usi || 0;
       confirmDestructive("Togliere «" + tag + "» da " + quanti +
-          (quanti === 1 ? " palcoscenico? Lo perde tutta la band." : " palcoscenici? Lo perde tutta la band."), function(){
+          (quanti === 1 ? " palco? Lo perde tutta la band." : " palchi? Lo perde tutta la band."), function(){
         api("POST", "/api/tags/delete", {tag: tag}).then(function(){
           return loadVenues();
         }).then(function(){
@@ -9973,7 +9973,7 @@
     var input = document.getElementById("tagEditName");
     input.value = voce.tag;
     document.getElementById("tagEditUsage").textContent =
-      "Su " + voce.usi + (voce.usi === 1 ? " palcoscenico." : " palcoscenici.") +
+      "Su " + voce.usi + (voce.usi === 1 ? " palco." : " palchi.") +
       " I tag sono della band: rinominandolo cambia per tutti.";
     elTagEditScreen.hidden = false;
     requestAnimationFrame(function(){ elTagEditScreen.classList.add("in"); });
@@ -10034,7 +10034,7 @@
       var subParts = [];
       if(b.genre) subParts.push(dato(b.genre));
       if(b.city) subParts.push(dato(b.city));
-      subParts.push(b.venue_count + (b.venue_count === 1 ? " palcoscenico" : " palcoscenici"));
+      subParts.push(b.venue_count + (b.venue_count === 1 ? " palco" : " palchi"));
       if(b.member_count > 1) subParts.push(b.member_count + " membri");
       var check = b.active
         ? '<span class="ws-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>'
@@ -10213,7 +10213,7 @@
   var ROLE_LABELS = {leader: "Leader", member: "Member", slaker: "Slaker"};
   var ROLE_OPTIONS = [
     {value: "leader", label: "Leader", hint: "Gestisce la band: invita, cambia i ruoli, rimuove le persone"},
-    {value: "member", label: "Member", hint: "Lavora sui dati: aggiunge e modifica i palcoscenici"},
+    {value: "member", label: "Member", hint: "Lavora sui dati: aggiunge e modifica i palchi"},
     {value: "slaker", label: "Slaker", hint: "Consulta e basta: vede tutto, non modifica niente"}
   ];
 
@@ -11063,13 +11063,13 @@
   }
 
   /* ---------------- le posizioni che mancano ----------------
-     Stesso giro delle copertine: una richiesta per palcoscenico, la barra
+     Stesso giro delle copertine: una richiesta per palco, la barra
      che avanza, e si puo' fermare. Non e' pigrizia di chi l'ha scritto —
      si puo' chiedere una posizione al secondo, e cinque minuti di attesa
      senza niente sullo schermo si leggono come "si e' bloccato".
 
      Sta nell'Admin e non nelle Impostazioni perche' e' una cosa che si fa
-     una volta ogni tanto, dopo un import, e tocca i palcoscenici di tutti. */
+     una volta ogni tanto, dopo un import, e tocca i palchi di tutti. */
   var geoRunning = false, geoStop = false;
   var GEO_PAUSA = 1200;   /* il server ha gia' il suo freno: questa e' l'aria per l'app */
   function venuesSenzaPosizione(){
@@ -11166,7 +11166,7 @@
   var ADMIN_KINDS = {
     venue_type: {
       title: "Tipologie", header: "TIPOLOGIE DI PARTENZA", placeholder: "Nuova tipologia…",
-      footer: "Sono le tipologie di palcoscenico che una band nuova si trova già pronte. Tocca per rinominare, scorri a sinistra per eliminare.",
+      footer: "Sono le tipologie di palco che una band nuova si trova già pronte. Tocca per rinominare, scorri a sinistra per eliminare.",
       hasMessage: false, countEl: "adminTypesCount"
     },
     venue_category: {
@@ -11719,7 +11719,7 @@
     }, {passive:true});
   }
 
-  /* Cosa si ricarica: i palcoscenici (da cui vengono Home, elenco, preferiti,
+  /* Cosa si ricarica: i palchi (da cui vengono Home, elenco, preferiti,
      opportunita' e agenda), la tua stella e la cassa. Sono le tre cose che
      cambiano mentre la band lavora; tipologie e categorie no, e ricaricarle a
      ogni trascinamento sarebbe una decina di richieste per niente. */

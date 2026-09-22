@@ -3,7 +3,7 @@ data/
 
 # File Excel di importazione: pesano nell'immagine e non servono a runtime.
 # Se ti serve rilanciare un import dentro il container, copiali con
-# `docker compose cp file.xlsx palcoscenici:/app/` prima di eseguirlo.
+# `docker compose cp file.xlsx gigflow:/app/` prima di eseguirlo.
 *.xlsx
 
 __pycache__/

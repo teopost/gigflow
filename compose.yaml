@@ -13,6 +13,6 @@ services:
         required: false
     volumes:
       # Bind mount sulla cartella data/ già esistente sul computer, così i
-      # palcoscenici, le band e le foto già presenti restano al loro posto
+      # palchi, le band e le foto già presenti restano al loro posto
       # anche passando a Docker: nessuna migrazione dei dati necessaria.
       - ./data:/app/data

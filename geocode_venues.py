@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Geocodifica i palcoscenici che hanno un indirizzo/città ma non ancora
+"""Geocodifica i palchi che hanno un indirizzo/città ma non ancora
 coordinate, usando Nominatim (OpenStreetMap, gratuito, nessuna chiave API).
 
 Le regole della ricerca — quali domande fare, come riconoscere la risposta
@@ -31,9 +31,9 @@ def main():
     rows = conn.execute(
         f"SELECT id, name, address, city, lat, lng FROM locations WHERE {where}"
     ).fetchall()
-    print(f"Palcoscenici da geocodificare: {len(rows)}" + (" (prova, non scrivo)" if prova else ""))
+    print(f"Palchi da geocodificare: {len(rows)}" + (" (prova, non scrivo)" if prova else ""))
 
-    # La cache è di tutto il giro: molti palcoscenici condividono la città,
+    # La cache è di tutto il giro: molti palchi condividono la città,
     # e senza cache sarebbe una richiesta a testa per la stessa risposta.
     cache = {}
     precisi, approssimati, incerti, falliti = 0, 0, 0, []
@@ -72,7 +72,7 @@ def main():
         print("I 'centro incerto' sono città che possono essere più comuni (o che non sono")
         print("comuni italiani): scrivi la provincia fra parentesi, tipo «Misano (RN)», e rilancia.")
     if falliti:
-        print("Palcoscenici senza risultato (da controllare/inserire a mano):")
+        print("Palchi senza risultato (da controllare/inserire a mano):")
         for etichetta in falliti:
             print(f"  - {etichetta}")
 

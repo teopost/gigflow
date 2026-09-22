@@ -22,7 +22,7 @@ assignees: ''
 
 ### Dove starebbe
 
-<!-- Home, Palcoscenici, Preferiti, Opportunita', Agenda, Cassa, Bands,
+<!-- Home, Palchi, Preferiti, Opportunita', Agenda, Cassa, Bands,
      Impostazioni, Admin, Notifiche. "Non lo so" va benissimo: e' mezzo
      lavoro deciderlo. -->
 

@@ -271,7 +271,7 @@ LOCATION_FIELDS = [
     "capacity", "genre",
     "art_director_id", "status", "next_contact_date", "planning_note",
     "owner_email",
-    # "favorite" non c'e' piu': la stella non e' un campo del palcoscenico,
+    # "favorite" non c'e' piu': la stella non e' un campo del palco,
     # e' una riga di location_favorites intestata a chi l'ha messa.
     # "focus" e' una colonna, ma non sta qui: la scheda e' una bozza che si
     # salva con Salva, e un interruttore nella barra in alto non e' una
@@ -330,7 +330,7 @@ CASH_KINDS = {"costo", "ricavo"}
 
 # Le categorie di spesa stanno nella tabella generica delle liste di valori,
 # con una chiave loro. Non sono entrate in VENUE_LISTS apposta: quelle sono
-# campi del palcoscenico — hanno una colonna su locations, un filtro
+# campi del palco — hanno una colonna su locations, un filtro
 # nell'elenco e un selettore nella scheda — e la categoria di un costo non
 # e' niente di tutto questo.
 CASH_CATEGORY_LIST = "cost_category"
@@ -359,7 +359,7 @@ MAX_REPORT_CHARS = 4000
 # stato che diceva "no" e basta lasciava in rubrica righe morte che non
 # erano ne' l'una ne' l'altra cosa.
 #
-# Le due liste non si somigliano piu' (15 settembre 2026). Un palcoscenico e'
+# Le due liste non si somigliano piu' (15 settembre 2026). Un palco e'
 # un posto e il suo stato dice che rapporto c'e' fra la band e quel posto: un
 # nome in rubrica, uno su cui stai puntando, uno dove hai gia' suonato, uno
 # che e' rimasto indietro, uno messo via. Una serata e' il tentativo di
@@ -380,7 +380,7 @@ LOCATION_STATUS_VALUES = {
 #
 # I nomi sono cambiati il 15 settembre 2026: "da contattare" si chiamava come
 # il primo segmento dell'Agenda e le due cose si confondevano (li' sono i
-# palcoscenici da richiamare adesso, qui il punto di partenza di un
+# palchi da richiamare adesso, qui il punto di partenza di un
 # tentativo), e "in trattativa" era l'unico stato con una preposizione
 # davanti. "Interessato" e' entrato in mezzo: hai parlato con qualcuno e ha
 # detto che gli interessa, che non e' ancora trattare una data e un
@@ -396,7 +396,7 @@ GIG_STATUS_VALUES = {
 # arrivare in qualunque momento fino a quel punto.
 #
 # La "a" finale non e' un capriccio: "rifiutato" al maschile e' il vecchio
-# stato del PALCOSCENICO, tolto il 13 settembre, e migrate_drop_rifiutato
+# stato del PALCO, tolto il 13 settembre, e migrate_drop_rifiutato
 # continua a ripulirlo a ogni avvio. Due parole quasi uguali per due cose
 # diverse sarebbero diventate una sola, e la migrazione avrebbe cancellato
 # ogni serata rifiutata al riavvio dopo.
@@ -435,7 +435,7 @@ MANUAL_LOCATION_STATUSES = LOCATION_STATUS_VALUES - {ARCHIVED_STATUS}
 GIG_PRE_CONTACT_STATUSES = {"opportunita"}
 
 # Gli stati della serata applicati alla singola stagione invece che al
-# palcoscenico: e' quello che permette di ripartire da zero ogni anno senza
+# palco: e' quello che permette di ripartire da zero ogni anno senza
 # cancellare com'e' andata quello prima.
 GIG_FIELDS = ["status", "gig_date", "fee", "outcome_note"]
 
@@ -456,7 +456,7 @@ CLOSING_STATUSES = {"suonato", "annullato", REJECTED_STATUS}
 GIG_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # --- i compiti ---------------------------------------------------------
-# Una cosa da fare su un palcoscenico, con dentro le quattro cose che
+# Una cosa da fare su un palco, con dentro le quattro cose che
 # servono a farla: cosa, entro quando, a che punto sta e chi la fa.
 #
 # Gli stati sono tre, e sono tre modi in cui un compito finisce di essere
@@ -507,7 +507,7 @@ def valid_next_contact_date(value):
     return True
 
 
-# Il tipo di attivita' fatta sul palcoscenico. "nota" e' il default e copre
+# Il tipo di attivita' fatta sul palco. "nota" e' il default e copre
 # tutto quello che si scriveva prima che le attivita' avessero un tipo.
 NOTE_KINDS = {"nota", "visita", "chiamata", "messaggio", "email"}
 NOTE_KIND_LABELS = {
@@ -608,7 +608,7 @@ def init_db():
         -- senza che uno cancelli l'altro.
         -- I tag no: quelli dicono com'e' fatto il posto ("anni80-90" e' una
         -- cosa vera del locale, non un'opinione), quindi sono della band come
-        -- il tipo e la categoria. Uno per palcoscenico, chiunque lo mette e
+        -- il tipo e la categoria. Uno per palco, chiunque lo mette e
         -- chiunque lo toglie; "created_by" resta solo per sapere chi e' stato.
         -- Come notes e photos non portano workspace_id: seguono la location.
         CREATE TABLE IF NOT EXISTS location_favorites (
@@ -791,13 +791,13 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
-        -- I compiti di un palcoscenico: "mandare il preventivo", "richiamare
+        -- I compiti di un palco: "mandare il preventivo", "richiamare
         -- il gestore lunedi'". Sono attaccati al posto come le serate, e
         -- come quelle ce ne possono essere piu' d'uno per volta; a
         -- differenza delle serate non si chiudono a vicenda — dieci cose da
         -- fare sullo stesso locale sono dieci righe, tutte vive insieme.
         -- assignee_email e' l'email di un membro della band, la stessa
-        -- chiave con cui si scrive chi possiede un palcoscenico.
+        -- chiave con cui si scrive chi possiede un palco.
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
@@ -905,11 +905,11 @@ def migrate_schema(conn):
     # deve essere la stessa per tutti quelli che aprono l'app.
     if "focus" not in cols:
         conn.execute("ALTER TABLE locations ADD COLUMN focus INTEGER NOT NULL DEFAULT 0")
-    # La stella era una colonna del palcoscenico, quindi della band intera:
+    # La stella era una colonna del palco, quindi della band intera:
     # la metteva uno e se la vedevano tutti, e due persone non potevano avere
     # lo stesso posto fra i preferiti senza litigarsi la casella. Adesso sta
     # in location_favorites, una riga per persona. Le stelle che c'erano
-    # passano al proprietario del palcoscenico — e' l'unico nome che il dato
+    # passano al proprietario del palco — e' l'unico nome che il dato
     # vecchio si porta dietro, e chi ha messo la stella non era scritto da
     # nessuna parte. Finito il travaso la colonna se ne va: lasciarla li',
     # morta e con quel nome, era una trappola per il prossimo che legge.
@@ -1073,7 +1073,7 @@ def migrate_schema(conn):
     if "kind" not in note_cols:
         conn.execute("ALTER TABLE notes ADD COLUMN kind TEXT")
     if "gig_id" not in note_cols:
-        # Senza REFERENCES: la nota resta appesa al palcoscenico anche se la
+        # Senza REFERENCES: la nota resta appesa al palco anche se la
         # serata viene cancellata, il legame col ciclo e' un in piu'.
         conn.execute("ALTER TABLE notes ADD COLUMN gig_id INTEGER")
     if "created_by" not in note_cols:
@@ -1142,7 +1142,7 @@ def migrate_schema(conn):
     if venue_lists_are_new:
         migrate_to_venue_lists(conn)
 
-    # Qui ci stava una riga che rimetteva "lead" ogni palcoscenico senza
+    # Qui ci stava una riga che rimetteva "lead" ogni palco senza
     # serate, a ogni avvio. Aveva senso finche' lo stato era la copia della
     # serata: senza serata non c'era niente da copiare. Adesso lo stato e'
     # una cosa che decidi tu, e quella riga cancellerebbe ogni prospect al
@@ -1223,10 +1223,10 @@ def migrate_photos_cover(conn):
 
 
 def migrate_drop_rifiutato(conn):
-    """Toglie il vecchio stato "rifiutato" dalle serate e dai palcoscenici.
+    """Toglie il vecchio stato "rifiutato" dalle serate e dai palchi.
 
     Attenzione al genere: qui si parla di "rifiutato", che era uno stato del
-    palcoscenico; "rifiutata" con la "a" e' lo stato della serata nato il 15
+    palco; "rifiutata" con la "a" e' lo stato della serata nato il 15
     settembre 2026 e non va toccato — vedi REJECTED_STATUS.
 
     Un no del titolare non e' un capolinea: o lo richiami l'anno prossimo, e
@@ -1237,7 +1237,7 @@ def migrate_drop_rifiutato(conn):
     che nessuno guardava piu'.
 
     Diventano opportunita' e restano chiuse: la serata dice "non
-    conclusa", che e' quello che e' successo davvero, e il palcoscenico
+    conclusa", che e' quello che e' successo davvero, e il palco
     torna in circolo. Chi va tolto dalla rubrica si archivia a mano, che e'
     una decisione e non un effetto collaterale di un aggiornamento.
 
@@ -1256,17 +1256,17 @@ def migrate_drop_rifiutato(conn):
 
 
 # Il vocabolario di prima: otto stati della trattativa che stavano sul
-# palcoscenico perche' erano la copia della sua serata. "rifiutato" e
+# palco perche' erano la copia della sua serata. "rifiutato" e
 # "potenziale" sono passati di qui e non ci sono piu', ma restano in lista:
 # un database fermo a una versione vecchia li ha ancora addosso.
-VECCHI_STATI_PALCOSCENICO = (
+VECCHI_STATI_PALCO = (
     "lead", "potenziale", "da_contattare", "contattato", "trattativa",
     "confermato", "suonato", "annullato", "rifiutato",
 )
 
 
 def migrate_to_venue_lifecycle(conn):
-    """Dal vocabolario della trattativa a quello del palcoscenico
+    """Dal vocabolario della trattativa a quello del palco
     (15 settembre 2026).
 
     Quattro regole, in quest'ordine, e l'ordine e' la regola:
@@ -1289,10 +1289,10 @@ def migrate_to_venue_lifecycle(conn):
     l'unica parola che i due hanno in comune — la regola 3 la lascia dov'e',
     quindi ripassare non sposta niente.
     """
-    segna = ",".join("?" for _ in VECCHI_STATI_PALCOSCENICO)
+    segna = ",".join("?" for _ in VECCHI_STATI_PALCO)
     da_fare = conn.execute(
         f"SELECT COUNT(*) AS n FROM locations WHERE status IN ({segna}) AND status != 'lead'",
-        VECCHI_STATI_PALCOSCENICO,
+        VECCHI_STATI_PALCO,
     ).fetchone()["n"]
     if not da_fare:
         return
@@ -1300,28 +1300,28 @@ def migrate_to_venue_lifecycle(conn):
     conn.execute(
         f"UPDATE locations SET status = ?, updated_at = ? "
         f"WHERE status IN ({segna}) AND deleted_at IS NOT NULL",
-        (ARCHIVED_STATUS, ts) + VECCHI_STATI_PALCOSCENICO,
+        (ARCHIVED_STATUS, ts) + VECCHI_STATI_PALCO,
     )
     conn.execute(
         f"UPDATE locations SET status = ?, updated_at = ? "
         f"WHERE status IN ({segna}) "
         f"AND EXISTS (SELECT 1 FROM gigs g WHERE g.location_id = locations.id "
         f"            AND g.status = 'suonato')",
-        (CLIENT_STATUS, ts) + VECCHI_STATI_PALCOSCENICO,
+        (CLIENT_STATUS, ts) + VECCHI_STATI_PALCO,
     )
     conn.execute(
         f"UPDATE locations SET status = ?, updated_at = ? "
         f"WHERE status IN ({segna}) AND status != ?",
-        (INACTIVE_STATUS, ts) + VECCHI_STATI_PALCOSCENICO + (LEAD_STATUS,),
+        (INACTIVE_STATUS, ts) + VECCHI_STATI_PALCO + (LEAD_STATUS,),
     )
-    print("  Stati dei palcoscenici: %d righe portate al vocabolario nuovo." % da_fare)
+    print("  Stati dei palchi: %d righe portate al vocabolario nuovo." % da_fare)
 
 
 def migrate_to_gig_opportunita(conn):
     """"Da contattare" diventa "opportunita'" (15 settembre 2026).
 
     Il nome vecchio era identico a quello del primo segmento dell'Agenda, che
-    e' un'altra cosa — li' ci sono i palcoscenici da richiamare adesso, qui
+    e' un'altra cosa — li' ci sono i palchi da richiamare adesso, qui
     il punto di partenza di un tentativo — e a voce le due cose finivano per
     chiamarsi uguale.
 
@@ -1349,7 +1349,7 @@ def migrate_to_next_contact_date(conn):
     Dal 13 settembre 2026 era un periodo senza anno: "10" per ottobre,
     "10-15" per il 15 di ottobre. L'anno era stato tolto perche' chiudere
     una serata lo riscriveva come "quello di prima piu' un anno", e il
-    promemoria camminava avanti da solo — in archivio c'era un palcoscenico
+    promemoria camminava avanti da solo — in archivio c'era un palco
     suonato ad agosto 2026 da richiamare a maggio 2029. Quel ricalcolo non
     c'e' piu', e senza di lui l'anno e' di nuovo una cosa che sai e che
     scrivi tu. Serve perche' un elenco in ordine di data non si puo' fare
@@ -1407,7 +1407,7 @@ def migrate_drop_season(conn):
     """Toglie la colonna della stagione dalle serate.
 
     La stagione era il nome del tentativo: serviva quando la serata nasceva
-    insieme al palcoscenico e non aveva nient'altro addosso. Adesso un
+    insieme al palco e non aveva nient'altro addosso. Adesso un
     tentativo comincia quando decidi di provarci, l'anno lo dice la data e
     l'ordine lo dice la riga stessa, quindi quella colonna era rimasta a
     dire una cosa che nessuno guardava e che nessuno poteva piu' correggere:
@@ -1538,7 +1538,7 @@ def migrate_to_venue_lists(conn):
 
 def migrate_to_gigs(conn):
     """Porta la storia esistente dentro le serate. Prima di questa versione lo
-    stato della trattativa viveva sul palcoscenico, quindi ogni palcoscenico
+    stato della trattativa viveva sul palco, quindi ogni palco
     aveva un solo ciclo: quello in corso. Diventa la sua prima serata, e le
     successive nascono quando si riparte per una stagione nuova.
 
@@ -1548,7 +1548,7 @@ def migrate_to_gigs(conn):
     """
     if conn.execute("SELECT id FROM gigs LIMIT 1").fetchone():
         return
-    # Anche i palcoscenici archiviati: se vengono ripristinati la loro storia
+    # Anche i palchi archiviati: se vengono ripristinati la loro storia
     # deve essere ancora li'.
     rows = conn.execute("SELECT id, status, created_at FROM locations").fetchall()
     if not rows:
@@ -2525,7 +2525,7 @@ DEFAULT_VENUE_TYPES = [
     "Evento privato", "Spazio pubblico", "Bar", "Ristorante",
 ]
 
-# I Pink Froid non hanno mai usato le categorie e nessun palcoscenico ne ha
+# I Pink Froid non hanno mai usato le categorie e nessun palco ne ha
 # una assegnata: non c'e' nessun set rodato da cui copiare, quindi una band
 # nuova parte senza categorie invece che con categorie inventate.
 DEFAULT_VENUE_CATEGORIES = []
@@ -2550,7 +2550,7 @@ DEFAULT_WA_TEMPLATES = [
 
 # I modelli email arrivano dopo i segnaposto che si risolvono all'invio, e
 # usano solo quelli: {mio_nome}, {mio_cognome} e {mia_band} sono chi scrive,
-# {titolare} il referente del palcoscenico, {art_nome} e {art_cognome}
+# {titolare} il referente del palco, {art_nome} e {art_cognome}
 # l'art director. Non passano da render_default_text — restano scritti cosi'
 # anche nella copia della band, e si riempiono ogni volta che si invia.
 DEFAULT_MAIL_TEMPLATES = [
@@ -2601,7 +2601,7 @@ def render_default_text(text, band_name, genre=None, person=None):
 
 
 # Cosa ha ogni tipo di template: il testo lungo ce l'hanno i messaggi, e
-# l'oggetto solo la mail — una tipologia di palcoscenico e' solo un nome.
+# l'oggetto solo la mail — una tipologia di palco e' solo un nome.
 TEMPLATE_KINDS = {
     "venue_type": {"message": False, "subject": False},
     "venue_category": {"message": False, "subject": False},
@@ -2886,7 +2886,7 @@ def gig_to_dict(row):
 
 def current_gig_row(conn, loc_id):
     """La serata che conta adesso: quella aperta, e se non ce ne sono aperte
-    l'ultima chiusa. E' da qui che il palcoscenico prende lo stato mostrato
+    l'ultima chiusa. E' da qui che il palco prende lo stato mostrato
     negli elenchi, ed e' a questa che si attaccano le attivita' registrate.
     Di aperte ce n'e' al massimo una: aprirne una chiude quella di prima."""
     return conn.execute(
@@ -2897,12 +2897,12 @@ def current_gig_row(conn, loc_id):
 
 
 def venue_status_from_gigs(conn, loc_id):
-    """Lo stato che spetta a un palcoscenico guardando solo le sue serate:
+    """Lo stato che spetta a un palco guardando solo le sue serate:
     cliente se ci hai suonato almeno una volta, inattivo se ci hai provato,
     lead se non c'e' mai stato nessun tentativo.
 
     Non e' la verita' su tutti — prospect lo decidi tu e da qui non esce mai
-    — ma e' quella giusta quando un palcoscenico torna dall'archivio e
+    — ma e' quella giusta quando un palco torna dall'archivio e
     bisogna rimetterlo da qualche parte.
     """
     row = conn.execute(
@@ -2920,11 +2920,11 @@ def venue_status_from_gigs(conn, loc_id):
 def refresh_location_status(conn, loc_id):
     """Una regola sola, e in una direzione sola: la prima serata suonata fa
     cliente. Gira dove le serate cambiano — aperte, modificate, eliminate —
-    ed e' l'unico automatismo rimasto sullo stato del palcoscenico.
+    ed e' l'unico automatismo rimasto sullo stato del palco.
 
     Prima qui si copiava lo stato della serata in corso, ed era l'unico modo
     che l'elenco aveva di dire a che punto fosse la trattativa. Adesso quello
-    lo racconta la serata: il palcoscenico dice un'altra cosa, piu' lenta, e
+    lo racconta la serata: il palco dice un'altra cosa, piu' lenta, e
     va toccata solo quando succede qualcosa che la cambia davvero.
 
     Non torna mai indietro da solo: cancellare la serata suonata dell'anno
@@ -2981,15 +2981,15 @@ def gig_is_empty(conn, gig):
 
 
 def set_location_status(conn, loc_id, status):
-    """Lo stato del palcoscenico e' tornato a essere un campo suo, e questo e'
+    """Lo stato del palco e' tornato a essere un campo suo, e questo e'
     l'unico posto che lo scrive quando lo scegli tu.
 
     Non tocca nessuna serata. Prima lo faceva: cambiare stato da qui apriva
     una stagione, la spostava o la chiudeva, perche' lo stato del
-    palcoscenico *era* quello della sua serata. Adesso sono due cose, e
+    palco *era* quello della sua serata. Adesso sono due cose, e
     aprire un tentativo resta un gesto solo — il pulsante delle serate.
 
-    In archivio non si scrive: un palcoscenico archiviato e' archiviato, e
+    In archivio non si scrive: un palco archiviato e' archiviato, e
     per cambiargli stato va prima ripristinato.
     """
     if status not in MANUAL_LOCATION_STATUSES:
@@ -2998,9 +2998,9 @@ def set_location_status(conn, loc_id, status):
         "SELECT status FROM locations WHERE id = ?", (loc_id,)
     ).fetchone()
     if row is None:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     if row["status"] == ARCHIVED_STATUS:
-        raise ApiError(400, "Questo palcoscenico è in archivio: ripristinalo per cambiargli stato.")
+        raise ApiError(400, "Questo palco è in archivio: ripristinalo per cambiargli stato.")
     conn.execute(
         "UPDATE locations SET status = ?, updated_at = ? WHERE id = ?",
         (status, now_iso(), loc_id),
@@ -3017,7 +3017,7 @@ def advance_open_gig_on_activity(conn, gig, ts=None):
     e il risultato si vede in archivio: 251 serate su 276 senza data, senza
     compenso e senza una riga scritta, di cui 221 in stato "contattato". Erano
     mail e telefonate, non occasioni di suonare. Una mail mandata a un lead e'
-    un'attivita' del palcoscenico; la serata nasce quando c'e' una data di cui
+    un'attivita' del palco; la serata nasce quando c'e' una data di cui
     parlare, e la apre una persona dal suo pulsante.
     """
     if gig is None or gig["closed_at"] is not None:
@@ -3057,7 +3057,7 @@ def require_location(conn, ws, loc_id):
         "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     return row
 
 
@@ -3068,7 +3068,7 @@ def create_gig(conn, ws, loc_id, body):
     require_gig_date_if_confirmed(data["status"], data.get("gig_date"))
     ts = now_iso()
     # Ricominciare chiude il tentativo rimasto in sospeso: di aperta ce n'e'
-    # una sola per volta, ed e' quella che il palcoscenico mostra come stato.
+    # una sola per volta, ed e' quella che il palco mostra come stato.
     # Lo stato di quella vecchia resta scritto com'era: la storia non si
     # riscrive, si chiude.
     conn.execute(
@@ -3085,7 +3085,7 @@ def create_gig(conn, ws, loc_id, body):
     refresh_location_status(conn, loc_id)
     # Qui ci stava una riga che, aprendo una stagione senza promemoria, ne
     # scriveva uno con la data di oggi: serviva solo a non far sparire il
-    # palcoscenico dall'Agenda, che allora erano due elenchi con due criteri
+    # palco dall'Agenda, che allora erano due elenchi con due criteri
     # diversi. Adesso l'elenco e' uno e va a periodo: aprire una serata non
     # e' dire quando ririchiamarli, e l'app non lo scrive al posto tuo.
     conn.commit()
@@ -3104,7 +3104,7 @@ def gig_location_id(conn, ws, gig_id):
 
 
 def update_gig(conn, ws, gig_id, body):
-    """`next_contact_date` non e' un campo della serata ma del palcoscenico:
+    """`next_contact_date` non e' un campo della serata ma del palco:
     si accetta lo stesso qui perche' chiudere una serata e dire quando
     ririchiamarli sono una cosa sola, e farne due chiamate lascerebbe la
     serata chiusa senza promemoria se la seconda fallisce."""
@@ -3162,13 +3162,13 @@ def delete_gig(conn, ws, gig_id):
 
 # ----------------------------------------------------------------- compiti --
 # Gli stessi quattro verbi delle serate, e per la stessa ragione: un compito
-# e' una riga attaccata al palcoscenico, si crea, si cambia e si butta, e
-# ogni scrittura restituisce il palcoscenico intero — cosi' la scheda aperta
+# e' una riga attaccata al palco, si crea, si cambia e si butta, e
+# ogni scrittura restituisce il palco intero — cosi' la scheda aperta
 # si ritrova aggiornata senza dover chiedere due volte.
 #
 # Quello che i compiti NON fanno, al contrario delle serate: non si chiudono
 # a vicenda (di aperti ce ne stanno quanti ne vuoi) e non toccano lo stato
-# del palcoscenico. Mandare un preventivo non cambia il rapporto con il
+# del palco. Mandare un preventivo non cambia il rapporto con il
 # locale: quello lo dice la serata.
 
 
@@ -3283,7 +3283,7 @@ def delete_task(conn, ws, task_id):
 # suonate ogni volta che la cassa si apre. Il compenso di una serata e' gia'
 # scritto su gigs.fee, ed e' li' che si guarda; una copia in cassa avrebbe
 # voluto dire riallinearla a ogni modifica della serata, a ogni cambio di
-# stato, quando il palcoscenico viene rinominato (la descrizione contiene il
+# stato, quando il palco viene rinominato (la descrizione contiene il
 # suo nome) e quando la serata viene cancellata. locations.status e' stata
 # una copia per mesi e ha gia' fatto il suo danno — tanto che non lo e' piu':
 # non se ne aggiunge una seconda, e sui soldi meno che mai.
@@ -3309,7 +3309,7 @@ def fetch_cash(conn, ws):
     dimenticati: li compone la pagina leggendo le serate che ha gia' in
     mano. Erano nati qui, e da qui sono usciti per un motivo preciso — il
     telefono teneva due elenchi, le serate e la cassa, e correggendo un
-    compenso dalla scheda del palcoscenico si aggiornava solo il primo: la
+    compenso dalla scheda del palco si aggiornava solo il primo: la
     Cassa continuava a mostrare la cifra vecchia finche' non si ricaricava.
     Erano due copie, e come tutte le copie sono divergute.
 
@@ -3433,7 +3433,7 @@ def delete_cash_entry(conn, ws, entry_id):
 
 
 # Le categorie di spesa. Stessa tabella delle altre liste configurabili, ma
-# CRUD suo: rinominare propaga sui movimenti invece che sui palcoscenici, e
+# CRUD suo: rinominare propaga sui movimenti invece che sui palchi, e
 # una categoria in uso non si elimina.
 
 
@@ -3531,11 +3531,11 @@ def location_to_dict(row, notes_by_location, ad_by_id, photos_by_location=None,
     d["art_director_name"] = ad["name"] if ad else None
     d["notes"] = notes_by_location.get(d["id"], [])
     d["photos"] = (photos_by_location or {}).get(d["id"], [])
-    # I tag sono della band come il tipo: viaggiano dentro il palcoscenico.
+    # I tag sono della band come il tipo: viaggiano dentro il palco.
     d["tags"] = (tags_by_location or {}).get(d["id"], [])
     gigs = (gigs_by_location or {}).get(d["id"], [])
     d["gigs"] = gigs
-    # I compiti come le serate: arrivano dentro il palcoscenico, cosi' la
+    # I compiti come le serate: arrivano dentro il palco, cosi' la
     # scheda non deve chiedere niente a parte.
     d["tasks"] = (tasks_by_location or {}).get(d["id"], [])
     # Quante volte ci hai suonato e in quali stagioni: e' il dato che dice se
@@ -3624,7 +3624,7 @@ def fetch_location(conn, ws, loc_id):
         "SELECT * FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     ad_rows = conn.execute("SELECT * FROM art_directors WHERE workspace_id = ?", (ws,)).fetchall()
     ad_by_id = {r["id"]: dict(r) for r in ad_rows}
     note_rows = conn.execute(
@@ -3668,7 +3668,7 @@ def clean_location_payload(body, partial):
             value = value or LEAD_STATUS
         elif field == "next_contact_date":
             # Vuoto vuol dire "non ricontattarli": si scrive NULL, non "",
-            # cosi' e' lo stesso niente con cui nasce un palcoscenico e le
+            # cosi' e' lo stesso niente con cui nasce un palco e le
             # query che cercano il promemoria non devono sapere di due vuoti.
             value = (value or "").strip() or None
             if value and not valid_next_contact_date(value):
@@ -3692,7 +3692,7 @@ def create_location(conn, ws, body, owner_email=None):
     cur = conn.execute(
         f"INSERT INTO locations ({','.join(fields)}) VALUES ({placeholders})", values
     )
-    # Un palcoscenico nuovo e' un lead: esiste, e basta. Nessuno stato apre
+    # Un palco nuovo e' un lead: esiste, e basta. Nessuno stato apre
     # piu' una serata — la serata nasce dal suo pulsante, quando decidi di
     # provarci. Aprirla qui vorrebbe dire contare come tentativo ogni
     # indirizzo trascritto, e a fine stagione il numero dei tentativi sarebbe
@@ -3706,9 +3706,9 @@ def update_location(conn, ws, loc_id, body):
         "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not existing:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     data = clean_location_payload(body, partial=True)
-    # Lo stato e' tornato a essere un campo del palcoscenico, ma passa
+    # Lo stato e' tornato a essere un campo del palco, ma passa
     # comunque di la': set_location_status e' l'unico punto che lo scrive, e
     # sa dire di no a chi e' in archivio.
     status = data.pop("status", None)
@@ -3737,7 +3737,7 @@ def delete_location(conn, ws, loc_id):
     )
     conn.commit()
     if cur.rowcount == 0:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
 
 
 def restore_location(conn, ws, loc_id):
@@ -3754,19 +3754,19 @@ def restore_location(conn, ws, loc_id):
     )
     conn.commit()
     if cur.rowcount == 0:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     return fetch_location(conn, ws, loc_id)
 
 
 def purge_location(conn, ws, loc_id):
-    """Eliminazione definitiva: sparisce il palcoscenico e tutto quello che
+    """Eliminazione definitiva: sparisce il palco e tutto quello che
     gli sta attaccato. Al contrario dell'archiviazione non e' recuperabile,
     quindi i file delle foto vanno tolti anche dal disco."""
     existing = conn.execute(
         "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not existing:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     filenames = [
         r["filename"]
         for r in conn.execute("SELECT filename FROM photos WHERE location_id = ?", (loc_id,)).fetchall()
@@ -3779,7 +3779,7 @@ def purge_location(conn, ws, loc_id):
     conn.execute("DELETE FROM location_tags WHERE location_id = ?", (loc_id,))
     # Le spese segnate su quelle serate restano in cassa senza piu' la
     # serata: i soldi sono usciti davvero, e il bilancio dell'anno non si
-    # aggiusta cancellando un palcoscenico.
+    # aggiusta cancellando un palco.
     conn.execute(
         "UPDATE cash_entries SET gig_id = NULL, updated_at = ? WHERE gig_id IN "
         "(SELECT id FROM gigs WHERE location_id = ?)",
@@ -3831,7 +3831,7 @@ def add_note(conn, ws, loc_id, body, email=None):
     # lunedi' deve restare di venerdi'. Tutto il resto (updated_at, la
     # serata che avanza) resta a adesso, che e' quando e' successo davvero.
     quando = note_created_at(body.get("date"), ts)
-    # L'attivita' e' del palcoscenico. Si lega a una serata solo se quella
+    # L'attivita' e' del palco. Si lega a una serata solo se quella
     # serata e' aperta adesso: appiccicarla all'ultima stagione chiusa vorrebbe
     # dire far comparire una telefonata di quest'anno sotto la serata
     # dell'anno scorso.
@@ -3852,7 +3852,7 @@ def add_note(conn, ws, loc_id, body, email=None):
     # arrivata la trattativa lo sa solo chi la sta portando avanti.
     #
     # Se serate aperte non ce ne sono, non ne nasce nessuna: l'attivita' resta
-    # attaccata al palcoscenico e basta. Lo stato del palcoscenico non si
+    # attaccata al palco e basta. Lo stato del palco non si
     # muove lo stesso: una telefonata non fa di un lead un cliente, quello lo
     # fa una serata suonata.
     if kind != "nota":
@@ -3952,16 +3952,16 @@ def delete_note(conn, ws, note_id):
 # ----------------------------------------------- la stella e i tag
 # Due cose che si somigliano e non lo sono.
 #
-# La stella e' di chi la mette: il palcoscenico e' della band, ma che ti
+# La stella e' di chi la mette: il palco e' della band, ma che ti
 # interessi o no lo decidi tu. Sta in location_favorites con l'email dentro
-# la chiave, e non viaggia dentro /api/locations — l'elenco dei palcoscenici
+# la chiave, e non viaggia dentro /api/locations — l'elenco dei palchi
 # e' uguale per tutti e resta uguale per tutti. Arriva a parte, da
 # /api/my/favorites, e l'app la tiene accanto: cosi' nessun salvataggio del
-# palcoscenico puo' portarsela via per sbaglio.
+# palco puo' portarsela via per sbaglio.
 #
 # I tag no. "anni80-90", "estivi": dicono com'e' fatto il posto, non cosa ne
 # pensi tu, e il lavoro di chi li scrive serve a tutta la band. Sono una
-# proprieta' del palcoscenico come il tipo, viaggiano dentro di lui, e
+# proprieta' del palco come il tipo, viaggiano dentro di lui, e
 # chiunque li mette e li toglie. Di chi li ha scritti resta la firma, che non
 # cambia niente a nessuno ma dice a chi chiedere.
 
@@ -3992,12 +3992,12 @@ def _location_di(conn, ws, loc_id):
         "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     return row["id"]
 
 
 def tags_per_location(conn, ws=None, loc_id=None):
-    """I tag, raggruppati per palcoscenico. Con loc_id ne guarda uno solo."""
+    """I tag, raggruppati per palco. Con loc_id ne guarda uno solo."""
     if loc_id is not None:
         righe = conn.execute(
             "SELECT location_id, tag FROM location_tags WHERE location_id = ? "
@@ -4016,8 +4016,8 @@ def tags_per_location(conn, ws=None, loc_id=None):
 
 
 def my_favorites(conn, ws, email):
-    """I palcoscenici che questa persona si e' segnata. I tag non stanno qui:
-    sono della band e arrivano dentro il palcoscenico, con tutto il resto."""
+    """I palchi che questa persona si e' segnata. I tag non stanno qui:
+    sono della band e arrivano dentro il palco, con tutto il resto."""
     if not email:
         return {"favorites": []}
     righe = conn.execute(
@@ -4054,7 +4054,7 @@ def set_focus(conn, ws, loc_id, on):
     mette uno e se lo trovano tutti, ed e' il punto: serve a dire alla band
     "questi sono i posti su cui stiamo lavorando", non "questi piacciono a
     me". Per la stessa ragione non chiede chi l'ha messo: una volta acceso
-    e' del palcoscenico, non di chi ha toccato l'occhio."""
+    e' del palco, non di chi ha toccato l'occhio."""
     loc_id = _location_di(conn, ws, loc_id)
     conn.execute(
         "UPDATE locations SET focus = ?, updated_at = ? WHERE id = ?",
@@ -4065,7 +4065,7 @@ def set_focus(conn, ws, loc_id, on):
 
 
 def tag_vocabolario(conn, ws):
-    """I nomi di tag in uso nella band, con su quanti palcoscenici stanno.
+    """I nomi di tag in uso nella band, con su quanti palchi stanno.
 
     Scrivere due volte lo stesso nome in due modi ("Anni 80" e "anni 80") e'
     il modo tipico in cui un sistema di tag si sbriciola: qui i due si
@@ -4086,7 +4086,7 @@ def tag_vocabolario(conn, ws):
 
 
 def set_tags(conn, ws, email, loc_id, tags):
-    """I tag di questo palcoscenico: si manda l'elenco completo, non
+    """I tag di questo palco: si manda l'elenco completo, non
     l'aggiunta.
 
     Mandare la lista intera invece di "aggiungi questo" e "togli quello"
@@ -4112,7 +4112,7 @@ def set_tags(conn, ws, email, loc_id, tags):
         viste.add(chiave)
         puliti.append(gia_in_uso.get(chiave, tag))
     if len(puliti) > TAG_MAX_PER_VENUE:
-        raise ApiError(400, f"Non piu' di {TAG_MAX_PER_VENUE} tag per palcoscenico")
+        raise ApiError(400, f"Non piu' di {TAG_MAX_PER_VENUE} tag per palco")
 
     # Si riscrive solo la differenza: i tag che restano tengono la data in
     # cui sono stati messi, ed e' quella che da' l'ordine in cui si rivedono.
@@ -4140,7 +4140,7 @@ def set_tags(conn, ws, email, loc_id, tags):
 
 
 def rename_tag(conn, ws, vecchio, nuovo):
-    """Ribattezza un tag su tutti i palcoscenici della band. Vale per tutti:
+    """Ribattezza un tag su tutti i palchi della band. Vale per tutti:
     il tag e' della band, non di chi l'ha scritto per primo."""
     nuovo = tag_pulito(nuovo)
     if not tag_chiave(nuovo):
@@ -4164,11 +4164,11 @@ def rename_tag(conn, ws, vecchio, nuovo):
         )
         toccati += 1
     conn.commit()
-    return {"tag": nuovo, "palcoscenici": toccati}
+    return {"tag": nuovo, "palchi": toccati}
 
 
 def delete_tag(conn, ws, tag):
-    """Toglie un tag da tutti i palcoscenici della band. I palcoscenici
+    """Toglie un tag da tutti i palchi della band. I palchi
     restano, e restano nei preferiti di chi ce li aveva messi: il tag e'
     un'etichetta, non il modo in cui ci sono finiti."""
     chiave = tag_chiave(tag)
@@ -4185,7 +4185,7 @@ def delete_tag(conn, ws, tag):
             )
             tolti += 1
     conn.commit()
-    return {"palcoscenici": tolti}
+    return {"palchi": tolti}
 
 
 # ---------------------------------------------------------------- posizione
@@ -4198,7 +4198,7 @@ def delete_tag(conn, ws, tag):
 # richiesta al secondo e di dire chi sei. Il freno sta qui sotto, in un posto
 # solo: cosi' vale anche se l'app decidesse di chiamare piu' in fretta.
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-GEO_USER_AGENT = "PalcosceniciCRM/1.0 (gestionale locale per band, uso personale)"
+GEO_USER_AGENT = "PalchiCRM/1.0 (gestionale locale per band, uso personale)"
 GEO_RATE_LIMIT_SECONDS = 1.1
 # San Marino insieme all'Italia: per questa band e' dietro l'angolo, e con
 # il solo "it" i suoi locali non potevano proprio essere trovati.
@@ -4510,7 +4510,7 @@ def geo_best(domande, domanda_citta, nomi=(), cache=None):
 
 
 def geocode_location(conn, ws, loc_id, body=None):
-    """Trova il punto di un palcoscenico e lo salva. Con "force" lo rifa'
+    """Trova il punto di un palco e lo salva. Con "force" lo rifa'
     anche se ce l'ha gia': serve quando l'indirizzo e' stato corretto.
 
     Nome, indirizzo e citta' possono arrivare dalla scheda aperta invece che
@@ -4522,7 +4522,7 @@ def geocode_location(conn, ws, loc_id, body=None):
         "WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     body = body or {}
     force = bool(body.get("force"))
     if row["lat"] is not None and row["lng"] is not None and not force:
@@ -4564,7 +4564,7 @@ def add_photo(conn, ws, loc_id, body):
         "SELECT id FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not existing:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
 
     data_url = body.get("image_base64") or ""
     m = DATA_URL_RE.match(data_url)
@@ -4613,7 +4613,7 @@ def salva_foto(conn, loc_id, raw, ext, copertina=False):
 # del profilo — quella quadrata, non la copertina larga in cima. Niente app
 # Facebook da registrare, niente token da rinnovare, niente revisione da
 # passare: una richiesta e via. Vale la pena perche' due terzi dei
-# palcoscenici in archivio hanno una pagina Facebook al posto del sito, e
+# palchi in archivio hanno una pagina Facebook al posto del sito, e
 # quella foto e' quasi sempre l'insegna del locale.
 #
 # Con "redirect=false" invece dell'immagine arriva un JSON che dice anche
@@ -4702,7 +4702,7 @@ def facebook_page_id(url):
         # /p/Ristorante-Barafonda-61574620851392/ — qui il numero non e' un
         # pezzo di indirizzo per conto suo: sta appiccicato in fondo al nome,
         # ed e' la forma che Facebook da' oggi dal telefono. Senza questa
-        # riga quattordici palcoscenici in archivio non avevano il pulsante
+        # riga quattordici palchi in archivio non avevano il pulsante
         # della copertina (trovato il 15 settembre 2026).
         for pezzo in reversed(segmenti[1:]):
             trovato = FB_SLUG_ID.search(unquote(pezzo))
@@ -4846,7 +4846,7 @@ def _parole_semplici(testo):
 
 
 def instagram_cerca(conn, ws, loc_id, body=None):
-    """Cerca il profilo Instagram di un palcoscenico provando i nomi utente
+    """Cerca il profilo Instagram di un palco provando i nomi utente
     che gli somigliano, e torna quelli che esistono davvero.
 
     Nome e citta' arrivano dalla scheda aperta, come per la copertina: quello
@@ -4862,7 +4862,7 @@ def instagram_cerca(conn, ws, loc_id, body=None):
         "SELECT name, city FROM locations WHERE id = ? AND workspace_id = ?", (loc_id, ws)
     ).fetchone()
     if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
     body = body or {}
     nome = (body.get("name") or row["name"] or "").strip()
     citta = (body.get("city") or row["city"] or "").strip()
@@ -4896,7 +4896,7 @@ def _facebook_pic_url(page_id):
     """L'indirizzo della foto del profilo di una pagina Facebook, o None se
     Facebook non la da'. Succede per i link nella forma profile.php?id=...:
     l'endpoint pubblico risponde 200 ma con la sagoma grigia (provato il 15
-    settembre 2026 su 17 palcoscenici, tutti e 17 silhouette; con i link che
+    settembre 2026 su 17 palchi, tutti e 17 silhouette; con i link che
     hanno il nome della pagina, 11 su 12 foto vera)."""
     # Il nome vecchio stile va provato in due modi: com'e' scritto, e poi
     # col solo numero in fondo, che e' l'id sopravvissuto al cambio di nome.
@@ -4927,7 +4927,7 @@ def _facebook_pic_url(page_id):
 
 def social_cover(conn, ws, loc_id, body=None):
     """Prende l'immagine del profilo da Facebook o da Instagram e la mette
-    come copertina del palcoscenico. Resta una foto come le altre: si
+    come copertina del palco. Resta una foto come le altre: si
     cancella dalla striscia, e la copertina si puo' rimettere su un'altra con
     la stella.
 
@@ -4946,7 +4946,7 @@ def social_cover(conn, ws, loc_id, body=None):
         (loc_id, ws),
     ).fetchone()
     if not row:
-        raise ApiError(404, "Palcoscenico non trovato")
+        raise ApiError(404, "Palco non trovato")
 
     url = (body or {}).get("url") or row["facebook"] or row["instagram"]
     page_id = facebook_page_id(url)
@@ -5034,7 +5034,7 @@ def delete_photo(conn, ws, photo_id):
 
 
 def set_photo_cover(conn, ws, photo_id):
-    """Una sola copertina per palcoscenico: si spegne il segno su tutte e lo
+    """Una sola copertina per palco: si spegne il segno su tutte e lo
     si accende su questa. Cancellarla non lascia la striscia senza: senza
     nessun segno torna a comandare l'ordine di arrivo, e la prima e' la piu'
     vecchia — che e' come si comportava prima di poter scegliere."""
@@ -5245,7 +5245,7 @@ def update_my_band(conn, ctx, ws_id, body):
 
 
 def delete_my_band(conn, ctx, ws_id):
-    """Elimina una band solo se e' vuota. Cancellare a cascata i palcoscenici
+    """Elimina una band solo se e' vuota. Cancellare a cascata i palchi
     di una band per un tocco sbagliato e' un danno irreversibile: meglio
     obbligare a svuotarla prima."""
     if ctx.email and not is_member(conn, ws_id, ctx.email):
@@ -5256,7 +5256,7 @@ def delete_my_band(conn, ctx, ws_id):
         "SELECT COUNT(*) AS n FROM locations WHERE workspace_id = ?", (ws_id,)
     ).fetchone()["n"]
     if n:
-        noun = "palcoscenico" if n == 1 else "palcoscenici"
+        noun = "palco" if n == 1 else "palchi"
         raise ApiError(
             400,
             f"Questa band contiene {n} {noun}: eliminali prima, oppure lascia la band "
@@ -5491,7 +5491,7 @@ def delete_venue_type(conn, ws, type_id):
         (row["name"], ws),
     ).fetchone()["n"]
     if count > 0:
-        noun = "palcoscenico" if count == 1 else "palcoscenici"
+        noun = "palco" if count == 1 else "palchi"
         verb = "usa" if count == 1 else "usano"
         raise ApiError(400, f"Impossibile eliminare: {count} {noun} {verb} ancora questa tipologia")
     conn.execute("DELETE FROM venue_types WHERE id = ? AND workspace_id = ?", (type_id, ws))
@@ -5572,7 +5572,7 @@ def delete_venue_category(conn, ws, category_id):
         (row["name"], ws),
     ).fetchone()["n"]
     if count > 0:
-        noun = "palcoscenico" if count == 1 else "palcoscenici"
+        noun = "palco" if count == 1 else "palchi"
         verb = "usa" if count == 1 else "usano"
         raise ApiError(400, f"Impossibile eliminare: {count} {noun} {verb} ancora questa categoria")
     conn.execute(
@@ -5583,7 +5583,7 @@ def delete_venue_category(conn, ws, category_id):
 
 # --- liste di valori configurabili: un CRUD solo per tutte -------------
 # Stesse regole della categoria: nomi unici senza distinzione di maiuscole,
-# rinominare propaga sui palcoscenici che usano quel valore, e un valore in
+# rinominare propaga sui palchi che usano quel valore, e un valore in
 # uso non si puo' eliminare.
 
 
@@ -5681,7 +5681,7 @@ def delete_venue_list_value(conn, ws, key, value_id):
         (row["name"], ws),
     ).fetchone()["n"]
     if count > 0:
-        noun = "palcoscenico" if count == 1 else "palcoscenici"
+        noun = "palco" if count == 1 else "palchi"
         verb = "usa" if count == 1 else "usano"
         raise ApiError(400, f"Impossibile eliminare: {count} {noun} {verb} ancora {cfg['in_use']}")
     conn.execute(
@@ -5801,8 +5801,8 @@ def _query(conn, sql, args=()):
 def export_zip(conn):
     """Tutti i dati in un archivio di CSV, uno per foglio.
 
-    Un CSV solo non puo' tenere palcoscenici, serate e note insieme senza
-    ripetere ogni palcoscenico una volta per nota. Meglio i fogli separati,
+    Un CSV solo non puo' tenere palchi, serate e note insieme senza
+    ripetere ogni palco una volta per nota. Meglio i fogli separati,
     che in Excel si aprono uno per uno e si incrociano con l'id.
 
     Non escono sessioni e inviti: contengono i token con cui si entra
@@ -5810,7 +5810,7 @@ def export_zip(conn):
     """
     fogli = []
 
-    fogli.append(("palcoscenici.csv", _csv_bytes(
+    fogli.append(("palchi.csv", _csv_bytes(
         ["id", "band", "nome", "tipo", "categoria", "contesto", "stagionalita", "periodo",
          "citta", "indirizzo", "lat", "lng", "capienza", "genere", "titolare", "telefono",
          "cellulare", "email", "sito", "facebook", "instagram", "art_director", "stato", "data_prossimo_contatto",
@@ -5829,10 +5829,10 @@ def export_zip(conn):
             "ORDER BY w.name, l.name")])))
 
     # Preferiti e tag escono in due fogli loro e non in una colonna del
-    # palcoscenico: sono di chi li mette, e sullo stesso posto ce ne possono
+    # palco: sono di chi li mette, e sullo stesso posto ce ne possono
     # essere di piu' persone. In una colonna sola non ci stavano.
     fogli.append(("preferiti.csv", _csv_bytes(
-        ["palcoscenico_id", "palcoscenico", "band", "chi", "dal"],
+        ["palco_id", "palco", "band", "chi", "dal"],
         [(r["location_id"], r["name"], r["band"], r["email"], r["created_at"])
          for r in _query(conn,
             "SELECT f.*, l.name, w.name AS band FROM location_favorites f "
@@ -5841,7 +5841,7 @@ def export_zip(conn):
             "ORDER BY w.name, f.email, l.name")])))
 
     fogli.append(("tag.csv", _csv_bytes(
-        ["palcoscenico_id", "palcoscenico", "band", "tag", "messo_da", "dal"],
+        ["palco_id", "palco", "band", "tag", "messo_da", "dal"],
         [(r["location_id"], r["name"], r["band"], r["tag"], r["created_by"], r["created_at"])
          for r in _query(conn,
             "SELECT t.*, l.name, w.name AS band FROM location_tags t "
@@ -5850,7 +5850,7 @@ def export_zip(conn):
             "ORDER BY w.name, t.tag, l.name")])))
 
     fogli.append(("serate.csv", _csv_bytes(
-        ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "stato",
+        ["id", "band", "palco_id", "palco", "citta", "stato",
          "data", "compenso", "note", "chiusa_il", "creata_il"],
         [(g["id"], g["band"], g["location_id"], g["palco"], g["city"], g["status"],
           g["gig_date"], g["fee"], g["outcome_note"], g["closed_at"], g["created_at"])
@@ -5861,7 +5861,7 @@ def export_zip(conn):
             "ORDER BY g.gig_date DESC, g.id DESC")])))
 
     fogli.append(("compiti.csv", _csv_bytes(
-        ["id", "band", "palcoscenico_id", "palcoscenico", "citta", "descrizione",
+        ["id", "band", "palco_id", "palco", "citta", "descrizione",
          "scadenza", "stato", "assegnato_a", "creato_il", "aggiornato_il"],
         [(t["id"], t["band"], t["location_id"], t["palco"], t["city"], t["description"],
           t["due_date"], t["status"], t["assignee_email"], t["created_at"], t["updated_at"])
@@ -5877,7 +5877,7 @@ def export_zip(conn):
     # stesso euro due volte in due fogli, e chi somma la colonna sbaglia.
     fogli.append(("cassa.csv", _csv_bytes(
         ["id", "band", "verso", "data", "descrizione", "importo", "categoria",
-         "pagato", "serata_id", "palcoscenico", "inserito_da", "creato_il"],
+         "pagato", "serata_id", "palco", "inserito_da", "creato_il"],
         [(c["id"], c["band"], c["kind"], c["entry_date"], c["description"], c["amount"],
           c["category"], "sì" if c["paid"] else "no", c["gig_id"], c["palco"],
           c["created_by"], c["created_at"])
@@ -5889,7 +5889,7 @@ def export_zip(conn):
             "ORDER BY w.name, c.entry_date DESC, c.id DESC")])))
 
     fogli.append(("note.csv", _csv_bytes(
-        ["id", "band", "palcoscenico_id", "palcoscenico", "tipo", "testo", "serata_id",
+        ["id", "band", "palco_id", "palco", "tipo", "testo", "serata_id",
          "segnata_da", "creata_il"],
         [(n["id"], n["band"], n["location_id"], n["palco"], n["kind"], n["text"],
           n["gig_id"], n["created_by"], n["created_at"])
@@ -5966,7 +5966,7 @@ def export_zip(conn):
 
 
 def list_owners(conn, ws):
-    """Chi puo' avere inserito un palcoscenico: i membri della band attiva,
+    """Chi puo' avere inserito un palco: i membri della band attiva,
     non piu' chiunque abbia un profilo sul server."""
     rows = conn.execute(
         "SELECT m.email, p.name FROM workspace_members m "
@@ -6488,9 +6488,9 @@ ROUTES = [
     ("POST", re.compile(r"^/api/locations/(\d+)/photos/social$"), _h_social_cover),
     ("POST", re.compile(r"^/api/locations/(\d+)/social/instagram$"), _h_instagram_cerca),
     ("POST", re.compile(r"^/api/locations/(\d+)/geocode$"), _h_geocode_location),
-    # La stella sta fuori dal palcoscenico perche' e' di chi la mette: ha una
+    # La stella sta fuori dal palco perche' e' di chi la mette: ha una
     # rotta sua, ed e' l'unica cosa che l'app chiede "per me". I tag invece
-    # arrivano dentro il palcoscenico — sono della band — e qui hanno solo i
+    # arrivano dentro il palco — sono della band — e qui hanno solo i
     # verbi che li cambiano.
     ("GET", re.compile(r"^/api/my/favorites$"), _h_my_favorites),
     ("PUT", re.compile(r"^/api/locations/(\d+)/favorite$"), _h_set_favorite),
@@ -7080,7 +7080,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # Provincia e regione di ogni sigla: l'app le ricava dalla citta' che
-        # e' gia' scritta sul palcoscenico, cosi' i filtri per provincia e
+        # e' gia' scritta sul palco, cosi' i filtri per provincia e
         # regione esistono senza che nessuno debba inserire quei dati.
         if method == "GET" and path == "/province.json":
             self._send_file(os.path.join(STATIC_DIR, "province.json"), "application/json; charset=utf-8")
@@ -7170,7 +7170,7 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     init_db()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    print("Palcoscenici CRM avviato.")
+    print("Palchi CRM avviato.")
     # Scritto all'avvio perche' e' l'unico modo di sapere da fuori se sono
     # accese: se sono spente per sbaglio, non arriva nessun messaggio e non
     # arriva nemmeno nessun errore.

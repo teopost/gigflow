@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Importa palcoscenici e band nel database del CRM da uno o più file Excel.
+"""Importa palchi e band nel database del CRM da uno o più file Excel.
 
 Riconosce automaticamente il tipo di ogni foglio dall'intestazione:
-- colonne "Locale, Citta, Pagina Facebook, Identita, Tipo, ..."   -> palcoscenici
+- colonne "Locale, Citta, Pagina Facebook, Identita, Tipo, ..."   -> palchi
 - colonne "Band, Pagina Facebook, Follower, Base, ..."            -> band
-- colonne "..., Stato Lead, ..." (export lead da Zoho CRM)        -> palcoscenici
+- colonne "..., Stato Lead, ..." (export lead da Zoho CRM)        -> palchi
 
 Rilanciabile: salta i record già presenti (stesso nome, confronto case-insensitive).
 
@@ -32,8 +32,8 @@ VENUE_TYPE_MAP = {
 }
 
 # Gli stati di Zoho raccontavano a che punto era il contatto, e finivano
-# dritti sullo stato del palcoscenico finche' quello era la copia della
-# serata. Dal 15 settembre 2026 non lo e' piu': il palcoscenico dice che
+# dritti sullo stato del palco finche' quello era la copia della
+# serata. Dal 15 settembre 2026 non lo e' piu': il palco dice che
 # rapporto c'e' con quel posto, e chi e' stato solo contattato non e' ancora
 # niente di piu' di un prospect. A che punto sia il contatto lo direbbe la
 # serata, che questo import non apre: quello che si sa e' scritto nelle note.
@@ -138,7 +138,7 @@ def row_get(header_index, row, name):
     return clean(row[i])
 
 
-# ---------------------------------------------------------------- palcoscenici (elenco deduplicato)
+# ---------------------------------------------------------------- palchi (elenco deduplicato)
 
 def build_venue_type(tipo_raw, name):
     tipo_raw = tipo_raw.lower().strip()
@@ -237,7 +237,7 @@ def import_bands_sheet(conn, rows, existing_names, source_label):
     return created, skipped
 
 
-# ---------------------------------------------------------------- lead Zoho CRM -> palcoscenici
+# ---------------------------------------------------------------- lead Zoho CRM -> palchi
 
 def build_lead_status(stato_raw):
     return LEAD_STATUS_MAP.get(stato_raw.lower().strip(), "lead")
@@ -332,7 +332,7 @@ def process_file(conn, xlsx_path, existing_venue_names, existing_band_names):
         source_label = f"{label}, foglio {sheet_name}"
         if kind == "venues":
             any_recognized = True
-            print(f"[{sheet_name}] -> palcoscenici")
+            print(f"[{sheet_name}] -> palchi")
             import_venues_sheet(conn, rows, existing_venue_names, source_label)
         elif kind == "bands":
             any_recognized = True
@@ -340,7 +340,7 @@ def process_file(conn, xlsx_path, existing_venue_names, existing_band_names):
             import_bands_sheet(conn, rows, existing_band_names, source_label)
         elif kind == "leads":
             any_recognized = True
-            print(f"[{sheet_name}] -> palcoscenici (da lead CRM)")
+            print(f"[{sheet_name}] -> palchi (da lead CRM)")
             import_leads_sheet(conn, rows, existing_venue_names, source_label)
         else:
             print(f"[{sheet_name}] foglio non riconosciuto, saltato (colonne: {rows[0]})")

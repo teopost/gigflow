@@ -14,7 +14,7 @@ help:
 	@echo "make shell     - apre una shell dentro il container"
 	@echo "make clean     - ferma il container e rimuove container + immagine (i dati in data/ restano intatti)"
 	@echo "make import    - rilancia lo script di importazione Excel dentro il container"
-	@echo "make geocode   - rilancia la geocodifica dei palcoscenici dentro il container"
+	@echo "make geocode   - rilancia la geocodifica dei palchi dentro il container"
 
 build:
 	docker compose build
