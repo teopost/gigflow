@@ -7292,14 +7292,15 @@
         patchVenue("type", t).then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo: "+t); });
       }});
     });
+    // Niente testo libero: un tipo scritto qui finiva nel palco senza che
+    // nessuno lo creasse in anagrafica, e quel valore restava orfano — fuori
+    // da Impostazioni, senza emoji, non filtrabile, e saltato da qualunque
+    // rinomina futura. I tipi si creano in Impostazioni, che e' l'unico
+    // posto dove si vedono tutti insieme.
     openSheet({
       title:"Tipo di palco",
       searchable:true,
-      searchPlaceholder:"Cerca o scrivi un tipo personalizzato…",
-      freeText:true,
-      onFreeText:function(value){
-        patchVenue("type", value).then(function(updated){ applyUpdatedVenue(updated); renderTypeRow(updated); renderList(); toast("Tipo: "+value); });
-      },
+      searchPlaceholder:"Cerca un tipo…",
       options: opts
     });
   });
@@ -7341,14 +7342,11 @@
         patchVenue("category", c).then(function(updated){ applyUpdatedVenue(updated); renderCategoryRow(updated); renderList(); toast("Categoria: "+c); });
       }});
     });
+    // Stessa ragione del tipo qui sopra: si creano in Impostazioni.
     openSheet({
       title:"Categoria del palco",
       searchable:true,
-      searchPlaceholder:"Cerca o scrivi una categoria personalizzata…",
-      freeText:true,
-      onFreeText:function(value){
-        patchVenue("category", value).then(function(updated){ applyUpdatedVenue(updated); renderCategoryRow(updated); renderList(); toast("Categoria: "+value); });
-      },
+      searchPlaceholder:"Cerca una categoria…",
       options: opts
     });
   });
@@ -9810,12 +9808,12 @@
         opts.push({label:item.name, dato:true, checkmark: v[L.field] === item.name,
           onSelect:function(){ scegli(item.name); }});
       });
+      // Come tipo e categoria: i valori nuovi si aggiungono in Impostazioni,
+      // se no restano orfani, invisibili proprio nel posto dove si governano.
       openSheet({
         title: L.label + " del palco",
         searchable: true,
-        searchPlaceholder: "Cerca o scrivi " + L.g.un + " " + L.lower + " " + L.g.personalizzato + "…",
-        freeText: true,
-        onFreeText: scegli,
+        searchPlaceholder: "Cerca " + L.g.un + " " + L.lower + "…",
         options: opts
       });
     });
