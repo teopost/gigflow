@@ -1,23 +1,24 @@
-<!-- Sezioni, non campi: cancella quelle che non servono, scrivi solo dove hai
-     qualcosa da dire. Niente qui e' obbligatorio. -->
+<!-- Sezioni, non campi: scrivi solo dove hai qualcosa da dire, cancella il
+     resto. Niente qui e' obbligatorio. -->
 
-## Cosa
+### Cosa vorrei
 
 <!-- Cosa non va adesso, o cosa dovrebbe fare l'app. Detto come lo diresti a voce. -->
 
-## Dove
+### Quando mi servirebbe
 
-<!-- La scheda da cui si vede: Home, Palcoscenici, Preferiti, Opportunita',
-     Agenda, Cassa, Bands, Impostazioni, Admin, Notifiche. "Non lo so" va bene. -->
+<!-- Il momento vero in cui la useresti. E' quello che decide la forma.
+     Se e' un'anomalia, qui ci sta anche la build (Impostazioni, in fondo):
+     meta' delle anomalie sono gia' corrette in una build piu' recente di
+     quella che hai sul telefono. -->
 
-## Come vedo che e' a posto
+### Dove starebbe
 
-<!-- Cosa tocchi sul telefono e cosa ti aspetti di vedere. E' la sezione che di
-     solito manca: senza, non si sa quando la cosa e' finita. -->
+<!-- Home, Palcoscenici, Preferiti, Opportunita', Agenda, Cassa, Bands,
+     Impostazioni, Admin, Notifiche. "Non lo so" va benissimo: e' mezzo
+     lavoro deciderlo. -->
 
-## Note
+### Come faccio a vedere che e' a posto
 
-<!-- Facoltativo. Per un'anomalia serve la build (Impostazioni, in fondo: il
-     numero o l'impronta): meta' delle anomalie sono gia' corrette in una build
-     piu' recente di quella che hai sul telefono. Poi foto, urgenza, cosa avevi
-     provato. -->
+<!-- Cosa tocchi sul telefono e cosa ti aspetti di vedere. E' la sezione che
+     di solito manca: senza, non si sa quando la cosa e' finita. -->
