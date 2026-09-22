@@ -2401,7 +2401,7 @@
       <div class="section-header">ART DIRECTOR</div>
       <div class="grouped-list">
         <div class="field-row picker" id="rowArtDirector">
-          <label>Referente</label>
+          <label>Art director</label>
           <div class="picker-value"><span id="artDirectorValue">— nessuno —</span>
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
@@ -2409,7 +2409,7 @@
 
       <div class="section-header">CONTATTI DIRETTI</div>
       <div class="grouped-list">
-        <div class="field-row"><label for="fContactName">Titolare</label><input id="fContactName" type="text" placeholder="Nome di chi gestisce il posto"></div>
+        <div class="field-row"><label for="fContactName">Referente</label><input id="fContactName" type="text" placeholder="Nome di chi gestisce il posto"></div>
         <div class="field-row"><label for="fLandline">Telefono</label><input id="fLandline" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fPhone">Cellulare</label><input id="fPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palco.it"></div>
@@ -2419,7 +2419,7 @@
         <div class="field-row picker" id="rowSocialCover" hidden><span class="link-action" id="socialCoverLabel">Copertina dal profilo Facebook</span></div>
         <div class="field-row picker" id="rowIgSearch" hidden><span class="link-action" id="igSearchLabel">Cerca il profilo Instagram</span></div>
       </div>
-      <div class="section-footer">Il titolare è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sotto, che può seguire più palchi. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
+      <div class="section-footer">Il referente è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sopra, che può seguire più palchi. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
 
       <div class="section-header">STATO</div>
       <div class="grouped-list">
@@ -2476,7 +2476,7 @@
           <svg class="row-chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 7.5 7.5 1 14"/></svg></div>
         </div>
       </div>
-      <div class="section-footer">Chi in GigFlow gestisce questo palco nel gestionale — diverso dal titolare del locale indicato sopra.</div>
+      <div class="section-footer">Chi in GigFlow gestisce questo palco nel gestionale — diverso dal referente del locale indicato sopra.</div>
 
       <div class="section-header">ATTIVITÀ</div>
       <div class="grouped-list">
@@ -8040,7 +8040,7 @@
         openAdDetail(created.id);
       });
     }});
-    openSheet({title:"Referente booking", options:opts});
+    openSheet({title:"Art director", options:opts});
   });
 
   /* Lo storico si puo' correggere: si tocca una riga e si apre sotto, come
