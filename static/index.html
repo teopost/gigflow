@@ -8065,18 +8065,31 @@
       patchVenue("art_director_id", null).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); renderList(); });
     }}];
     artDirectors.forEach(function(ad){
-      opts.push({label:ad.name, dato:true, checkmark: v.art_director_id===ad.id, onSelect:function(){
+      opts.push({label:ad.name, dato:true, thumb: ad.photo ? "/photos-ad/" + encodeURIComponent(ad.photo) : "",
+        checkmark: v.art_director_id===ad.id, onSelect:function(){
         patchVenue("art_director_id", ad.id).then(function(updated){ applyUpdatedVenue(updated); renderArtDirectorRow(updated); renderList(); toast("Art director: "+ad.name); });
       }});
     });
-    opts.push({label:"+ Nuovo art director", onSelect:function(){
+    // Il nome scritto nella ricerca diventa il nome del nuovo art director.
+    // "+ Nuovo" resta per chi apre il foglio e decide li' per li': scrivendo,
+    // pero', sparisce insieme a tutte le voci che non corrispondono, e senza
+    // questo si finirebbe a cercare uno che non c'e' senza poterlo creare.
+    function nuovoArtDirector(nome){
       returnToPalcoAfterAd = currentId;
-      api("POST", "/api/art_directors", {name:""}).then(function(created){
+      api("POST", "/api/art_directors", {name: nome || ""}).then(function(created){
         artDirectors.push(created);
         openAdDetail(created.id);
-      });
-    }});
-    openSheet({title:"Art director", options:opts});
+      }).catch(function(err){ toast(err.message); });
+    }
+    opts.push({label:"+ Nuovo art director", onSelect:function(){ nuovoArtDirector(""); }});
+    openSheet({
+      title:"Art director",
+      searchable: true,
+      searchPlaceholder:"Cerca o scrivi un nome nuovo…",
+      freeText: true,
+      onFreeText: nuovoArtDirector,
+      options: opts
+    });
   });
 
   /* Lo storico si puo' correggere: si tocca una riga e si apre sotto, come
