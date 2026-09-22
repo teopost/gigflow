@@ -45,6 +45,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "crm.db")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 PHOTOS_DIR = os.path.join(BASE_DIR, "data", "photos")
+# Le facce degli art director stanno in una cartella loro: sono di una
+# persona, non di un posto, e in mezzo alle 281 foto dei palchi non si
+# distinguerebbero piu' da quelle, ne' guardando la cartella ne' facendo un
+# backup di una cosa sola.
+AD_PHOTOS_DIR = os.path.join(BASE_DIR, "data", "ad_photos")
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
 PHOTO_EXT_CONTENT_TYPE = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg",
@@ -550,6 +555,7 @@ def get_conn():
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     os.makedirs(PHOTOS_DIR, exist_ok=True)
+    os.makedirs(AD_PHOTOS_DIR, exist_ok=True)
     conn = get_conn()
     # Si guarda prima di creare: e' l'unico momento in cui si puo' sapere
     # che questa installazione la cassa non l'ha mai vista, e quindi che le
@@ -5167,16 +5173,16 @@ def art_director_social_photo(conn, ws, ad_id, body=None):
     url = (body or {}).get("url") or row["facebook"] or row["instagram"]
     raw, ext = scarica_immagine_social(url)
 
-    os.makedirs(PHOTOS_DIR, exist_ok=True)
-    filename = f"ad{ad_id}_{uuid.uuid4().hex}.{ext}"
-    with open(os.path.join(PHOTOS_DIR, filename), "wb") as f:
+    os.makedirs(AD_PHOTOS_DIR, exist_ok=True)
+    filename = f"{ad_id}_{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(AD_PHOTOS_DIR, filename), "wb") as f:
         f.write(raw)
     vecchia = row["photo"]
     conn.execute("UPDATE art_directors SET photo = ? WHERE id = ?", (filename, ad_id))
     conn.commit()
     if vecchia:
         try:
-            os.remove(os.path.join(PHOTOS_DIR, vecchia))
+            os.remove(os.path.join(AD_PHOTOS_DIR, vecchia))
         except OSError:
             pass
 
@@ -5200,7 +5206,7 @@ def delete_art_director_photo(conn, ws, ad_id):
         conn.execute("UPDATE art_directors SET photo = NULL WHERE id = ?", (ad_id,))
         conn.commit()
         try:
-            os.remove(os.path.join(PHOTOS_DIR, row["photo"]))
+            os.remove(os.path.join(AD_PHOTOS_DIR, row["photo"]))
         except OSError:
             pass
     counts_row = conn.execute(
@@ -5225,7 +5231,7 @@ def delete_art_director(conn, ws, ad_id):
         raise ApiError(404, "Art director non trovato")
     if row and row["photo"]:
         try:
-            os.remove(os.path.join(PHOTOS_DIR, row["photo"]))
+            os.remove(os.path.join(AD_PHOTOS_DIR, row["photo"]))
         except OSError:
             pass
 
@@ -6232,11 +6238,11 @@ def _h_update_art_director(conn, match, query, body, ctx):
 
 
 def _h_art_director_social_photo(conn, match, query, body, ctx):
-    return art_director_social_photo(conn, ctx["ws"], int(match.group(1)), body)
+    return 200, art_director_social_photo(conn, require_ws(ctx), int(match.group(1)), body)
 
 
 def _h_delete_art_director_photo(conn, match, query, body, ctx):
-    return delete_art_director_photo(conn, ctx["ws"], int(match.group(1)))
+    return 200, delete_art_director_photo(conn, require_ws(ctx), int(match.group(1)))
 
 
 def _h_delete_art_director(conn, match, query, body, ctx):
@@ -7212,16 +7218,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send_file(full, "image/png")
             return
 
-        if method == "GET" and path.startswith("/photos/"):
-            filename = path[len("/photos/"):]
-            full = os.path.normpath(os.path.join(PHOTOS_DIR, filename))
-            if not full.startswith(os.path.normpath(PHOTOS_DIR) + os.sep) or not os.path.isfile(full):
-                self._send_json(404, {"error": "Non trovato"})
+        # Due cartelle, due indirizzi, e lo stesso controllo su tutti e due:
+        # il nome del file arriva da fuori, e senza questa riga un "../.."
+        # servirebbe qualunque file del disco.
+        for prefisso, cartella in (("/photos/", PHOTOS_DIR), ("/ad-photos/", AD_PHOTOS_DIR)):
+            if method == "GET" and path.startswith(prefisso):
+                filename = path[len(prefisso):]
+                full = os.path.normpath(os.path.join(cartella, filename))
+                if not full.startswith(os.path.normpath(cartella) + os.sep) or not os.path.isfile(full):
+                    self._send_json(404, {"error": "Non trovato"})
+                    return
+                ext = full.rsplit(".", 1)[-1].lower()
+                content_type = PHOTO_EXT_CONTENT_TYPE.get(ext, "application/octet-stream")
+                self._send_file(full, content_type)
                 return
-            ext = full.rsplit(".", 1)[-1].lower()
-            content_type = PHOTO_EXT_CONTENT_TYPE.get(ext, "application/octet-stream")
-            self._send_file(full, content_type)
-            return
 
         for route_method, pattern, fn in ROUTES:
             if route_method != method:
