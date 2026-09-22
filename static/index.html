@@ -2961,10 +2961,16 @@
   var artDirectors = [];
   var venueTypes = [];
   var venueCategories = [];
-  var filterStatus = "all";
-  var filterType = "all";
-  var filterCategory = "all";
-  var filterOwner = "all";
+  /* Ogni filtro e' un elenco di valori scelti, e vuoto vuol dire tutti — la
+     forma che i tag avevano gia' da soli. Due valori spuntati allargano
+     l'elenco invece di stringerlo: davanti a duecento palchi la domanda che
+     uno si fa e' "i bar oppure i ristoranti", non "i bar che sono anche
+     ristoranti", che non esistono. Fra filtri diversi invece si stringe
+     ancora: "i bar della Romagna" e' un'altra domanda e vale tutta. */
+  var filterStatus = [];
+  var filterType = [];
+  var filterCategory = [];
+  var filterOwner = [];
   /* I tag su cui stai filtrando, e sono piu' d'uno: gli altri filtri
      scelgono un valore (un tipo, una categoria), i tag no — un posto ne
      porta quanti ne vuoi, e la domanda vera e' "fammi vedere gli anni 80 e
@@ -2974,6 +2980,37 @@
      palco, questo dentro le tue etichette. */
   var filterTags = [];
   function filterTagsAttivi(){ return filterTags.length > 0; }
+  function filtroVuoto(sel){ return !sel || !sel.length; }
+  function filtroPrende(sel, valore){ return filtroVuoto(sel) || sel.indexOf(valore) > -1; }
+  /* Quello che si legge nella riga: niente se sono tutti, il nome se ne hai
+     scelto uno, il conto se sono di piu'. Tre nomi di fila non ci stanno in
+     una riga e verrebbero tagliati a meta'. */
+  function etichettaFiltro(sel, plurale, nomeDi){
+    if(filtroVuoto(sel)) return "";
+    if(sel.length === 1) return nomeDi ? nomeDi(sel[0]) : sel[0];
+    return sel.length + " " + plurale;
+  }
+  /* Un foglio a spunta multipla per tutti i filtri, che erano dieci copie
+     della stessa cosa. voci: [{valore, label, color, dato}]. */
+  function apriFiltroMulti(o){
+    var scelti = {};
+    (o.scelti || []).forEach(function(v){ scelti[v] = true; });
+    var voci = o.voci.map(function(x){
+      return {label:x.label, color:x.color, dato:x.dato, checkmark: !!scelti[x.valore],
+        onToggle:function(on){ if(on) scelti[x.valore] = true; else delete scelti[x.valore]; }};
+    });
+    openSheet({
+      title: o.titolo,
+      searchable: o.voci.length > 6,
+      searchPlaceholder: o.cerca,
+      multiSelect: true,
+      options: voci,
+      onDone: function(){
+        o.onDone(o.voci.map(function(x){ return x.valore; })
+                       .filter(function(v){ return scelti[v]; }));
+      }
+    });
+  }
   var owners = [];
   var searchText = "";
   /* Due filtri che non stanno nella riga dei dati del palco: la
@@ -3897,28 +3934,34 @@
   }
 
   function filtriVuoti(){
-    return {status:"all", type:"all", category:"all", owner:"all", regione:"all", provincia:"all",
+    return {status:[], type:[], category:[], owner:[], regione:[], provincia:[],
             tags:[], soloPreferiti:false, soloFocus:false,
             nearMe:false, nearMeKm:30, nearMeCoords:null, liste:{}, sortBy:"name"};
   }
   function snapshotFiltri(){
     var liste = {};
-    VENUE_LISTS.forEach(function(L){ liste[L.key] = L.filter; });
-    return {status:filterStatus, type:filterType, category:filterCategory, owner:filterOwner,
-            regione:filterRegione, provincia:filterProvincia, tags:filterTags.slice(),
+    VENUE_LISTS.forEach(function(L){ liste[L.key] = L.filter.slice(); });
+    return {status:filterStatus.slice(), type:filterType.slice(), category:filterCategory.slice(),
+            owner:filterOwner.slice(),
+            regione:(filterRegione||[]).slice(), provincia:(filterProvincia||[]).slice(),
+            tags:filterTags.slice(),
             soloPreferiti:filterSoloPreferiti, soloFocus:filterSoloFocus,
             nearMe:nearMeEnabled, nearMeKm:nearMeRadiusKm, nearMeCoords:nearMeCoords,
             liste:liste, sortBy:sortBy};
   }
   function applicaFiltri(snap){
-    filterStatus = snap.status; filterType = snap.type; filterCategory = snap.category; filterOwner = snap.owner;
-    filterRegione = snap.regione; filterProvincia = snap.provincia;
-    // Una copia, se no le due schermate si ritroverebbero lo stesso elenco
-    // e spuntare un tag di qua lo spunterebbe anche di la'.
+    // Sempre una copia, se no le due schermate si ritroverebbero lo stesso
+    // elenco e spuntare un valore di qua lo spunterebbe anche di la'.
+    filterStatus = (snap.status || []).slice();
+    filterType = (snap.type || []).slice();
+    filterCategory = (snap.category || []).slice();
+    filterOwner = (snap.owner || []).slice();
+    filterRegione = (snap.regione || []).slice();
+    filterProvincia = (snap.provincia || []).slice();
     filterTags = (snap.tags || []).slice();
     filterSoloPreferiti = !!snap.soloPreferiti; filterSoloFocus = !!snap.soloFocus;
     nearMeEnabled = snap.nearMe; nearMeRadiusKm = snap.nearMeKm; nearMeCoords = snap.nearMeCoords;
-    VENUE_LISTS.forEach(function(L){ L.filter = snap.liste[L.key] || "all"; });
+    VENUE_LISTS.forEach(function(L){ L.filter = (snap.liste[L.key] || []).slice(); });
     sortBy = snap.sortBy;
   }
   function filtriDi(scope){
@@ -3928,10 +3971,11 @@
   function filtriAccesi(snap){
     if(!snap) return false;
     var liste = snap.liste || {};
-    return snap.status !== "all" || snap.type !== "all" || snap.category !== "all" || snap.owner !== "all"
-        || snap.regione !== "all" || snap.provincia !== "all" || (snap.tags || []).length
+    return (snap.status || []).length || (snap.type || []).length || (snap.category || []).length
+        || (snap.owner || []).length || (snap.regione || []).length || (snap.provincia || []).length
+        || (snap.tags || []).length
         || snap.soloPreferiti || snap.soloFocus || snap.nearMe
-        || Object.keys(liste).some(function(k){ return liste[k] !== "all"; });
+        || Object.keys(liste).some(function(k){ return (liste[k] || []).length; });
   }
   /* Il passaggio di consegne fra le due schermate: quella che lasci si
      porta via i suoi filtri, quella che apri si rimette i propri. Le liste
@@ -3972,18 +4016,23 @@
     return (o && o.name) ? o.name : email;
   }
   function renderFilterStatusRow(){
-    var st = venueStatusInfo(filterStatus === "all" ? null : filterStatus);
-    document.getElementById("filterStatusDot").style.background = filterStatus === "all" ? "var(--text-tertiary)" : st.color;
-    document.getElementById("filterStatusValue").textContent = filterStatus === "all" ? "Tutti" : st.label;
+    // Il pallino colorato vale finche' lo stato e' uno: con due stati scelti
+    // un colore solo direbbe una cosa falsa, e il grigio e' il colore del
+    // "non uno in particolare".
+    var uno = filterStatus.length === 1 ? venueStatusInfo(filterStatus[0]) : null;
+    document.getElementById("filterStatusDot").style.background = uno ? uno.color : "var(--text-tertiary)";
+    document.getElementById("filterStatusValue").textContent =
+      filtroVuoto(filterStatus) ? "Tutti"
+        : (uno ? uno.label : filterStatus.length + " stati");
   }
   function renderFilterTypeRow(){
-    setDato("filterTypeValue", filterType === "all" ? "" : filterType, "Tutti i tipi");
+    setDato("filterTypeValue", etichettaFiltro(filterType, "tipi"), "Tutti i tipi");
   }
   function renderFilterCategoryRow(){
-    setDato("filterCategoryValue", filterCategory === "all" ? "" : filterCategory, "Tutte");
+    setDato("filterCategoryValue", etichettaFiltro(filterCategory, "categorie"), "Tutte");
   }
   function renderFilterOwnerRow(){
-    setDato("filterOwnerValue", filterOwner === "all" ? "" : ownerLabel(filterOwner), "Tutti");
+    setDato("filterOwnerValue", etichettaFiltro(filterOwner, "persone", ownerLabel), "Tutti");
   }
   function renderFilterTagRow(){
     var n = filterTags.length;
@@ -4022,48 +4071,36 @@
     });
   });
   document.getElementById("rowFilterStatus").addEventListener("click", function(){
-    var opts = [{label:"Tutti", checkmark: filterStatus==="all", onSelect:function(){
-      filterStatus = "all"; renderFilterStatusRow(); renderAll();
-    }}];
-    VENUE_STATUSES.forEach(function(s){
-      opts.push({label:s.label, color:s.color, checkmark: filterStatus===s.key, onSelect:function(){
-        filterStatus = s.key; renderFilterStatusRow(); renderAll();
-      }});
+    apriFiltroMulti({
+      titolo:"Filtra per stato",
+      scelti: filterStatus,
+      voci: VENUE_STATUSES.map(function(s){ return {valore:s.key, label:s.label, color:s.color}; }),
+      onDone:function(scelti){ filterStatus = scelti; renderFilterStatusRow(); renderAll(); }
     });
-    openSheet({title:"Filtra per stato", options:opts});
   });
   document.getElementById("rowFilterType").addEventListener("click", function(){
-    var opts = [{label:"Tutti i tipi", checkmark: filterType==="all", onSelect:function(){
-      filterType = "all"; renderFilterTypeRow(); renderAll();
-    }}];
-    venueTypes.forEach(function(t){
-      opts.push({label:t.name, dato:true, checkmark: filterType===t.name, onSelect:function(){
-        filterType = t.name; renderFilterTypeRow(); renderAll();
-      }});
+    apriFiltroMulti({
+      titolo:"Filtra per tipo", cerca:"Cerca tipo…",
+      scelti: filterType,
+      voci: venueTypes.map(function(t){ return {valore:t.name, label:t.name, dato:true}; }),
+      onDone:function(scelti){ filterType = scelti; renderFilterTypeRow(); renderAll(); }
     });
-    openSheet({title:"Filtra per tipo", searchable: venueTypes.length > 6, searchPlaceholder:"Cerca tipo…", options:opts});
   });
   document.getElementById("rowFilterCategory").addEventListener("click", function(){
-    var opts = [{label:"Tutte", checkmark: filterCategory==="all", onSelect:function(){
-      filterCategory = "all"; renderFilterCategoryRow(); renderAll();
-    }}];
-    venueCategories.forEach(function(c){
-      opts.push({label:c.name, dato:true, checkmark: filterCategory===c.name, onSelect:function(){
-        filterCategory = c.name; renderFilterCategoryRow(); renderAll();
-      }});
+    apriFiltroMulti({
+      titolo:"Filtra per categoria", cerca:"Cerca categoria…",
+      scelti: filterCategory,
+      voci: venueCategories.map(function(c){ return {valore:c.name, label:c.name, dato:true}; }),
+      onDone:function(scelti){ filterCategory = scelti; renderFilterCategoryRow(); renderAll(); }
     });
-    openSheet({title:"Filtra per categoria", searchable: venueCategories.length > 6, searchPlaceholder:"Cerca categoria…", options:opts});
   });
   document.getElementById("rowFilterOwner").addEventListener("click", function(){
-    var opts = [{label:"Tutti", checkmark: filterOwner==="all", onSelect:function(){
-      filterOwner = "all"; renderFilterOwnerRow(); renderAll();
-    }}];
-    owners.forEach(function(o){
-      opts.push({label:o.name || o.email, dato:true, checkmark: filterOwner===o.email, onSelect:function(){
-        filterOwner = o.email; renderFilterOwnerRow(); renderAll();
-      }});
+    apriFiltroMulti({
+      titolo:"Filtra per proprietario", cerca:"Cerca proprietario…",
+      scelti: filterOwner,
+      voci: owners.map(function(o){ return {valore:o.email, label:o.name || o.email, dato:true}; }),
+      onDone:function(scelti){ filterOwner = scelti; renderFilterOwnerRow(); renderAll(); }
     });
-    openSheet({title:"Filtra per proprietario", searchable: owners.length > 6, searchPlaceholder:"Cerca proprietario…", options:opts});
   });
   var elFilterFavToggle = document.getElementById("filterFavToggle");
   var elFilterFocusToggle = document.getElementById("filterFocusToggle");
@@ -4188,7 +4225,7 @@
      palco che stavi andando a vedere. */
   function azzeraFiltri(opts){
     opts = opts || {};
-    filterStatus = "all"; filterType = "all"; filterCategory = "all"; filterOwner = "all"; filterTags = [];
+    filterStatus = []; filterType = []; filterCategory = []; filterOwner = []; filterTags = [];
     resetVenueListFilters();
     resetGeoFilters();
     filterSoloPreferiti = false; filterSoloFocus = false;
@@ -4222,12 +4259,12 @@
     // L'unico punto in cui gli archiviati spariscono dalla vista: da qui
     // passano sia l'elenco sia i segnalini della mappa.
     if(v.deleted_at && !showDeletedEnabled) return false;
-    if(filterStatus !== "all" && v.status !== filterStatus) return false;
-    if(filterType !== "all" && v.type !== filterType) return false;
-    if(filterCategory !== "all" && v.category !== filterCategory) return false;
+    if(!filtroPrende(filterStatus, v.status)) return false;
+    if(!filtroPrende(filterType, v.type)) return false;
+    if(!filtroPrende(filterCategory, v.category)) return false;
     if(!venueMatchesVenueLists(v)) return false;
     if(!venueMatchesGeo(v)) return false;
-    if(filterOwner !== "all" && v.owner_email !== filterOwner) return false;
+    if(!filtroPrende(filterOwner, v.owner_email)) return false;
     if(filterSoloPreferiti && !sonoPreferito(v.id)) return false;
     if(filterSoloFocus && !v.focus) return false;
     // Basta che ne abbia uno di quelli chiesti: due tag spuntati allargano
@@ -4420,7 +4457,7 @@
     elCountSub.textContent = filtered.length + (filtered.length===1 ? " palco" : " palchi");
     var sorted = filtered.slice().sort(venueSorter());
     if(sorted.length === 0){
-      var noFilters = filterStatus === "all" && filterType === "all" && filterCategory === "all" && filterOwner === "all" && !anyVenueListFilterOn() && !anyGeoFilterOn() && !filterSoloPreferiti && !filterSoloFocus && !searchText;
+      var noFilters = filtroVuoto(filterStatus) && filtroVuoto(filterType) && filtroVuoto(filterCategory) && filtroVuoto(filterOwner) && !filterTagsAttivi() && !anyVenueListFilterOn() && !anyGeoFilterOn() && !filterSoloPreferiti && !filterSoloFocus && !searchText;
       elList.innerHTML = '<div class="empty-state">'+
         (noFilters
           ? '<div class="glyph"><svg class="pick" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c5 0 9 2.1 9 5.6 0 4.6-5.2 12.2-9 12.2S3 13.2 3 8.6C3 5.1 7 3 12 3Z"/></svg></div><h2>Nessun palco ancora</h2><p>Tocca + in alto per aggiungere il primo posto dove far suonare la band: un locale, una festa di paese, un bagno al mare — quello che è.</p>'
@@ -9333,7 +9370,9 @@
       var id = del.getAttribute("data-del-type");
       api("DELETE", "/api/venue_types/" + id).then(function(){
         venueTypes = venueTypes.filter(function(t){ return String(t.id) !== String(id); });
-        if(venueTypes.every(function(t){ return t.name !== filterType; })) filterType = "all";
+        filterType = filterType.filter(function(n){
+          return venueTypes.some(function(t){ return t.name === n; });
+        });
         renderTypesList();
         updateSettingsTypesCount();
         renderFilterTypeRow();
@@ -9623,7 +9662,9 @@
       var id = del.getAttribute("data-del-category");
       api("DELETE", "/api/venue_categories/" + id).then(function(){
         venueCategories = venueCategories.filter(function(c){ return String(c.id) !== String(id); });
-        if(venueCategories.every(function(c){ return c.name !== filterCategory; })) filterCategory = "all";
+        filterCategory = filterCategory.filter(function(n){
+          return venueCategories.some(function(c){ return c.name === n; });
+        });
         renderCategoriesList();
         updateSettingsCategoriesCount();
         renderFilterCategoryRow();
@@ -9714,8 +9755,8 @@
   var SANMARINO = {};       // castello di San Marino -> true
   var SANMARINO_NOMI = [];  // gli stessi, scritti per bene e in ordine
   var SIGLE_STORICHE = {};  // sigla abolita -> sigla di oggi
-  var filterRegione = "all";
-  var filterProvincia = "all";
+  var filterRegione = [];
+  var filterProvincia = [];
   var luogoCache = {};
   var provincePromise = null;
 
@@ -9791,15 +9832,15 @@
   function venueProvincia(v){ var l = luogoDi(v.city); return l ? l.provincia : ""; }
 
   function venueMatchesGeo(v){
-    if(filterRegione !== "all" && venueRegione(v) !== filterRegione) return false;
-    if(filterProvincia !== "all" && venueProvincia(v) !== filterProvincia) return false;
+    if(!filtroPrende(filterRegione, venueRegione(v))) return false;
+    if(!filtroPrende(filterProvincia, venueProvincia(v))) return false;
     return true;
   }
-  function anyGeoFilterOn(){ return filterRegione !== "all" || filterProvincia !== "all"; }
-  function resetGeoFilters(){ filterRegione = "all"; filterProvincia = "all"; }
+  function anyGeoFilterOn(){ return !filtroVuoto(filterRegione) || !filtroVuoto(filterProvincia); }
+  function resetGeoFilters(){ filterRegione = []; filterProvincia = []; }
   function renderGeoFilterRows(){
-    setDato("filterRegioneValue", filterRegione === "all" ? "" : filterRegione, "Tutte");
-    setDato("filterProvinciaValue", filterProvincia === "all" ? "" : filterProvincia, "Tutte");
+    setDato("filterRegioneValue", etichettaFiltro(filterRegione, "regioni"), "Tutte");
+    setDato("filterProvinciaValue", etichettaFiltro(filterProvincia, "province"), "Tutte");
   }
 
   /* Nei menu compaiono solo le regioni e le province che hai davvero, con
@@ -9817,43 +9858,44 @@
 
   document.getElementById("rowFilterRegione").addEventListener("click", function(){
     var conte = contaPer(venueRegione);
-    var opts = [{label:"Tutte", checkmark: filterRegione === "all", onSelect:function(){
-      filterRegione = "all"; renderGeoFilterRows(); renderAll();
-    }}];
-    Object.keys(conte).sort().forEach(function(r){
-      opts.push({label:r + " (" + conte[r] + ")", checkmark: filterRegione === r, onSelect:function(){
-        filterRegione = r;
-        // Una provincia di un'altra regione darebbe un elenco vuoto senza
-        // dire perche': se non c'entra piu', si toglie.
-        if(filterProvincia !== "all"){
-          var ok = venues.some(function(v){
-            return !v.deleted_at && venueRegione(v) === r && venueProvincia(v) === filterProvincia;
+    apriFiltroMulti({
+      titolo:"Filtra per regione", cerca:"Cerca regione…",
+      scelti: filterRegione,
+      voci: Object.keys(conte).sort().map(function(r){
+        return {valore:r, label:r + " (" + conte[r] + ")"};
+      }),
+      onDone:function(scelti){
+        filterRegione = scelti;
+        // Una provincia che non sta in nessuna delle regioni scelte darebbe
+        // un elenco vuoto senza dire perche': se non c'entra piu', si toglie.
+        if(!filtroVuoto(filterProvincia) && !filtroVuoto(filterRegione)){
+          filterProvincia = filterProvincia.filter(function(pr){
+            return venues.some(function(v){
+              return !v.deleted_at && venueProvincia(v) === pr &&
+                     filterRegione.indexOf(venueRegione(v)) > -1;
+            });
           });
-          if(!ok) filterProvincia = "all";
         }
         renderGeoFilterRows(); renderAll();
-      }});
+      }
     });
-    openSheet({title:"Filtra per regione", searchable: opts.length > 7, searchPlaceholder:"Cerca regione…", options:opts});
   });
 
   document.getElementById("rowFilterProvincia").addEventListener("click", function(){
-    // Se una regione e' selezionata, l'elenco si restringe a quella.
+    // Se qualche regione e' scelta, l'elenco si restringe a quelle.
     var conte = contaPer(function(v){
-      if(filterRegione !== "all" && venueRegione(v) !== filterRegione) return "";
+      if(!filtroPrende(filterRegione, venueRegione(v))) return "";
       return venueProvincia(v);
     });
-    var opts = [{label:"Tutte", checkmark: filterProvincia === "all", onSelect:function(){
-      filterProvincia = "all"; renderGeoFilterRows(); renderAll();
-    }}];
-    Object.keys(conte).sort().forEach(function(p){
-      opts.push({label:p + " (" + conte[p] + ")", checkmark: filterProvincia === p, onSelect:function(){
-        filterProvincia = p; renderGeoFilterRows(); renderAll();
-      }});
-    });
-    openSheet({
-      title: filterRegione === "all" ? "Filtra per provincia" : "Province · " + filterRegione,
-      searchable: opts.length > 7, searchPlaceholder:"Cerca provincia…", options:opts
+    apriFiltroMulti({
+      titolo: filtroVuoto(filterRegione) ? "Filtra per provincia"
+        : "Province · " + (filterRegione.length === 1 ? filterRegione[0] : filterRegione.length + " regioni"),
+      cerca:"Cerca provincia…",
+      scelti: filterProvincia,
+      voci: Object.keys(conte).sort().map(function(pr){
+        return {valore:pr, label:pr + " (" + conte[pr] + ")"};
+      }),
+      onDone:function(scelti){ filterProvincia = scelti; renderGeoFilterRows(); renderAll(); }
     });
   });
 
@@ -9882,7 +9924,7 @@
 
   var VENUE_LISTS = [
     {
-      key:"context", label:"Contesto", lower:"contesto", genere:"m",
+      key:"context", label:"Contesto", lower:"contesto", plur:"contesti", genere:"m",
       adminKind:"venue_context",
       hint:"Dove si può suonare in quel posto: all'aperto, al chiuso o in tutte e due le situazioni.",
       ids:{row:"rowContext", value:"contextValue",
@@ -9891,7 +9933,7 @@
            adminRow:"rowAdminContext", adminCount:"adminContextCount"}
     },
     {
-      key:"seasonality", label:"Stagionalità", lower:"stagionalità", genere:"f",
+      key:"seasonality", label:"Stagionalità", lower:"stagionalità", plur:"stagionalità", genere:"f",
       adminKind:"venue_seasonality",
       hint:"Il periodo dell'anno in cui il locale è aperto.",
       ids:{row:"rowSeasonality", value:"seasonalityValue",
@@ -9900,7 +9942,7 @@
            adminRow:"rowAdminSeasonality", adminCount:"adminSeasonalityCount"}
     },
     {
-      key:"live_period", label:"Periodo", lower:"periodo", genere:"m",
+      key:"live_period", label:"Periodo", lower:"periodo", plur:"periodi", genere:"m",
       adminKind:"venue_period",
       hint:"Il periodo in cui ci fanno suonare dal vivo, che non sempre è tutto quello in cui sono aperti.",
       ids:{row:"rowLivePeriod", value:"livePeriodValue",
@@ -9918,7 +9960,7 @@
     L.field = L.key;
     L.values = [];
     L.caricata = false;
-    L.filter = "all";
+    L.filter = [];
   });
   function venueListByKey(key){
     return VENUE_LISTS.filter(function(L){ return L.key === key; })[0];
@@ -9985,34 +10027,30 @@
 
   /* --- la riga nei filtri --- */
   function renderVenueListFilterRow(L){
-    setDato(L.ids.filterValue, L.filter === "all" ? "" : L.filter, L.g.tutti);
+    setDato(L.ids.filterValue, etichettaFiltro(L.filter, L.plur), L.g.tutti);
   }
   function renderVenueListFilterRows(){
     VENUE_LISTS.forEach(renderVenueListFilterRow);
   }
   function anyVenueListFilterOn(){
-    return VENUE_LISTS.some(function(L){ return L.filter !== "all"; });
+    return VENUE_LISTS.some(function(L){ return !filtroVuoto(L.filter); });
   }
   function resetVenueListFilters(){
-    VENUE_LISTS.forEach(function(L){ L.filter = "all"; });
+    VENUE_LISTS.forEach(function(L){ L.filter = []; });
   }
   function venueMatchesVenueLists(v){
     return VENUE_LISTS.every(function(L){
-      return L.filter === "all" || v[L.field] === L.filter;
+      return filtroPrende(L.filter, v[L.field]);
     });
   }
   VENUE_LISTS.forEach(function(L){
     document.getElementById(L.ids.filterRow).addEventListener("click", function(){
-      var opts = [{label:L.g.tutti, checkmark: L.filter === "all", onSelect:function(){
-        L.filter = "all"; renderVenueListFilterRow(L); renderAll();
-      }}];
-      L.values.forEach(function(item){
-        opts.push({label:item.name, dato:true, checkmark: L.filter === item.name, onSelect:function(){
-          L.filter = item.name; renderVenueListFilterRow(L); renderAll();
-        }});
+      apriFiltroMulti({
+        titolo:"Filtra per " + L.lower, cerca:"Cerca…",
+        scelti: L.filter,
+        voci: L.values.map(function(item){ return {valore:item.name, label:item.name, dato:true}; }),
+        onDone:function(scelti){ L.filter = scelti; renderVenueListFilterRow(L); renderAll(); }
       });
-      openSheet({title:"Filtra per " + L.lower, searchable: L.values.length > 6,
-                 searchPlaceholder:"Cerca…", options:opts});
     });
   });
 
@@ -10073,7 +10111,9 @@
         L.values = L.values.filter(function(x){ return String(x.id) !== String(id); });
         // Un filtro puntato su un valore che non esiste piu' nasconderebbe
         // tutto senza spiegare perche'.
-        if(L.values.every(function(x){ return x.name !== L.filter; })) L.filter = "all";
+        L.filter = L.filter.filter(function(n){
+          return L.values.some(function(x){ return x.name === n; });
+        });
         renderVenueListItems();
         updateVenueListCount(L);
         renderVenueListFilterRow(L);
