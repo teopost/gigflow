@@ -3779,12 +3779,6 @@
     if(!sporco){ chiudi(); return; }
     confirmDestructive("Uscire senza salvare le modifiche?", chiudi);
   }
-  /* La stessa conferma, senza il rosso: ci sono cose da confermare che non
-     cancellano niente, e il rosso in questa app vuol dire "questo si perde".
-     Le due parole restano quelle di sempre, Annulla e Conferma. */
-  function confirmAzione(domanda, onConfirm){
-    openSheet({title: domanda, options: [{label: "Conferma", onSelect: onConfirm}]});
-  }
   function confirmDestructive(domanda, onConfirm){
     openSheet({title: domanda, options: [{label: "Conferma", destructive: true, onSelect: onConfirm}]});
   }
@@ -5646,6 +5640,10 @@
   });
 
   function renderPlanList(){
+    // Rifare l'elenco adesso vorrebbe dire togliere da sotto al calendario la
+    // riga a cui e' attaccato, e chiuderlo. Si aspetta che il campo perda il
+    // fuoco: ci pensa il focusout qui sotto.
+    if(pickerAperto) return;
     renderPlanFilterBar();
     var righe = venuesToPlan();
     if(!righe.length){
@@ -5686,42 +5684,75 @@
 
      Col mouse invece "change" arriva a scelta fatta, una volta: si toglie il
      fuoco e il salvataggio parte subito, come prima. */
-  var dataDaSalvare = null;
+  /* Il calendario della pastiglia "Ricontatta", com'e' venuto fuori provandolo
+     sui telefoni veri.
+
+     Su iPad e iPhone il calendario si chiude con "Fine", e "Fine" non toglie
+     il fuoco al campo: aspettare il focusout voleva dire non salvare finche'
+     non toccavi un'altra riga. Quindi si salva quando la data viene scelta —
+     "change" — e "Fine" si limita a chiudere, che e' come funziona il resto
+     del sistema.
+
+     Quello che non si puo' fare e' rifare l'elenco li' per li': la riga
+     uscirebbe da "Da pianificare" mentre il calendario e' ancora attaccato a
+     lei, e il calendario si chiuderebbe da solo. Per questo l'elenco resta
+     fermo finche' il campo ha il fuoco, e si rifa quando lo perde. Nel
+     frattempo il messaggio in basso dice che la data e' stata scritta.
+
+     "Ripristina" (iOS) e "Annulla" (Android) svuotano il campo: se in questo
+     giro avevamo gia' scritto una data la togliamo, cosi' si esce davvero
+     senza aver fatto niente. */
+  var pickerAperto = false;
+  var dataScritta = null;
+  var apertoAlle = 0;
+
+  elPlanList.addEventListener("focusin", function(e){
+    if(!e.target.closest("[data-period]")) return;
+    pickerAperto = true;
+    dataScritta = null;
+    apertoAlle = Date.now();
+  });
+
   elPlanList.addEventListener("change", function(e){
-    var quando = e.target.closest("[data-period]");
-    if(!quando || !quando.value) return;
-    var giri = dataDaSalvare ? dataDaSalvare.giri + 1 : 1;
-    dataDaSalvare = {id: quando.getAttribute("data-period"), valore: quando.value, giri: giri};
-    if(!conIlDito()) quando.blur();
-  });
-  elPlanList.addEventListener("focusout", function(e){
     var campo = e.target.closest("[data-period]");
-    if(!campo || !dataDaSalvare) return;
-    var scelta = dataDaSalvare;
-    dataDaSalvare = null;
-    // Un solo scatto, e la data e' quella di oggi: e' la rotella che si e'
-    // aperta e richiusa senza che nessuno la girasse, non una scelta. Girare
-    // la rotella ne fa scattare parecchi, quindi "oggi" scelto davvero
-    // arriva sempre con piu' di uno. Vale solo col dito: col mouse lo scatto
-    // e' uno solo per definizione, e oggi vuol dire oggi.
-    // Il campo si svuota comunque: quello che non e' stato confermato non
-    // deve restare scritto li' dentro, che sia una data annullata o la data
-    // di oggi che ci ha messo la rotella aprendosi.
-    campo.value = "";
-    if(conIlDito() && scelta.giri === 1 && scelta.valore === todayStr()) return;
-    // La domanda dice per intero cosa succede, perche' il pulsante dice solo
-    // "Conferma": chiudere una riga di "Da pianificare" vuol dire spostarla
-    // in "Da contattare", e chi tocca deve saperlo prima, non dopo.
-    confirmAzione("Richiamarli " + nextContactPhrase(scelta.valore) + "?", function(){
-      // L'elenco si accorcia di una riga: senza rimettere lo scorrimento dove
-      // era, quello che stavi guardando si sposta sotto il dito. Cosi' invece
-      // al posto della riga che se ne va trovi la successiva.
-      var scroll = elScrollRecontact ? elScrollRecontact.scrollTop : 0;
-      saveNextContact(scelta.id, scelta.valore).then(function(){
-        if(elScrollRecontact) elScrollRecontact.scrollTop = scroll;
-      });
-    });
+    if(!campo) return;
+    var id = campo.getAttribute("data-period");
+
+    if(!campo.value){
+      // Ripristina / Annulla: si torna com'era. Se non avevamo ancora scritto
+      // niente non c'e' niente da disfare.
+      if(dataScritta){
+        dataScritta = null;
+        saveNextContact(id, "");
+      }
+      return;
+    }
+    // Il calendario che si presenta scrive la data di oggi da solo, prima che
+    // tu abbia toccato qualcosa: arriva nell'istante dell'apertura, mentre
+    // una data scelta arriva dopo che l'hai guardato. Mezzo secondo separa le
+    // due cose e non si mangia nessun tocco vero.
+    if(campo.value === todayStr() && Date.now() - apertoAlle < 500) return;
+
+    dataScritta = campo.value;
+    saveNextContact(id, campo.value);
+    // Col mouse il calendario si e' gia' chiuso da se': si toglie il fuoco, e
+    // l'elenco si rifa subito invece di aspettare un clic altrove.
+    if(!conIlDito()) campo.blur();
   });
+
+  elPlanList.addEventListener("focusout", function(e){
+    if(!e.target.closest("[data-period]")) return;
+    pickerAperto = false;
+    if(!dataScritta) return;
+    dataScritta = null;
+    // L'elenco si accorcia di una riga: senza rimettere lo scorrimento dove
+    // era, quello che stavi guardando si sposta sotto il dito. Cosi' invece
+    // al posto della riga che se ne va trovi la successiva.
+    var scroll = elScrollRecontact ? elScrollRecontact.scrollTop : 0;
+    renderRecontact();
+    if(elScrollRecontact) elScrollRecontact.scrollTop = scroll;
+  });
+
   elPlanList.addEventListener("click", function(e){
     // Il pulsante sta dentro la riga: senza questa riga il calendario si
     // aprirebbe insieme alla scheda del palco.
