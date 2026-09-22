@@ -45,11 +45,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "crm.db")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 PHOTOS_DIR = os.path.join(BASE_DIR, "data", "photos")
-# Le facce degli art director stanno in una cartella loro: sono di una
-# persona, non di un posto, e in mezzo alle 281 foto dei palchi non si
-# distinguerebbero piu' da quelle, ne' guardando la cartella ne' facendo un
-# backup di una cosa sola.
-AD_PHOTOS_DIR = os.path.join(BASE_DIR, "data", "ad_photos")
+# Le facce degli art director stanno in una cartella loro (photos_ad, di fianco
+# a photos): sono di una persona, non di un posto, e in mezzo alle 281 foto
+# dei palchi non si distinguerebbero piu', ne' guardando la cartella ne'
+# facendo il backup di una cosa sola.
+PHOTOS_AD_DIR = os.path.join(BASE_DIR, "data", "photos_ad")
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
 PHOTO_EXT_CONTENT_TYPE = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg",
@@ -555,7 +555,7 @@ def get_conn():
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     os.makedirs(PHOTOS_DIR, exist_ok=True)
-    os.makedirs(AD_PHOTOS_DIR, exist_ok=True)
+    os.makedirs(PHOTOS_AD_DIR, exist_ok=True)
     conn = get_conn()
     # Si guarda prima di creare: e' l'unico momento in cui si puo' sapere
     # che questa installazione la cassa non l'ha mai vista, e quindi che le
@@ -5173,16 +5173,16 @@ def art_director_social_photo(conn, ws, ad_id, body=None):
     url = (body or {}).get("url") or row["facebook"] or row["instagram"]
     raw, ext = scarica_immagine_social(url)
 
-    os.makedirs(AD_PHOTOS_DIR, exist_ok=True)
+    os.makedirs(PHOTOS_AD_DIR, exist_ok=True)
     filename = f"{ad_id}_{uuid.uuid4().hex}.{ext}"
-    with open(os.path.join(AD_PHOTOS_DIR, filename), "wb") as f:
+    with open(os.path.join(PHOTOS_AD_DIR, filename), "wb") as f:
         f.write(raw)
     vecchia = row["photo"]
     conn.execute("UPDATE art_directors SET photo = ? WHERE id = ?", (filename, ad_id))
     conn.commit()
     if vecchia:
         try:
-            os.remove(os.path.join(AD_PHOTOS_DIR, vecchia))
+            os.remove(os.path.join(PHOTOS_AD_DIR, vecchia))
         except OSError:
             pass
 
@@ -5206,7 +5206,7 @@ def delete_art_director_photo(conn, ws, ad_id):
         conn.execute("UPDATE art_directors SET photo = NULL WHERE id = ?", (ad_id,))
         conn.commit()
         try:
-            os.remove(os.path.join(AD_PHOTOS_DIR, row["photo"]))
+            os.remove(os.path.join(PHOTOS_AD_DIR, row["photo"]))
         except OSError:
             pass
     counts_row = conn.execute(
@@ -5231,7 +5231,7 @@ def delete_art_director(conn, ws, ad_id):
         raise ApiError(404, "Art director non trovato")
     if row and row["photo"]:
         try:
-            os.remove(os.path.join(AD_PHOTOS_DIR, row["photo"]))
+            os.remove(os.path.join(PHOTOS_AD_DIR, row["photo"]))
         except OSError:
             pass
 
@@ -7221,7 +7221,7 @@ class Handler(BaseHTTPRequestHandler):
         # Due cartelle, due indirizzi, e lo stesso controllo su tutti e due:
         # il nome del file arriva da fuori, e senza questa riga un "../.."
         # servirebbe qualunque file del disco.
-        for prefisso, cartella in (("/photos/", PHOTOS_DIR), ("/ad-photos/", AD_PHOTOS_DIR)):
+        for prefisso, cartella in (("/photos/", PHOTOS_DIR), ("/photos-ad/", PHOTOS_AD_DIR)):
             if method == "GET" and path.startswith(prefisso):
                 filename = path[len(prefisso):]
                 full = os.path.normpath(os.path.join(cartella, filename))

@@ -8633,7 +8633,7 @@
   function renderAdFace(ad){
     var foto = ad && ad.photo;
     elAdFaceRow.hidden = !foto;
-    if(foto) elAdFace.src = "/ad-photos/" + encodeURIComponent(foto);
+    if(foto) elAdFace.src = "/photos-ad/" + encodeURIComponent(foto);
   }
   function renderAdPhotoRows(){
     elRowAdFbPhoto.hidden = !facebookPageId(adFacebook.value);
@@ -8876,7 +8876,7 @@
     var sorted = artDirectors.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
     elAdList.innerHTML = '<div class="grouped-list">' + sorted.map(function(ad){
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-ad="'+ad.id+'">'+
-        (ad.photo ? '<img class="ad-row-face" src="/ad-photos/'+encodeURIComponent(ad.photo)+'" loading="lazy" alt="">' : '')+
+        (ad.photo ? '<img class="ad-row-face" src="/photos-ad/'+encodeURIComponent(ad.photo)+'" loading="lazy" alt="">' : '')+
         '<div class="row-main"><div class="row-title">'+dato(ad.name||"Senza nome")+'</div>'+
         '<div class="row-sub">'+(ad.phone?dato(ad.phone):"")+(ad.phone&&ad.email?" · ":"")+(ad.email?dato(ad.email):"")+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+ad.location_count+'</span>'+
