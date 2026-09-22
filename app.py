@@ -4587,8 +4587,16 @@ def add_photo(conn, ws, loc_id, body):
     if not existing:
         raise ApiError(404, "Palco non trovato")
 
-    data_url = body.get("image_base64") or ""
-    m = DATA_URL_RE.match(data_url)
+    raw, ext = immagine_da_data_url(body.get("image_base64"))
+    return salva_foto(conn, loc_id, raw, ext)
+
+
+def immagine_da_data_url(data_url):
+    """L'immagine che arriva dal telefono, gia' decodificata: (byte,
+    estensione). La chiedono la striscia di un palco e la faccia di un art
+    director, e i controlli — che sia davvero un'immagine, che non pesi piu'
+    di 8 MB — devono essere gli stessi per tutte e due."""
+    m = DATA_URL_RE.match(data_url or "")
     if not m:
         raise ApiError(400, "Immagine non valida")
     ext = m.group(1).lower()
@@ -4602,8 +4610,7 @@ def add_photo(conn, ws, loc_id, body):
         raise ApiError(400, "Immagine non valida")
     if len(raw) > MAX_PHOTO_BYTES:
         raise ApiError(400, "Immagine troppo grande (massimo 8 MB)")
-
-    return salva_foto(conn, loc_id, raw, ext)
+    return raw, ext
 
 
 def salva_foto(conn, loc_id, raw, ext, copertina=False):
@@ -5218,12 +5225,30 @@ def art_director_social_photo(conn, ws, ad_id, body=None):
 
     url = (body or {}).get("url") or row["facebook"] or row["instagram"]
     raw, ext = scarica_immagine_social(url)
+    return scrivi_faccia_ad(conn, ws, ad_id, raw, ext, row["photo"])
 
+
+def set_art_director_photo(conn, ws, ad_id, body):
+    """La faccia scattata o scelta dalla libreria del telefono. Arriva dalla
+    stessa porta di quella presa dai social e prende lo stesso posto: di
+    facce ce n'e' una, e l'ultima arrivata e' quella buona."""
+    row = conn.execute(
+        "SELECT photo FROM art_directors WHERE id = ? AND workspace_id = ?", (ad_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Art director non trovato")
+    raw, ext = immagine_da_data_url((body or {}).get("image_base64"))
+    return scrivi_faccia_ad(conn, ws, ad_id, raw, ext, row["photo"])
+
+
+def scrivi_faccia_ad(conn, ws, ad_id, raw, ext, vecchia):
+    """Scrive il file e la riga, e butta via quello di prima. Lo fanno sia la
+    foto presa dai social sia quella scelta dal telefono, e il posto dove si
+    scrive e' uno solo — come salva_foto per i palchi."""
     os.makedirs(PHOTOS_AD_DIR, exist_ok=True)
     filename = f"{ad_id}_{uuid.uuid4().hex}.{ext}"
     with open(os.path.join(PHOTOS_AD_DIR, filename), "wb") as f:
         f.write(raw)
-    vecchia = row["photo"]
     conn.execute("UPDATE art_directors SET photo = ? WHERE id = ?", (filename, ad_id))
     conn.commit()
     if vecchia:
@@ -6287,6 +6312,10 @@ def _h_art_director_social_photo(conn, match, query, body, ctx):
     return 200, art_director_social_photo(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_set_art_director_photo(conn, match, query, body, ctx):
+    return 200, set_art_director_photo(conn, require_ws(ctx), int(match.group(1)), body)
+
+
 def _h_delete_art_director_photo(conn, match, query, body, ctx):
     return 200, delete_art_director_photo(conn, require_ws(ctx), int(match.group(1)))
 
@@ -6669,6 +6698,7 @@ ROUTES = [
     ("POST", re.compile(r"^/api/art_directors$"), _h_create_art_director),
     ("PUT", re.compile(r"^/api/art_directors/(\d+)$"), _h_update_art_director),
     ("POST", re.compile(r"^/api/art_directors/(\d+)/photo/social$"), _h_art_director_social_photo),
+    ("POST", re.compile(r"^/api/art_directors/(\d+)/photo$"), _h_set_art_director_photo),
     ("DELETE", re.compile(r"^/api/art_directors/(\d+)/photo$"), _h_delete_art_director_photo),
     ("DELETE", re.compile(r"^/api/art_directors/(\d+)$"), _h_delete_art_director),
     ("GET", re.compile(r"^/api/bands$"), _h_list_bands),

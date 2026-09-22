@@ -461,6 +461,9 @@
   .ad-face-row{display:flex;justify-content:center;padding:14px 16px 0;}
   .ad-face-wrap{position:relative;width:96px;height:96px;}
   .ad-face{width:96px;height:96px;border-radius:50%;object-fit:cover;display:block;background:var(--fill);}
+  /* Quando la faccia non c'e', al suo posto il tondo col +: se lo spazio
+     restasse vuoto non ci sarebbe niente da toccare per metterla. */
+  .ad-face-add{width:96px;height:96px;border-radius:50%;border:1.5px dashed var(--separator);background:transparent;color:var(--tint);font-size:34px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
   .ad-face-del{position:absolute;top:-2px;right:-2px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:rgba(0,0,0,.62);color:#fff;font-size:13px;line-height:1;cursor:pointer;padding:0;}
   .d-title-name{padding:6px 16px 16px;}
   .d-title-name input{width:100%;border:none;background:transparent;font-size:28px;font-weight:700;letter-spacing:-.01em;color:var(--text);padding:2px 0;font-family:inherit;}
@@ -2530,12 +2533,15 @@
       </div>
     </header>
     <div class="screen-scroll">
-      <div class="ad-face-row" id="adFaceRow" hidden>
-        <div class="ad-face-wrap">
+      <div class="ad-face-row" id="adFaceRow">
+        <div class="ad-face-wrap" id="adFaceWrap" hidden>
           <img class="ad-face" id="adFace" alt="">
           <button class="ad-face-del" id="btnAdFaceDel" type="button" aria-label="Togli la foto">✕</button>
         </div>
+        <button class="ad-face-add" id="btnAdFaceAdd" type="button" aria-label="Aggiungi la foto">+</button>
       </div>
+      <input type="file" id="adFaceInputCamera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="adFaceInputLibrary" accept="image/*" hidden>
       <div class="d-title-name"><input id="adName" placeholder="Nome e cognome" /></div>
       <div class="quick-actions" id="adQuickActions"></div>
       <div class="section-header">CONTATTI</div>
@@ -8629,7 +8635,8 @@
       adFacebook = document.getElementById("adFacebook"),
       adInstagram = document.getElementById("adInstagram"),
       adNotes = document.getElementById("adNotes");
-  var elAdFaceRow = document.getElementById("adFaceRow"),
+  var elAdFaceWrap = document.getElementById("adFaceWrap"),
+      elAdFaceAdd = document.getElementById("btnAdFaceAdd"),
       elAdFace = document.getElementById("adFace"),
       elAzioniAdFacebook = document.getElementById("azioniAdFacebook"),
       elAzioniAdInstagram = document.getElementById("azioniAdInstagram");
@@ -8660,9 +8667,42 @@
      spiegare. Stessa regola della copertina del palco. */
   function renderAdFace(ad){
     var foto = ad && ad.photo;
-    elAdFaceRow.hidden = !foto;
+    elAdFaceWrap.hidden = !foto;
+    elAdFaceAdd.hidden = !!foto;
     if(foto) elAdFace.src = "/photos-ad/" + encodeURIComponent(foto);
   }
+
+  /* Le stesse due voci della striscia di un palco, e nello stesso ordine:
+     una foto di una persona la si scatta li' per li' o la si ripesca fra
+     quelle che si hanno gia'. Toccando la faccia che c'e' gia' si riapre lo
+     stesso foglio: cambiarla e' la cosa che si vuole fare piu' spesso, e un
+     secondo pulsante per farlo sarebbe un pulsante in piu' per niente. */
+  function apriFogliaFotoAd(){
+    openSheet({options:[
+      {label:"📷 Scatta foto", onSelect:function(){ document.getElementById("adFaceInputCamera").click(); }},
+      {label:"🖼️ Scegli dalla libreria", onSelect:function(){ document.getElementById("adFaceInputLibrary").click(); }}
+    ]});
+  }
+  elAdFaceAdd.addEventListener("click", apriFogliaFotoAd);
+  elAdFace.addEventListener("click", apriFogliaFotoAd);
+  function adFaceFileScelto(e){
+    var file = e.target.files[0];
+    e.target.value = "";
+    if(!file || !currentAdId) return;
+    var idQuando = currentAdId;
+    toast("Caricamento foto\u2026");
+    resizeImageFile(file, 1600, 0.82).then(function(dataUrl){
+      return api("POST", "/api/art_directors/" + idQuando + "/photo", {image_base64: dataUrl});
+    }).then(function(updated){
+      var a = artDirectors.find(function(x){ return x.id === updated.id; });
+      if(a) a.photo = updated.photo;
+      if(currentAdId === idQuando) renderAdFace({photo: updated.photo});
+      renderAdList();
+      toast("Foto aggiunta");
+    }).catch(function(err){ toast(err.message || "Errore nel caricamento della foto"); });
+  }
+  document.getElementById("adFaceInputCamera").addEventListener("change", adFaceFileScelto);
+  document.getElementById("adFaceInputLibrary").addEventListener("change", adFaceFileScelto);
   function renderAdPhotoRows(){
     elAzioniAdFacebook.hidden = !currentAdId || !sembraDi(adFacebook.value, ["facebook.com", "fb.com", "fb.me"]);
     elAzioniAdInstagram.hidden = !currentAdId || !sembraDi(adInstagram.value, ["instagram.com", "instagr.am"]);
