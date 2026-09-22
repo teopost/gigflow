@@ -345,6 +345,13 @@
   /* due azioni sulla stessa riga: serve il doppio di spazio, altrimenti le
      etichette non ci stanno e i bersagli diventano troppo stretti da toccare */
   .row-actions.two{flex:0 0 184px;}
+  /* display:flex batte [hidden], come per .field-row qui sotto: senza questa
+     riga la barretta resterebbe visibile anche quando non c'e' niente da
+     scaricare. */
+  .row-actions[hidden]{display:none;}
+  /* Il rosso delle azioni che scorri vuol dire "questo cancella". Prendere
+     una copertina non cancella niente, e col rosso sembrerebbe di si'. */
+  .row-actions button.social-azione{background:var(--tint);}
   .row-actions button{flex:1;border:none;background:var(--destructive);color:#fff;font-size:13px;font-weight:600;cursor:pointer;padding:0 6px;line-height:1.2;}
   /* var(--tint) e' cremisi come var(--destructive): usarlo qui renderebbe
      l'azione di promozione indistinguibile da quella di rimozione. Grigio
@@ -401,6 +408,10 @@
   /* ---------- field rows (forms, native settings-style) ---------- */
   .field-row{display:flex;align-items:center;gap:12px;padding:11px 16px;min-height:44px;background:var(--bg-elevated);}
   .field-row + .field-row{border-top:.5px solid var(--separator);}
+  /* La linea fra un campo e l'altro veniva da .field-row + .field-row: un
+     campo infilato dentro uno swipe-row non e' piu' vicino al precedente, e
+     senza questa riga la linea sparirebbe proprio sotto i due social. */
+  .grouped-list > .swipe-row:not(:first-child) .row-content > .field-row{border-top:.5px solid var(--separator);}
   /* display:flex batte [hidden]: senza questa la riga del giorno resterebbe
      li' anche quando un mese non c'e'. */
   .field-row[hidden]{display:none;}
@@ -2414,12 +2425,15 @@
         <div class="field-row"><label for="fPhone">Cellulare</label><input id="fPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="fEmail">Email</label><input id="fEmail" type="email" placeholder="nome@palco.it"></div>
         <div class="field-row"><label for="fWebsite">Sito</label><input id="fWebsite" type="text" placeholder="www.locale.it"></div>
-        <div class="field-row"><label for="fFacebook">Facebook</label><input id="fFacebook" type="text" placeholder="facebook.com/…"></div>
-        <div class="field-row"><label for="fInstagram">Instagram</label><input id="fInstagram" type="text" placeholder="instagram.com/…"></div>
-        <div class="field-row picker" id="rowSocialCover" hidden><span class="link-action" id="socialCoverLabel">Copertina dal profilo Facebook</span></div>
+        <div class="swipe-row"><div class="row-content">
+          <div class="field-row"><label for="fFacebook">Facebook</label><input id="fFacebook" type="text" placeholder="facebook.com/…"></div>
+        </div><div class="row-actions" id="azioniFacebook" hidden><button class="social-azione" type="button">Copertina</button></div></div>
+        <div class="swipe-row"><div class="row-content">
+          <div class="field-row"><label for="fInstagram">Instagram</label><input id="fInstagram" type="text" placeholder="instagram.com/…"></div>
+        </div><div class="row-actions" id="azioniInstagram" hidden><button class="social-azione" type="button">Copertina</button></div></div>
         <div class="field-row picker" id="rowIgSearch" hidden><span class="link-action" id="igSearchLabel">Cerca il profilo Instagram</span></div>
       </div>
-      <div class="section-footer">Il referente è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sopra, che può seguire più palchi. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello.</div>
+      <div class="section-footer">Il referente è chi gestisce direttamente questo posto (proprietario, gerente…), diverso dall'art director della sezione qui sopra, che può seguire più palchi. Chiama e WhatsApp partono dal <strong>cellulare</strong>: il telefono fisso resta lì per chi preferisce quello. <strong>Scorri</strong> il campo Facebook o Instagram per prendere da lì la copertina.</div>
 
       <div class="section-header">STATO</div>
       <div class="grouped-list">
@@ -2528,12 +2542,14 @@
       <div class="grouped-list">
         <div class="field-row"><label for="adPhone">Cellulare</label><input id="adPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="adEmail">Email</label><input id="adEmail" type="email" placeholder="nome@mail.it"></div>
-        <div class="field-row"><label for="adFacebook">Facebook</label><input id="adFacebook" type="text" placeholder="facebook.com/…"></div>
-        <div class="field-row"><label for="adInstagram">Instagram</label><input id="adInstagram" type="text" placeholder="instagram.com/…"></div>
-        <div class="field-row picker" id="rowAdFbPhoto" hidden><span class="link-action" id="adFbPhotoLabel">Foto dal profilo Facebook</span></div>
-        <div class="field-row picker" id="rowAdIgPhoto" hidden><span class="link-action" id="adIgPhotoLabel">Foto dal profilo Instagram</span></div>
+        <div class="swipe-row"><div class="row-content">
+          <div class="field-row"><label for="adFacebook">Facebook</label><input id="adFacebook" type="text" placeholder="facebook.com/…"></div>
+        </div><div class="row-actions" id="azioniAdFacebook" hidden><button class="social-azione" type="button">Foto</button></div></div>
+        <div class="swipe-row"><div class="row-content">
+          <div class="field-row"><label for="adInstagram">Instagram</label><input id="adInstagram" type="text" placeholder="instagram.com/…"></div>
+        </div><div class="row-actions" id="azioniAdInstagram" hidden><button class="social-azione" type="button">Foto</button></div></div>
       </div>
-      <div class="section-footer">Chiama e WhatsApp partono dal cellulare. I due link servono anche a prendere la foto del profilo: la scarica da lì, e diventa la faccia qui sopra.</div>
+      <div class="section-footer">Chiama e WhatsApp partono dal cellulare. <strong>Scorri</strong> il campo Facebook o Instagram per prendere da lì la foto del profilo: diventa la faccia qui sopra, al posto di quella che c'è adesso.</div>
       <div class="section-header">PALCHI PER CUI LAVORA</div>
       <div class="grouped-list" id="adVenuesList"></div>
       <div class="grouped-list" style="margin-top:10px;">
@@ -6890,25 +6906,33 @@
     return socialCoverUrl({facebook: fFacebook.value, instagram: fInstagram.value});
   }
 
-  var elRowSocialCover = document.getElementById("rowSocialCover");
-  var elSocialCoverLabel = document.getElementById("socialCoverLabel");
+  var elAzioniFacebook = document.getElementById("azioniFacebook");
+  var elAzioniInstagram = document.getElementById("azioniInstagram");
   var socialCoverBusy = false;
-  function socialCoverLabel(fonte){ return "Copertina dal profilo " + (fonte || "Facebook"); }
-  function renderSocialCoverRow(){
-    var fonte = socialCoverFonte(socialCoverUrlScheda());
-    elRowSocialCover.hidden = !fonte;
-    if(fonte && !socialCoverBusy) elSocialCoverLabel.textContent = socialCoverLabel(fonte);
+  /* L'azione si scopre scorrendo il campo che contiene il link, e ce n'e'
+     una per social invece di un pulsante solo che sceglie: scorrendo quel
+     campo li' hai gia' detto da quale dei due la vuoi.
+
+     Compare per qualunque link di quel social, anche quando non e' una
+     pagina — il link a una foto, per esempio. Farla sparire sarebbe piu'
+     pulito e piu' muto: resterebbe un campo che non fa niente e nessuno
+     saprebbe perche'. Cosi' invece il messaggio dice cos'e' sbagliato e
+     cosa copiare al suo posto. */
+  function sembraDi(valore, domini){
+    var t = (valore || "").trim().toLowerCase();
+    return domini.some(function(d){ return t.indexOf(d) > -1; });
+  }
+  function renderSocialSwipeActions(){
+    elAzioniFacebook.hidden = !currentId || !sembraDi(fFacebook.value, ["facebook.com", "fb.com", "fb.me"]);
+    elAzioniInstagram.hidden = !currentId || !sembraDi(fInstagram.value, ["instagram.com", "instagr.am"]);
     renderIgSearchRow();
   }
-  elRowSocialCover.addEventListener("click", function(){
+  function prendiCopertina(fonte, url, btn){
     if(socialCoverBusy || !currentId) return;
-    var url = socialCoverUrlScheda();
-    var fonte = socialCoverFonte(url);
-    if(!fonte) return;
     var idQuando = currentId;
     socialCoverBusy = true;
-    elRowSocialCover.classList.add("busy");
-    elSocialCoverLabel.textContent = "Scarico da " + fonte + "\u2026";
+    var scritta = btn.textContent;
+    btn.textContent = "\u2026";
     api("POST", "/api/locations/" + idQuando + "/photos/social", {url: url})
       .then(function(updated){
         // Solo le foto, non tutta la scheda: quello che stai scrivendo qui
@@ -6925,12 +6949,19 @@
       .catch(function(err){ toast(err.message || "Non sono riuscito a prendere l'immagine"); })
       .then(function(){
         socialCoverBusy = false;
-        elRowSocialCover.classList.remove("busy");
-        elSocialCoverLabel.textContent = socialCoverLabel(socialCoverFonte(socialCoverUrlScheda()));
+        btn.textContent = scritta;
       });
+  }
+  elAzioniFacebook.addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    prendiCopertina("Facebook", fFacebook.value, b);
   });
-  fFacebook.addEventListener("input", renderSocialCoverRow);
-  fInstagram.addEventListener("input", renderSocialCoverRow);
+  elAzioniInstagram.addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    prendiCopertina("Instagram", fInstagram.value, b);
+  });
+  fFacebook.addEventListener("input", renderSocialSwipeActions);
+  fInstagram.addEventListener("input", renderSocialSwipeActions);
 
   /* ---------------- trovare il profilo Instagram ----------------
      La ricerca sul web dal server non si puo' fare: i motori rispondono a
@@ -6973,8 +7004,7 @@
     function scrivi(){
       fInstagram.value = url;
       venueDirty = true;
-      renderSocialCoverRow();
-      renderIgSearchRow();
+      renderSocialSwipeActions();
       toast("Link incollato · salva la scheda");
     }
     // Sopra un link che c'era gia' non ci si scrive di nascosto: quello e'
@@ -8330,7 +8360,7 @@
     venueDirty = false;
     renderPhotosStrip(v);
     renderQuickActions(v);
-    renderSocialCoverRow();
+    renderSocialSwipeActions();
     // Il verso torna su "Noi" a ogni scheda aperta: e' il caso di quasi
     // sempre, e restare su "Loro" da un palco all'altro vorrebbe dire
     // segnare la telefonata di domani dalla parte sbagliata. Per la stessa
@@ -8601,10 +8631,8 @@
       adNotes = document.getElementById("adNotes");
   var elAdFaceRow = document.getElementById("adFaceRow"),
       elAdFace = document.getElementById("adFace"),
-      elRowAdFbPhoto = document.getElementById("rowAdFbPhoto"),
-      elRowAdIgPhoto = document.getElementById("rowAdIgPhoto"),
-      elAdFbPhotoLabel = document.getElementById("adFbPhotoLabel"),
-      elAdIgPhotoLabel = document.getElementById("adIgPhotoLabel");
+      elAzioniAdFacebook = document.getElementById("azioniAdFacebook"),
+      elAzioniAdInstagram = document.getElementById("azioniAdInstagram");
   var elAdInlineTitle = document.getElementById("adDetailInlineTitle");
 
   function currentAd(){ return artDirectors.find(function(a){ return a.id === currentAdId; }); }
@@ -8636,41 +8664,53 @@
     if(foto) elAdFace.src = "/photos-ad/" + encodeURIComponent(foto);
   }
   function renderAdPhotoRows(){
-    elRowAdFbPhoto.hidden = !facebookPageId(adFacebook.value);
-    elRowAdIgPhoto.hidden = !instagramUser(adInstagram.value);
+    elAzioniAdFacebook.hidden = !currentAdId || !sembraDi(adFacebook.value, ["facebook.com", "fb.com", "fb.me"]);
+    elAzioniAdInstagram.hidden = !currentAdId || !sembraDi(adInstagram.value, ["instagram.com", "instagr.am"]);
   }
   adFacebook.addEventListener("input", renderAdPhotoRows);
   adInstagram.addEventListener("input", renderAdPhotoRows);
 
   var adFacePresa = false;
-  function prendiFacciaAd(riga, etichetta, testo, url, fonte){
+  /* Qui lo scorrimento chiede, mentre sul palco scarica e basta. La
+     differenza non e' un capriccio: sul palco la copertina di prima resta
+     nella striscia e si rimette con la stella, qui la faccia e' una sola e
+     quella vecchia viene cancellata dal disco. Un dito di troppo mentre
+     scorri, li' si rimedia, qui no. */
+  function prendiFacciaAd(btn, url, fonte){
     if(adFacePresa || !currentAdId) return;
-    var idQuando = currentAdId;
-    adFacePresa = true;
-    riga.classList.add("busy");
-    etichetta.textContent = "Scarico da " + fonte + "\u2026";
-    api("POST", "/api/art_directors/" + idQuando + "/photo/social", {url: url})
-      .then(function(updated){
-        // Solo la foto: il resto della scheda e' roba che stai scrivendo, e
-        // la risposta ha quello che c'era salvato prima.
-        var ad = artDirectors.find(function(a){ return a.id === updated.id; });
-        if(ad) ad.photo = updated.photo;
-        if(currentAdId === idQuando) renderAdFace({photo: updated.photo});
-        renderAdList();
-        toast("Foto presa da " + fonte);
-      })
-      .catch(function(err){ toast(err.message || "Non sono riuscito a prendere l'immagine"); })
-      .then(function(){
-        adFacePresa = false;
-        riga.classList.remove("busy");
-        etichetta.textContent = testo;
-      });
+    var ad = currentAd();
+    var domanda = (ad && ad.photo)
+      ? "Scaricare la foto da " + fonte + "? Quella di adesso viene sostituita."
+      : "Scaricare la foto da " + fonte + " e usarla come faccia?";
+    confirmDestructive(domanda, function(){
+      var idQuando = currentAdId;
+      adFacePresa = true;
+      var scritta = btn.textContent;
+      btn.textContent = "\u2026";
+      api("POST", "/api/art_directors/" + idQuando + "/photo/social", {url: url})
+        .then(function(updated){
+          // Solo la foto: il resto della scheda e' roba che stai scrivendo, e
+          // la risposta ha quello che c'era salvato prima.
+          var a = artDirectors.find(function(x){ return x.id === updated.id; });
+          if(a) a.photo = updated.photo;
+          if(currentAdId === idQuando) renderAdFace({photo: updated.photo});
+          renderAdList();
+          toast("Foto presa da " + fonte);
+        })
+        .catch(function(err){ toast(err.message || "Non sono riuscito a prendere l'immagine"); })
+        .then(function(){
+          adFacePresa = false;
+          btn.textContent = scritta;
+        });
+    });
   }
-  elRowAdFbPhoto.addEventListener("click", function(){
-    prendiFacciaAd(elRowAdFbPhoto, elAdFbPhotoLabel, "Foto dal profilo Facebook", adFacebook.value, "Facebook");
+  elAzioniAdFacebook.addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    prendiFacciaAd(b, adFacebook.value, "Facebook");
   });
-  elRowAdIgPhoto.addEventListener("click", function(){
-    prendiFacciaAd(elRowAdIgPhoto, elAdIgPhotoLabel, "Foto dal profilo Instagram", adInstagram.value, "Instagram");
+  elAzioniAdInstagram.addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    prendiFacciaAd(b, adInstagram.value, "Instagram");
   });
   document.getElementById("btnAdFaceDel").addEventListener("click", function(){
     if(!currentAdId) return;

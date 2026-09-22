@@ -4680,6 +4680,20 @@ IG_MAX_CANDIDATI = 6
 IG_CERCA_TIMEOUT = 12
 IG_OG_RE = re.compile(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"')
 FB_HOSTS = ("facebook.com", "fb.com", "fb.me")
+# Pezzi di indirizzo che stanno dentro facebook.com ma non sono una pagina:
+# una foto, un post, un video, un gruppo. Quello che si copia dalla barra
+# guardando una foto — facebook.com/photo?fbid=...&set=a... — non contiene da
+# nessuna parte il nome della pagina: fbid e' il numero della foto e set
+# quello dell'album, e chiedere a Facebook la foto profilo di una pagina che
+# si chiama "photo" risponde ovviamente che non esiste. Senza questa lista
+# l'errore diceva "pagina sparita", che e' falso e manda a cercare dalla
+# parte sbagliata.
+FB_NON_PAGINE = {
+    "photo", "photo.php", "permalink.php", "story.php", "watch", "reel",
+    "video.php", "groups", "events", "marketplace", "media", "share",
+    "sharer.php", "l.php", "login", "search", "hashtag", "notes", "messages",
+    "settings", "help", "policies", "privacy",
+}
 FB_ID_OK = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 # Il nome vecchio stile delle pagine: "Bar-Belverde-170145990444191". Come
 # nome non esiste piu', ma il numero in fondo e' ancora l'id buono.
@@ -4716,6 +4730,8 @@ def facebook_page_id(url):
     if segmenti[0] == "profile.php":
         valori = parse_qs(parti.query or "").get("id") or []
         return valori[0] if valori and valori[0].isdigit() else None
+    if segmenti[0].lower() in FB_NON_PAGINE:
+        return None
     if segmenti[0] in ("pages", "p", "people"):
         numeri = [s for s in segmenti if s.isdigit()]
         if numeri:
@@ -4734,6 +4750,28 @@ def facebook_page_id(url):
     if not FB_ID_OK.match(nome):
         return None
     return nome
+
+
+def facebook_link_non_pagina(url):
+    """Vero se e' un link dentro facebook.com che non porta a una pagina.
+    Serve solo a dare il messaggio giusto: sapere *perche'* un link non va
+    bene e' quello che fa la differenza fra "riprova" e "copia quell'altro"."""
+    if not url:
+        return False
+    testo = url.strip()
+    if not re.match(r"^https?://", testo, re.I):
+        testo = "https://" + testo
+    try:
+        parti = urlparse(testo)
+    except ValueError:
+        return False
+    host = (parti.netloc or "").lower().split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    if not (host in FB_HOSTS or any(host.endswith("." + h) for h in FB_HOSTS)):
+        return False
+    segmenti = [x for x in (parti.path or "").split("/") if x]
+    return bool(segmenti) and segmenti[0].lower() in FB_NON_PAGINE
 
 
 def instagram_username(url):
@@ -4957,6 +4995,14 @@ def scarica_immagine_social(url):
     page_id = facebook_page_id(url)
     ig_user = None if page_id else instagram_username(url)
     if not page_id and not ig_user:
+        if facebook_link_non_pagina(url):
+            raise ApiError(
+                400,
+                "Questo è il link a una foto o a un post, non alla pagina. "
+                "Apri la pagina del locale e copia l'indirizzo che sta in alto "
+                "(facebook.com/nomelocale).",
+                "non_pagina",
+            )
         raise ApiError(
             400,
             "Questo link non e' una pagina Facebook ne' un profilo Instagram",
