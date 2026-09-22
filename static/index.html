@@ -5684,80 +5684,91 @@
 
      Col mouse invece "change" arriva a scelta fatta, una volta: si toglie il
      fuoco e il salvataggio parte subito, come prima. */
-  /* Il calendario della pastiglia "Ricontatta", com'e' venuto fuori provandolo
-     sui telefoni veri.
+  /* Il calendario della pastiglia "Ricontatta", come si comporta sui telefoni
+     veri — e su iOS non come su Android.
 
-     Su iPad e iPhone il calendario si chiude con "Fine", e "Fine" non toglie
-     il fuoco al campo: aspettare il focusout voleva dire non salvare finche'
-     non toccavi un'altra riga. Quindi si salva quando la data viene scelta —
-     "change" — e "Fine" si limita a chiudere, che e' come funziona il resto
-     del sistema.
+     Si salva quando la data viene scelta ("change"), e "Fine" chiude e
+     basta: su iPad "Fine" non toglie nemmeno il fuoco al campo, quindi
+     aspettarlo voleva dire non salvare finche' non toccavi un'altra riga.
 
-     Quello che non si puo' fare e' rifare l'elenco li' per li': la riga
-     uscirebbe da "Da pianificare" mentre il calendario e' ancora attaccato a
-     lei, e il calendario si chiuderebbe da solo. Per questo l'elenco resta
-     fermo finche' il campo ha il fuoco, e si rifa quando lo perde. Nel
-     frattempo il messaggio in basso dice che la data e' stata scritta.
+     **Un campo vuoto non cancella niente.** C'e' stato un giro in cui
+     "Ripristina" (iOS) e "Annulla" (Android) disfacevano la data appena
+     scritta: sembrava giusto, e su iOS ha cancellato date che erano state
+     scelte e salvate — nel database restavano righe toccate un istante
+     prima e con la data a NULL. Da fuori i due casi non si distinguono, e
+     fra il rischio di tenere una data che volevi buttare e quello di
+     buttarne una che volevi tenere, il secondo e' peggio: la prima si
+     cambia riscegliendola, la seconda sparisce senza che nessuno lo dica.
+     Per disfare c'e' la scheda del palco, dove la ✕ toglie il promemoria.
 
-     "Ripristina" (iOS) e "Annulla" (Android) svuotano il campo: se in questo
-     giro avevamo gia' scritto una data la togliamo, cosi' si esce davvero
-     senza aver fatto niente. */
+     L'elenco non si rifa finche' il calendario e' aperto: la riga uscirebbe
+     da "Da pianificare" con il calendario ancora attaccato a lei, e si
+     chiuderebbe da solo — era il guaio di partenza. Si rifa quando il campo
+     perde il fuoco o quando tocchi qualcos'altro, e il messaggio in basso
+     nel frattempo dice che la data e' stata scritta. */
   var pickerAperto = false;
-  var dataScritta = null;
+  var dataScritta = false;
+  var rifattoAlle = 0;
   var apertoAlle = 0;
 
-  elPlanList.addEventListener("focusin", function(e){
-    if(!e.target.closest("[data-period]")) return;
+  function apreIlCalendario(){
     pickerAperto = true;
-    dataScritta = null;
     apertoAlle = Date.now();
-  });
-
-  elPlanList.addEventListener("change", function(e){
-    var campo = e.target.closest("[data-period]");
-    if(!campo) return;
-    var id = campo.getAttribute("data-period");
-
-    if(!campo.value){
-      // Ripristina / Annulla: si torna com'era. Se non avevamo ancora scritto
-      // niente non c'e' niente da disfare.
-      if(dataScritta){
-        dataScritta = null;
-        saveNextContact(id, "");
-      }
-      return;
-    }
-    // Il calendario che si presenta scrive la data di oggi da solo, prima che
-    // tu abbia toccato qualcosa: arriva nell'istante dell'apertura, mentre
-    // una data scelta arriva dopo che l'hai guardato. Mezzo secondo separa le
-    // due cose e non si mangia nessun tocco vero.
-    if(campo.value === todayStr() && Date.now() - apertoAlle < 500) return;
-
-    dataScritta = campo.value;
-    saveNextContact(id, campo.value);
-    // Col mouse il calendario si e' gia' chiuso da se': si toglie il fuoco, e
-    // l'elenco si rifa subito invece di aspettare un clic altrove.
-    if(!conIlDito()) campo.blur();
-  });
-
-  elPlanList.addEventListener("focusout", function(e){
-    if(!e.target.closest("[data-period]")) return;
+  }
+  function chiudeIlCalendario(){
+    if(!pickerAperto) return;
     pickerAperto = false;
     if(!dataScritta) return;
-    dataScritta = null;
+    dataScritta = false;
     // L'elenco si accorcia di una riga: senza rimettere lo scorrimento dove
     // era, quello che stavi guardando si sposta sotto il dito. Cosi' invece
     // al posto della riga che se ne va trovi la successiva.
     var scroll = elScrollRecontact ? elScrollRecontact.scrollTop : 0;
     renderRecontact();
     if(elScrollRecontact) elScrollRecontact.scrollTop = scroll;
+    rifattoAlle = Date.now();
+  }
+
+  // Il fuoco su iOS non arriva sempre, il tocco sulla pastiglia si': si
+  // segna da tutti e due i posti, chi arriva primo vince.
+  elPlanList.addEventListener("focusin", function(e){
+    if(e.target.closest("[data-period]")) apreIlCalendario();
   });
+
+  elPlanList.addEventListener("change", function(e){
+    var campo = e.target.closest("[data-period]");
+    if(!campo) return;
+    // Vuoto: vedi sopra, non si cancella niente.
+    if(!campo.value) return;
+    // Il calendario che si presenta scrive la data di oggi da solo, prima che
+    // tu abbia toccato qualcosa: arriva nell'istante dell'apertura, mentre
+    // una data scelta arriva dopo che l'hai guardato.
+    if(campo.value === todayStr() && Date.now() - apertoAlle < 500) return;
+
+    dataScritta = true;
+    saveNextContact(campo.getAttribute("data-period"), campo.value);
+    // Col mouse il calendario si e' gia' chiuso da se'.
+    if(!conIlDito()) campo.blur();
+  });
+
+  elPlanList.addEventListener("focusout", function(e){
+    if(e.target.closest("[data-period]")) chiudeIlCalendario();
+  });
+
+  // Su iOS il fuoco puo' non arrivare e non andarsene: il tocco da
+  // qualunque altra parte vale come "ho finito con quel calendario".
+  document.addEventListener("click", function(e){
+    if(!pickerAperto) return;
+    if(e.target.closest && e.target.closest(".plan-date")) return;
+    chiudeIlCalendario();
+  }, true);
 
   elPlanList.addEventListener("click", function(e){
     // Il pulsante sta dentro la riga: senza questa riga il calendario si
     // aprirebbe insieme alla scheda del palco.
     var pastiglia = e.target.closest(".plan-date");
     if(pastiglia){
+      apreIlCalendario();
       // Da computer un campo data trasparente non apre niente: il calendario
       // lo apre solo il clic sull'iconcina, che qui e' invisibile per scelta.
       // showPicker e' il modo di chiederlo. Col dito non si chiama: la
@@ -5769,6 +5780,10 @@
       }
       return;
     }
+    // L'elenco si e' appena accorciato sotto il dito: il tocco che era per la
+    // riga di prima aprirebbe quella che ha preso il suo posto, che e' un
+    // altro palco. Mezzo secondo di sordita' e si riapre come si deve.
+    if(Date.now() - rifattoAlle < 500) return;
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
