@@ -1,3 +1,11 @@
+---
+name: Segnalazione
+about: Una cosa da cambiare, da aggiustare o da aggiungere
+title: ''
+labels: ''
+assignees: ''
+---
+
 <!-- Sezioni, non campi: scrivi solo dove hai qualcosa da dire, cancella il
      resto. Niente qui e' obbligatorio. -->
 
