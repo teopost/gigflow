@@ -340,7 +340,7 @@ DEFAULT_COST_CATEGORIES = [
 
 CASH_FIELDS = ["kind", "entry_date", "description", "amount", "category", "gig_id", "paid"]
 
-ART_DIRECTOR_FIELDS = ["name", "phone", "email", "notes"]
+ART_DIRECTOR_FIELDS = ["name", "phone", "email", "facebook", "instagram", "notes"]
 BAND_FIELDS = ["name", "facebook", "followers", "base", "contact", "gigs_count", "notes"]
 
 # Una segnalazione nasce "da valutare"; l'amministratore dell'app la chiude
@@ -565,6 +565,9 @@ def init_db():
             name TEXT NOT NULL,
             phone TEXT,
             email TEXT,
+            facebook TEXT,
+            instagram TEXT,
+            photo TEXT,
             notes TEXT,
             created_at TEXT NOT NULL
         );
@@ -1137,6 +1140,7 @@ def migrate_schema(conn):
     migrate_to_venue_lifecycle(conn)
     migrate_to_gig_opportunita(conn)
     migrate_photos_cover(conn)
+    migrate_art_director_social(conn)
     migrate_venue_type_icon(conn)
     migrate_to_mail_templates(conn)
     if venue_lists_are_new:
@@ -1220,6 +1224,17 @@ def migrate_photos_cover(conn):
     if "is_cover" in cols:
         return
     conn.execute("ALTER TABLE photos ADD COLUMN is_cover INTEGER NOT NULL DEFAULT 0")
+
+
+def migrate_art_director_social(conn):
+    """I due social e la foto dell'art director. La foto sta in una colonna
+    sua e non nella tabella photos: quella e' la striscia di un palco, con la
+    copertina da scegliere fra tante; qui la foto e' una sola, ed e' la
+    faccia della persona."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(art_directors)").fetchall()}
+    for colonna in ("facebook", "instagram", "photo"):
+        if colonna not in cols:
+            conn.execute(f"ALTER TABLE art_directors ADD COLUMN {colonna} TEXT")
 
 
 def migrate_drop_rifiutato(conn):
@@ -4925,30 +4940,14 @@ def _facebook_pic_url(page_id):
     return dati.get("url")
 
 
-def social_cover(conn, ws, loc_id, body=None):
-    """Prende l'immagine del profilo da Facebook o da Instagram e la mette
-    come copertina del palco. Resta una foto come le altre: si
-    cancella dalla striscia, e la copertina si puo' rimettere su un'altra con
-    la stella.
+def scarica_immagine_social(url):
+    """Da un link a una pagina Facebook o a un profilo Instagram torna
+    l'immagine del profilo, gia' scaricata: (byte, estensione).
 
-    Il link decide lui dove andare a prendere la foto: se dentro c'e'
-    facebook.com si passa dal Graph, se c'e' instagram.com dai meta tag della
-    pagina pubblica. Un pulsante solo, e chi lo usa non deve sapere che sotto
-    ci sono due strade diverse.
-
-    Il link arriva dalla scheda aperta, non dal database: la scheda e' una
-    bozza finche' non si salva, e chiedere questa immagine per un indirizzo
-    diverso da quello che hai davanti sarebbe difficile da spiegare. Se non
-    arriva niente si ripiega su quello salvato — e li' Facebook viene prima,
-    perche' la sua immagine e' grande (720 pixel contro 150)."""
-    row = conn.execute(
-        "SELECT facebook, instagram FROM locations WHERE id = ? AND workspace_id = ?",
-        (loc_id, ws),
-    ).fetchone()
-    if not row:
-        raise ApiError(404, "Palco non trovato")
-
-    url = (body or {}).get("url") or row["facebook"] or row["instagram"]
+    Sta per conto suo perche' la chiedono in due — la copertina di un palco e
+    la foto di un art director — e le regole sono le stesse per tutti e due:
+    quale dei due social, da dove si accetta di scaricare, quanto puo'
+    pesare. Scritte una volta sola non possono divergere."""
     page_id = facebook_page_id(url)
     ig_user = None if page_id else instagram_username(url)
     if not page_id and not ig_user:
@@ -5013,7 +5012,34 @@ def social_cover(conn, ws, loc_id, body=None):
         raise ApiError(502, "Il social ha risposto con qualcosa che non e' un'immagine")
     if len(raw) > MAX_PHOTO_BYTES:
         raise ApiError(400, "Immagine troppo grande (massimo 8 MB)")
+    return raw, ext
 
+
+def social_cover(conn, ws, loc_id, body=None):
+    """Prende l'immagine del profilo da Facebook o da Instagram e la mette
+    come copertina del palco. Resta una foto come le altre: si
+    cancella dalla striscia, e la copertina si puo' rimettere su un'altra con
+    la stella.
+
+    Il link decide lui dove andare a prendere la foto: se dentro c'e'
+    facebook.com si passa dal Graph, se c'e' instagram.com dai meta tag della
+    pagina pubblica. Un pulsante solo, e chi lo usa non deve sapere che sotto
+    ci sono due strade diverse.
+
+    Il link arriva dalla scheda aperta, non dal database: la scheda e' una
+    bozza finche' non si salva, e chiedere questa immagine per un indirizzo
+    diverso da quello che hai davanti sarebbe difficile da spiegare. Se non
+    arriva niente si ripiega su quello salvato — e li' Facebook viene prima,
+    perche' la sua immagine e' grande (720 pixel contro 150)."""
+    row = conn.execute(
+        "SELECT facebook, instagram FROM locations WHERE id = ? AND workspace_id = ?",
+        (loc_id, ws),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Palco non trovato")
+
+    url = (body or {}).get("url") or row["facebook"] or row["instagram"]
+    raw, ext = scarica_immagine_social(url)
     salva_foto(conn, loc_id, raw, ext, copertina=True)
     return fetch_location(conn, ws, loc_id)
 
@@ -5120,13 +5146,88 @@ def update_art_director(conn, ws, ad_id, body):
     return art_director_to_dict(row, {ad_id: counts_row["n"]})
 
 
+def art_director_social_photo(conn, ws, ad_id, body=None):
+    """La foto dell'art director, presa dal suo profilo Facebook o Instagram.
+
+    Ne tiene una sola: quella di prima viene cancellata dal disco appena
+    arriva la nuova, se no la cartella si riempirebbe di facce vecchie che
+    nessuno vedra' mai piu'.
+
+    Come per il palco, il link arriva dalla scheda aperta: finche' non
+    salvi quello che hai davanti e' una bozza, e andare a prendere la foto
+    dell'indirizzo salvato — magari di un'altra persona — sarebbe difficile
+    da spiegare."""
+    row = conn.execute(
+        "SELECT facebook, instagram, photo FROM art_directors WHERE id = ? AND workspace_id = ?",
+        (ad_id, ws),
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Art director non trovato")
+
+    url = (body or {}).get("url") or row["facebook"] or row["instagram"]
+    raw, ext = scarica_immagine_social(url)
+
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    filename = f"ad{ad_id}_{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(PHOTOS_DIR, filename), "wb") as f:
+        f.write(raw)
+    vecchia = row["photo"]
+    conn.execute("UPDATE art_directors SET photo = ? WHERE id = ?", (filename, ad_id))
+    conn.commit()
+    if vecchia:
+        try:
+            os.remove(os.path.join(PHOTOS_DIR, vecchia))
+        except OSError:
+            pass
+
+    counts_row = conn.execute(
+        "SELECT COUNT(*) AS n FROM locations WHERE art_director_id = ? AND workspace_id = ?",
+        (ad_id, ws),
+    ).fetchone()
+    riga = conn.execute("SELECT * FROM art_directors WHERE id = ?", (ad_id,)).fetchone()
+    return art_director_to_dict(riga, {ad_id: counts_row["n"]})
+
+
+def delete_art_director_photo(conn, ws, ad_id):
+    """Toglie la foto e basta: l'art director resta, con le sue iniziali al
+    posto della faccia, com'era prima di averne una."""
+    row = conn.execute(
+        "SELECT photo FROM art_directors WHERE id = ? AND workspace_id = ?", (ad_id, ws)
+    ).fetchone()
+    if not row:
+        raise ApiError(404, "Art director non trovato")
+    if row["photo"]:
+        conn.execute("UPDATE art_directors SET photo = NULL WHERE id = ?", (ad_id,))
+        conn.commit()
+        try:
+            os.remove(os.path.join(PHOTOS_DIR, row["photo"]))
+        except OSError:
+            pass
+    counts_row = conn.execute(
+        "SELECT COUNT(*) AS n FROM locations WHERE art_director_id = ? AND workspace_id = ?",
+        (ad_id, ws),
+    ).fetchone()
+    riga = conn.execute("SELECT * FROM art_directors WHERE id = ?", (ad_id,)).fetchone()
+    return art_director_to_dict(riga, {ad_id: counts_row["n"]})
+
+
 def delete_art_director(conn, ws, ad_id):
+    # Il file della foto va tolto prima della riga: dopo non si saprebbe piu'
+    # come si chiama, e resterebbe nella cartella senza nessuno che lo guardi.
+    row = conn.execute(
+        "SELECT photo FROM art_directors WHERE id = ? AND workspace_id = ?", (ad_id, ws)
+    ).fetchone()
     cur = conn.execute(
         "DELETE FROM art_directors WHERE id = ? AND workspace_id = ?", (ad_id, ws)
     )
     conn.commit()
     if cur.rowcount == 0:
         raise ApiError(404, "Art director non trovato")
+    if row and row["photo"]:
+        try:
+            os.remove(os.path.join(PHOTOS_DIR, row["photo"]))
+        except OSError:
+            pass
 
 
 def clean_band_payload(body, partial):
@@ -6130,6 +6231,14 @@ def _h_update_art_director(conn, match, query, body, ctx):
     return 200, update_art_director(conn, require_ws(ctx), int(match.group(1)), body)
 
 
+def _h_art_director_social_photo(conn, match, query, body, ctx):
+    return art_director_social_photo(conn, ctx["ws"], int(match.group(1)), body)
+
+
+def _h_delete_art_director_photo(conn, match, query, body, ctx):
+    return delete_art_director_photo(conn, ctx["ws"], int(match.group(1)))
+
+
 def _h_delete_art_director(conn, match, query, body, ctx):
     delete_art_director(conn, require_ws(ctx), int(match.group(1)))
     return 204, {}
@@ -6507,6 +6616,8 @@ ROUTES = [
     ("GET", re.compile(r"^/api/art_directors$"), _h_list_art_directors),
     ("POST", re.compile(r"^/api/art_directors$"), _h_create_art_director),
     ("PUT", re.compile(r"^/api/art_directors/(\d+)$"), _h_update_art_director),
+    ("POST", re.compile(r"^/api/art_directors/(\d+)/photo/social$"), _h_art_director_social_photo),
+    ("DELETE", re.compile(r"^/api/art_directors/(\d+)/photo$"), _h_delete_art_director_photo),
     ("DELETE", re.compile(r"^/api/art_directors/(\d+)$"), _h_delete_art_director),
     ("GET", re.compile(r"^/api/bands$"), _h_list_bands),
     ("POST", re.compile(r"^/api/bands$"), _h_create_band),

@@ -444,6 +444,13 @@
   .ios-switch input:checked ~ .ios-switch-track .ios-switch-thumb{transform:translateX(20px);}
   .picker-value span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
+  /* La faccia dell'art director: una foto sola, tonda, sopra il nome. Non
+     e' una copertina e non sta in una striscia — lui e' una persona, non un
+     posto, e di persone ce n'e' una per scheda. */
+  .ad-face-row{display:flex;justify-content:center;padding:14px 16px 0;}
+  .ad-face-wrap{position:relative;width:96px;height:96px;}
+  .ad-face{width:96px;height:96px;border-radius:50%;object-fit:cover;display:block;background:var(--fill);}
+  .ad-face-del{position:absolute;top:-2px;right:-2px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:rgba(0,0,0,.62);color:#fff;font-size:13px;line-height:1;cursor:pointer;padding:0;}
   .d-title-name{padding:6px 16px 16px;}
   .d-title-name input{width:100%;border:none;background:transparent;font-size:28px;font-weight:700;letter-spacing:-.01em;color:var(--text);padding:2px 0;font-family:inherit;}
   .d-title-name input::placeholder{color:var(--text-tertiary);}
@@ -488,6 +495,10 @@
      non crescono, altrimenti i titoli delle righe con e senza foto non
      sarebbero più incolonnati. */
   .row-cover{flex:none;width:48px;height:48px;border-radius:8px;object-fit:cover;background:var(--fill);}
+  /* Tonda e piu' piccola della copertina di un palco: nell'elenco degli art
+     director si riconosce una persona, e una faccia quadrata sembrerebbe un
+     locale. */
+  .ad-row-face{flex:none;width:38px;height:38px;border-radius:50%;object-fit:cover;background:var(--fill);}
   /* Palchi e preferiti: un pixel in meno sopra e sotto, e la copertina
      due pixel piu' vicina al bordo. Sono le uniche righe che cominciano con
      un'immagine, e con l'incolonnamento di tutte le altre restava troppo
@@ -2505,13 +2516,24 @@
       </div>
     </header>
     <div class="screen-scroll">
+      <div class="ad-face-row" id="adFaceRow" hidden>
+        <div class="ad-face-wrap">
+          <img class="ad-face" id="adFace" alt="">
+          <button class="ad-face-del" id="btnAdFaceDel" type="button" aria-label="Togli la foto">✕</button>
+        </div>
+      </div>
       <div class="d-title-name"><input id="adName" placeholder="Nome e cognome" /></div>
       <div class="quick-actions" id="adQuickActions"></div>
       <div class="section-header">CONTATTI</div>
       <div class="grouped-list">
-        <div class="field-row"><label for="adPhone">Telefono</label><input id="adPhone" type="tel" placeholder="+39…"></div>
+        <div class="field-row"><label for="adPhone">Cellulare</label><input id="adPhone" type="tel" placeholder="+39…"></div>
         <div class="field-row"><label for="adEmail">Email</label><input id="adEmail" type="email" placeholder="nome@mail.it"></div>
+        <div class="field-row"><label for="adFacebook">Facebook</label><input id="adFacebook" type="text" placeholder="facebook.com/…"></div>
+        <div class="field-row"><label for="adInstagram">Instagram</label><input id="adInstagram" type="text" placeholder="instagram.com/…"></div>
+        <div class="field-row picker" id="rowAdFbPhoto" hidden><span class="link-action" id="adFbPhotoLabel">Foto dal profilo Facebook</span></div>
+        <div class="field-row picker" id="rowAdIgPhoto" hidden><span class="link-action" id="adIgPhotoLabel">Foto dal profilo Instagram</span></div>
       </div>
+      <div class="section-footer">Chiama e WhatsApp partono dal cellulare. I due link servono anche a prendere la foto del profilo: la scarica da lì, e diventa la faccia qui sopra.</div>
       <div class="section-header">PALCHI PER CUI LAVORA</div>
       <div class="grouped-list" id="adVenuesList"></div>
       <div class="grouped-list" style="margin-top:10px;">
@@ -8574,13 +8596,21 @@
   var adName = document.getElementById("adName"),
       adPhone = document.getElementById("adPhone"),
       adEmail = document.getElementById("adEmail"),
+      adFacebook = document.getElementById("adFacebook"),
+      adInstagram = document.getElementById("adInstagram"),
       adNotes = document.getElementById("adNotes");
+  var elAdFaceRow = document.getElementById("adFaceRow"),
+      elAdFace = document.getElementById("adFace"),
+      elRowAdFbPhoto = document.getElementById("rowAdFbPhoto"),
+      elRowAdIgPhoto = document.getElementById("rowAdIgPhoto"),
+      elAdFbPhotoLabel = document.getElementById("adFbPhotoLabel"),
+      elAdIgPhotoLabel = document.getElementById("adIgPhotoLabel");
   var elAdInlineTitle = document.getElementById("adDetailInlineTitle");
 
   function currentAd(){ return artDirectors.find(function(a){ return a.id === currentAdId; }); }
   // Bozza anche qui, per la stessa ragione della scheda del palco.
   var adDirty = false;
-  [adName, adPhone, adEmail, adNotes].forEach(function(el){
+  [adName, adPhone, adEmail, adFacebook, adInstagram, adNotes].forEach(function(el){
     el.addEventListener("input", function(){ adDirty = true; });
   });
   adName.addEventListener("input", function(){
@@ -8588,6 +8618,71 @@
   });
   adPhone.addEventListener("input", function(){ renderAdQuickActions(collectAdPayload()); });
   adEmail.addEventListener("input", function(){ renderAdQuickActions(collectAdPayload()); });
+
+  /* La foto e i due link che la vanno a prendere.
+
+     Qui i pulsanti sono due, uno per social, e non uno solo che decide come
+     nella scheda del palco: di una persona le due facce sono spesso diverse
+     — il logo dell'agenzia su Facebook, la faccia vera su Instagram — e
+     quale delle due vuoi lo sai tu, non il programma.
+
+     Il link che si manda e' quello che hai davanti, non quello salvato: la
+     scheda e' una bozza finche' non si salva, e scaricare la foto di un
+     profilo diverso da quello che stai scrivendo sarebbe difficile da
+     spiegare. Stessa regola della copertina del palco. */
+  function renderAdFace(ad){
+    var foto = ad && ad.photo;
+    elAdFaceRow.hidden = !foto;
+    if(foto) elAdFace.src = "/photos/" + encodeURIComponent(foto);
+  }
+  function renderAdPhotoRows(){
+    elRowAdFbPhoto.hidden = !facebookPageId(adFacebook.value);
+    elRowAdIgPhoto.hidden = !instagramUser(adInstagram.value);
+  }
+  adFacebook.addEventListener("input", renderAdPhotoRows);
+  adInstagram.addEventListener("input", renderAdPhotoRows);
+
+  var adFacePresa = false;
+  function prendiFacciaAd(riga, etichetta, testo, url, fonte){
+    if(adFacePresa || !currentAdId) return;
+    var idQuando = currentAdId;
+    adFacePresa = true;
+    riga.classList.add("busy");
+    etichetta.textContent = "Scarico da " + fonte + "\u2026";
+    api("POST", "/api/art_directors/" + idQuando + "/photo/social", {url: url})
+      .then(function(updated){
+        // Solo la foto: il resto della scheda e' roba che stai scrivendo, e
+        // la risposta ha quello che c'era salvato prima.
+        var ad = artDirectors.find(function(a){ return a.id === updated.id; });
+        if(ad) ad.photo = updated.photo;
+        if(currentAdId === idQuando) renderAdFace({photo: updated.photo});
+        renderAdList();
+        toast("Foto presa da " + fonte);
+      })
+      .catch(function(err){ toast(err.message || "Non sono riuscito a prendere l'immagine"); })
+      .then(function(){
+        adFacePresa = false;
+        riga.classList.remove("busy");
+        etichetta.textContent = testo;
+      });
+  }
+  elRowAdFbPhoto.addEventListener("click", function(){
+    prendiFacciaAd(elRowAdFbPhoto, elAdFbPhotoLabel, "Foto dal profilo Facebook", adFacebook.value, "Facebook");
+  });
+  elRowAdIgPhoto.addEventListener("click", function(){
+    prendiFacciaAd(elRowAdIgPhoto, elAdIgPhotoLabel, "Foto dal profilo Instagram", adInstagram.value, "Instagram");
+  });
+  document.getElementById("btnAdFaceDel").addEventListener("click", function(){
+    if(!currentAdId) return;
+    var idQuando = currentAdId;
+    api("DELETE", "/api/art_directors/" + idQuando + "/photo").then(function(updated){
+      var ad = artDirectors.find(function(a){ return a.id === updated.id; });
+      if(ad) ad.photo = null;
+      if(currentAdId === idQuando) renderAdFace(null);
+      renderAdList();
+      toast("Foto tolta");
+    }).catch(function(err){ toast(err.message); });
+  });
 
   /* Le stesse tre azioni della scheda del palco e nello stesso
      ordine: un art director si contatta come si contatta un locale, e
@@ -8670,7 +8765,11 @@
     adName.value = ad.name || "";
     adPhone.value = ad.phone || "";
     adEmail.value = ad.email || "";
+    adFacebook.value = ad.facebook || "";
+    adInstagram.value = ad.instagram || "";
     adNotes.value = ad.notes || "";
+    renderAdFace(ad);
+    renderAdPhotoRows();
     setDato(elAdInlineTitle, ad.name, "Nuovo art director");
     adDirty = false;
     renderAdQuickActions(ad);
@@ -8680,7 +8779,8 @@
     if(!ad.name){ setTimeout(function(){ adName.focus(); }, 260); }
   }
   function collectAdPayload(){
-    return { name: adName.value, phone: adPhone.value, email: adEmail.value, notes: adNotes.value };
+    return { name: adName.value, phone: adPhone.value, email: adEmail.value,
+             facebook: adFacebook.value, instagram: adInstagram.value, notes: adNotes.value };
   }
   function saveAdNow(){
     return api("PUT", "/api/art_directors/" + currentAdId, collectAdPayload()).then(function(updated){
@@ -8776,6 +8876,7 @@
     var sorted = artDirectors.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"it",{sensitivity:"base"}); });
     elAdList.innerHTML = '<div class="grouped-list">' + sorted.map(function(ad){
       return '<div class="swipe-row"><div class="row-content"><div class="row" data-open-ad="'+ad.id+'">'+
+        (ad.photo ? '<img class="ad-row-face" src="/photos/'+encodeURIComponent(ad.photo)+'" loading="lazy" alt="">' : '')+
         '<div class="row-main"><div class="row-title">'+dato(ad.name||"Senza nome")+'</div>'+
         '<div class="row-sub">'+(ad.phone?dato(ad.phone):"")+(ad.phone&&ad.email?" · ":"")+(ad.email?dato(ad.email):"")+'</div></div>'+
         '<div class="row-trail"><span class="row-badge" style="background:var(--fill);color:var(--text-secondary);">'+ad.location_count+'</span>'+
