@@ -380,8 +380,14 @@ LOCATION_STATUS_VALUES = {
 }
 
 # Una serata esiste perche' hai deciso di provarci, e il suo punto di
-# partenza e' "opportunita'": c'e' un posto dove si potrebbe suonare e tu hai
-# deciso di provarci, ma non hai ancora alzato la cornetta.
+# partenza e' "contattato": una serata la si apre quando c'e' una data di cui
+# parlare, e a quel punto la telefonata o la mail c'e' gia' stata.
+#
+# Fino al 22 settembre 2026 davanti c'era "opportunita'", che voleva dire
+# "ho deciso di provarci ma non ho ancora alzato la cornetta". E' stato tolto
+# da Stefano: la casella si riempiva di tentativi che non erano cominciati, e
+# "Opportunita'" e' gia' il nome della scheda che raccoglie le trattative
+# aperte — due cose diverse chiamate uguali.
 #
 # I nomi sono cambiati il 15 settembre 2026: "da contattare" si chiamava come
 # il primo segmento dell'Agenda e le due cose si confondevano (li' sono i
@@ -391,7 +397,7 @@ LOCATION_STATUS_VALUES = {
 # detto che gli interessa, che non e' ancora trattare una data e un
 # compenso, ma non e' nemmeno solo "l'ho chiamato".
 GIG_STATUS_VALUES = {
-    "opportunita", "contattato", "interessato", "trattativa",
+    "contattato", "interessato", "trattativa",
     "confermato", "rifiutata", "suonato", "annullato",
 }
 
@@ -432,12 +438,6 @@ ARCHIVED_STATUS = "archiviato"
 
 # I quattro che si scelgono a mano dalla scheda.
 MANUAL_LOCATION_STATUSES = LOCATION_STATUS_VALUES - {ARCHIVED_STATUS}
-
-# Prima che qualcuno risponda una serata puo' essere solo un'opportunita':
-# esiste perche' hai deciso di provarci, ma la telefonata non e' ancora
-# andata in porto. Registrare un'attivita' la fa avanzare a "contattato", e
-# se la serata non c'e' ancora la apre gia' li'.
-GIG_PRE_CONTACT_STATUSES = {"opportunita"}
 
 # Gli stati della serata applicati alla singola stagione invece che al
 # palco: e' quello che permette di ripartire da zero ogni anno senza
@@ -791,7 +791,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS gigs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
-            status TEXT NOT NULL DEFAULT 'opportunita',
+            status TEXT NOT NULL DEFAULT 'contattato',
             gig_date TEXT,
             fee REAL,
             outcome_note TEXT,
@@ -1145,6 +1145,7 @@ def migrate_schema(conn):
     migrate_drop_rifiutato(conn)
     migrate_to_venue_lifecycle(conn)
     migrate_to_gig_opportunita(conn)
+    migrate_drop_gig_opportunita(conn)
     migrate_photos_cover(conn)
     migrate_art_director_social(conn)
     migrate_venue_type_icon(conn)
@@ -1251,13 +1252,13 @@ def migrate_drop_rifiutato(conn):
     settembre 2026 e non va toccato — vedi REJECTED_STATUS.
 
     Un no del titolare non e' un capolinea: o lo richiami l'anno prossimo, e
-    allora quel posto e' di nuovo un'opportunita', o non ti interessa piu',
+    allora quel posto torna in circolo, o non ti interessa piu',
     e allora
     si archivia o si elimina. "Rifiutato" era una terza casella che non
     corrispondeva a nessuna delle due decisioni, e ci restavano dentro righe
     che nessuno guardava piu'.
 
-    Diventano opportunita' e restano chiuse: la serata dice "non
+    Diventano "contattato" e restano chiuse: la serata dice "non
     conclusa", che e' quello che e' successo davvero, e il palco
     torna in circolo. Chi va tolto dalla rubrica si archivia a mano, che e'
     una decisione e non un effetto collaterale di un aggiornamento.
@@ -1268,7 +1269,7 @@ def migrate_drop_rifiutato(conn):
     """
     ts = now_iso()
     conn.execute(
-        "UPDATE gigs SET status = 'opportunita', updated_at = ? WHERE status = 'rifiutato'",
+        "UPDATE gigs SET status = 'contattato', updated_at = ? WHERE status = 'rifiutato'",
         (ts,),
     )
     # Sulle locations non si scrive piu' niente: il loro "rifiutato" lo
@@ -1338,6 +1339,27 @@ def migrate_to_venue_lifecycle(conn):
     print("  Stati dei palchi: %d righe portate al vocabolario nuovo." % da_fare)
 
 
+def migrate_drop_gig_opportunita(conn):
+    """Toglie lo stato "opportunita'" dalle serate (22 settembre 2026).
+
+    Diventano "contattato", che e' il nuovo punto di partenza. Non e' una
+    traduzione esatta — "opportunita'" voleva dire "non ho ancora chiamato" —
+    ma delle due e' la meno falsa: la serata resta aperta, nello stato da cui
+    oggi nascerebbe, e chi la sta seguendo la sposta avanti quando sa dove
+    e' arrivata.
+
+    Idempotente: gira a ogni avvio e dopo la prima volta non trova piu'
+    niente.
+    """
+    ts = now_iso()
+    n = conn.execute(
+        "UPDATE gigs SET status = 'contattato', updated_at = ? WHERE status = 'opportunita'",
+        (ts,),
+    ).rowcount
+    if n:
+        print("  Stati delle serate: %d \"opportunita'\" diventano \"contattato\"." % n)
+
+
 def migrate_to_gig_opportunita(conn):
     """"Da contattare" diventa "opportunita'" (15 settembre 2026).
 
@@ -1358,10 +1380,10 @@ def migrate_to_gig_opportunita(conn):
     if not n:
         return
     conn.execute(
-        "UPDATE gigs SET status = 'opportunita', updated_at = ? WHERE status = 'da_contattare'",
+        "UPDATE gigs SET status = 'contattato', updated_at = ? WHERE status = 'da_contattare'",
         (now_iso(),),
     )
-    print("  Stati delle serate: %d \"da contattare\" diventano opportunita'." % n)
+    print("  Stati delle serate: %d \"da contattare\" diventano \"contattato\"." % n)
 
 
 def migrate_to_next_contact_date(conn):
@@ -1449,7 +1471,7 @@ def migrate_drop_season(conn):
         CREATE TABLE gigs_senza_stagione (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
-            status TEXT NOT NULL DEFAULT 'opportunita',
+            status TEXT NOT NULL DEFAULT 'contattato',
             gig_date TEXT,
             fee REAL,
             outcome_note TEXT,
@@ -3028,29 +3050,6 @@ def set_location_status(conn, loc_id, status):
     )
 
 
-def advance_open_gig_on_activity(conn, gig, ts=None):
-    """Un'attivita' registrata fa avanzare la SERATA APERTA, se ce n'e' una:
-    aver chiamato non cambia che rapporto hai con quel posto, cambia a che
-    punto e' il tentativo di quest'anno.
-
-    Se una serata aperta non c'e', qui non succede niente — e questo e' il
-    punto (15 settembre 2026). Prima l'attivita' ne apriva una a "contattato",
-    e il risultato si vede in archivio: 251 serate su 276 senza data, senza
-    compenso e senza una riga scritta, di cui 221 in stato "contattato". Erano
-    mail e telefonate, non occasioni di suonare. Una mail mandata a un lead e'
-    un'attivita' del palco; la serata nasce quando c'e' una data di cui
-    parlare, e la apre una persona dal suo pulsante.
-    """
-    if gig is None or gig["closed_at"] is not None:
-        return
-    if gig["status"] not in GIG_PRE_CONTACT_STATUSES:
-        return
-    conn.execute(
-        "UPDATE gigs SET status = 'contattato', updated_at = ? WHERE id = ?",
-        (ts or now_iso(), gig["id"]),
-    )
-
-
 def clean_gig_payload(body, partial):
     data = {}
     for field in GIG_FIELDS:
@@ -3060,7 +3059,7 @@ def clean_gig_payload(body, partial):
         if field == "status":
             if value and value not in GIG_STATUS_VALUES:
                 raise ApiError(400, "Stato non valido")
-            value = value or "opportunita"
+            value = value or "contattato"
         elif field == "gig_date":
             value = (value or "").strip() or None
             if value and not GIG_DATE_RE.match(value):
@@ -3085,7 +3084,7 @@ def require_location(conn, ws, loc_id):
 def create_gig(conn, ws, loc_id, body):
     require_location(conn, ws, loc_id)
     data = clean_gig_payload(body or {}, partial=False)
-    data.setdefault("status", "opportunita")
+    data.setdefault("status", "contattato")
     require_gig_date_if_confirmed(data["status"], data.get("gig_date"))
     ts = now_iso()
     # Ricominciare chiude il tentativo rimasto in sospeso: di aperta ce n'e'
@@ -3867,17 +3866,12 @@ def add_note(conn, ws, loc_id, body, email=None):
         (loc_id, aperta["id"] if aperta else None, kind, direction, text, email, quando),
     ).lastrowid
     conn.execute("UPDATE locations SET updated_at = ? WHERE id = ?", (ts, loc_id))
-    # Aver contattato il posto e' esattamente cosa distingue "opportunita'"
-    # da "contattato": avanzare la serata qui evita di doverlo fare a mano
-    # ogni volta. Da "contattato" in poi non si tocca piu' niente: dove sia
-    # arrivata la trattativa lo sa solo chi la sta portando avanti.
-    #
-    # Se serate aperte non ce ne sono, non ne nasce nessuna: l'attivita' resta
-    # attaccata al palco e basta. Lo stato del palco non si
-    # muove lo stesso: una telefonata non fa di un lead un cliente, quello lo
-    # fa una serata suonata.
-    if kind != "nota":
-        advance_open_gig_on_activity(conn, aperta, ts)
+    # Qui un'attivita' registrata faceva avanzare la serata aperta da
+    # "opportunita'" a "contattato". Tolto quello stato (22 settembre 2026)
+    # una serata nasce gia' contattata e non c'e' piu' niente da avanzare:
+    # dove sia arrivata la trattativa lo sa solo chi la sta portando avanti,
+    # e lo scrive lui. L'attivita' resta attaccata al palco, che e' sempre
+    # stato il suo posto.
     conn.commit()
     return fetch_location(conn, ws, loc_id)
 

@@ -2688,7 +2688,6 @@
      e passare di li' e' come si archivia da sempre. */
   var MANUAL_VENUE_STATUSES = VENUE_STATUSES.filter(function(s){ return s.key !== "archiviato"; });
   var GIG_STATUSES = [
-    {key:"opportunita",   label:"Opportunità",   color:"var(--teal)",  soft:"var(--teal-soft)"},
     {key:"contattato",    label:"Contattato",    color:"var(--blue)",  soft:"var(--blue-soft)"},
     {key:"interessato",   label:"Interessato",   color:"var(--indigo)",soft:"var(--indigo-soft)"},
     {key:"trattativa",    label:"Trattativa",    color:"var(--orange)",soft:"var(--orange-soft)"},
@@ -2764,17 +2763,19 @@
      finche' non la sposti. Ed e' quello che deve fare, perche' e' la
      telefonata che non hai fatto.
 
-     "Non l'ho chiamato" si legge sulla serata in corso, non sull'esistenza
-     di una serata: una serata aperta e lasciata su "Opportunita'" e' un
-     tentativo che c'e' senza che la telefonata ci sia stata. Chi si e'
-     mosso davvero e' passato a Contattato, Interessato, Trattativa o
-     Confermato, e quelli non sono in ritardo: hanno una trattativa per le
-     mani, non una chiamata da fare. */
+     In ritardo lo dice la data e basta, come l'elenco che la contiene:
+     "Da contattare" mostra i palchi che hanno una data di ricontatto, che
+     ci sia una serata aperta o no — 63 delle 69 righe di oggi non ce
+     l'hanno. Fino al 22 settembre 2026 il grassetto guardava anche la
+     serata, e risparmiava la sgridata a chi era gia' passato a Contattato o
+     Trattativa; con lo stato "Opportunita'" tolto quella condizione non
+     poteva piu' scattare per nessuno, e Stefano ha deciso che la data
+     scaduta vale da sola. Una telefonata rimandata e' rimandata anche se la
+     trattativa sta andando bene. */
   function recontactDue(v){
     var d = v && v.next_contact_date;
     if(!d) return null;
-    var g = currentGig(v);
-    return {date: d, late: d < todayStr() && (!g || g.status === "opportunita")};
+    return {date: d, late: d < todayStr()};
   }
   function venueGigs(v){ return (v && v.gigs) ? v.gigs : []; }
   /* Le attivita' vere sono quelle registrate col tocco: una visita, una
@@ -5021,7 +5022,7 @@
      gli stati veri, non un riassunto: chi legge deve poter ritrovare nelle
      pastiglie delle righe quello che c'e' scritto qui. */
   var GIG_SCOPE_NOTE = {
-    aperte: "Le trattative ancora in ballo: Opportunità, Contattato, Interessato, Trattativa. Fuori i palchi archiviati.",
+    aperte: "Le trattative ancora in ballo: Contattato, Interessato, Trattativa. Fuori i palchi archiviati.",
     chiuse: "Le serate arrivate a un esito: Confermato, Rifiutata, Suonato, Annullato. Una confermata sta qui perché non c’è più niente da trattare, anche se deve ancora essere suonata. Fuori i palchi archiviati.",
   };
   function isGigChiusa(k){ return GIG_CHIUSE.indexOf(k) > -1; }
@@ -7916,7 +7917,7 @@
   elBtnNewGig.addEventListener("click", function(){
     if(!currentVenue() || newGigOpen) return;
     newGigOpen = true;
-    newGigDraft = {status:"opportunita", gig_date:"", fee:"", outcome_note:""};
+    newGigDraft = {status:"contattato", gig_date:"", fee:"", outcome_note:""};
     renderNewGigFields();
   });
 
@@ -8509,11 +8510,12 @@
     }).catch(function(err){ toast(err.message); });
   }
   /* Registrare un'attivita' costa un tocco: il testo lo scrive il server.
-     Se c'e' una serata aperta ed e' ancora un'opportunita' avanza da sola —
-     l'aver contattato il posto e' esattamente cosa distingue i due stati —
-     ma una serata da qui non nasce mai (15 settembre 2026): mandare una mail
-     a un lead e' una cosa, aprire un tentativo di suonarci e' un'altra, e
-     tenerle insieme aveva riempito l'archivio di serate che non esistono. */
+     Non tocca nessuna serata: fino al 22 settembre 2026 faceva avanzare
+     quella aperta da "opportunita'" a "contattato", ma quello stato non
+     esiste piu' e una serata nasce gia' contattata. E una serata da qui non
+     nasce comunque (15 settembre 2026): mandare una mail a un lead e' una
+     cosa, aprire un tentativo di suonarci e' un'altra, e tenerle insieme
+     aveva riempito l'archivio di serate che non esistono. */
   /* `modello` c'e' solo quando il messaggio e' partito da un modello: il
      testo della nota lo compone il server, che e' dove stanno le etichette
      delle attivita' (vedi NOTE_KIND_LABELS in app.py). */
