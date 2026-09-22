@@ -418,6 +418,15 @@
   .field-row label{flex:0 0 118px;font-size:16px;color:var(--text);}
   .field-row input, .field-row select{flex:1;min-width:0;border:none;background:transparent;font-size:16px;color:var(--text);text-align:right;padding:0;font-family:inherit;}
   .field-row input::placeholder{color:var(--text-tertiary);}
+  /* Un campo data non disegna il suo valore come un testo normale: Safari lo
+     mette dentro un pezzo suo, e il text-align della riga qui sopra non lo
+     raggiunge. Sullo stretto non si nota — il campo e' largo quanto la data —
+     ma su iPad la riga e' larga e la data restava in mezzo al vuoto mentre
+     tutti gli altri campi stanno a destra. Due regole separate perche' i due
+     nomi non sono capiti dagli stessi browser, e una regola che non si capisce
+     non deve portarsi via anche l'altra. */
+  .field-row input[type="date"]::-webkit-date-and-time-value{text-align:right;}
+  .field-row input[type="date"]::-webkit-datetime-edit{text-align:right;}
   /* Un campo data, una volta scritto, sull'iPhone non si svuota piu': la
      rotella non ha un "niente" da scegliere e il campo non ha la X della
      ricerca. La data della serata pero' puo' benissimo non esserci — quasi
