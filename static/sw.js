@@ -152,6 +152,67 @@ function isHtmlDocument(req, url) {
   return req.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html";
 }
 
+// Quanto si aspetta la rete prima di servire la copia in cache. Una fetch
+// fallisce in fretta solo quando la connessione viene rifiutata: se il socket
+// resta aperto e muto — telefono che passa dal Wi-Fi al 4G, risveglio dallo
+// standby, server che si sta riavviando — non fallisce e non arriva. E
+// siccome il documento passa di qui, finche' quella promessa non si decide il
+// browser non disegna niente: e' lo schermo fermo che sembra un blocco
+// dell'app. Con il cronometro l'app parte comunque, al massimo con la pagina
+// di ieri, e la risposta vera — se poi arriva — aggiorna la cache per la
+// volta dopo.
+const DOC_ATTESA_MS = 4000;
+// E se non c'e' nemmeno una copia in cache, dopo un po' e' meglio una pagina
+// che dice cosa succede che uno schermo bianco all'infinito.
+const DOC_RESA_MS = 20000;
+
+function paginaSenzaRete() {
+  return new Response(
+    "<!doctype html><meta charset=utf-8>" +
+      "<meta name=viewport content=\"width=device-width,initial-scale=1\">" +
+      "<title>GigFlow</title>" +
+      "<body style=\"font-family:-apple-system,system-ui,sans-serif;padding:48px 24px;text-align:center;color:#666;line-height:1.5\">" +
+      "<p>La rete non risponde, e di questa pagina non c\u2019\u00e8 ancora una copia sul telefono.</p>" +
+      "<p><a href=\"/\" style=\"color:#0a7cff\">Riprova</a></p>",
+    { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
+}
+
+function documentoConCronometro(req) {
+  return new Promise((resolve) => {
+    let deciso = false;
+    const decidi = (res) => {
+      if (deciso || !res) return;
+      deciso = true;
+      resolve(res);
+    };
+
+    // Scaduto il tempo si serve la copia in cache, se c'e'. Se non c'e' non
+    // si decide niente: non c'e' niente di meglio da mostrare, e la rete ha
+    // ancora tempo fino a DOC_RESA_MS.
+    const paracadute = setTimeout(() => {
+      caches.match(req).then(decidi);
+    }, DOC_ATTESA_MS);
+    const resa = setTimeout(() => decidi(paginaSenzaRete()), DOC_RESA_MS);
+
+    fetch(req)
+      .then((res) => {
+        if (res && res.ok) {
+          const copia = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copia));
+        }
+        clearTimeout(paracadute);
+        clearTimeout(resa);
+        decidi(res);
+      })
+      .catch(() => {
+        clearTimeout(paracadute);
+        clearTimeout(resa);
+        caches.match(req).then((cached) => decidi(cached || paginaSenzaRete()));
+      });
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -160,20 +221,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return; // dati live, mai dalla cache
 
   if (isHtmlDocument(req, url)) {
-    // Network-first: mentre l'app è in sviluppo attivo, mostra sempre
-    // l'ultima versione quando il server risponde. La cache è solo il
-    // paracadute per quando sei offline.
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(req))
-    );
+    event.respondWith(documentoConCronometro(req));
     return;
   }
 

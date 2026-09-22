@@ -2893,12 +2893,35 @@
     return sync;
   }
 
+  /* Ogni chiamata ha un tempo massimo, e non e' un dettaglio di rete: senza,
+     una richiesta partita mentre il telefono cambia rete non fallisce e non
+     arriva mai, e con lei resta ferma la cosa che la stava aspettando — un
+     pulsante spento per sempre, o l'app che non finisce di caricare.
+
+     Due misure perche' le chiamate non sono tutte uguali: prendere una
+     copertina da Facebook o cercare un profilo Instagram vuol dire aspettare
+     un altro sito, e il server stesso ci mette fino a una ventina di secondi
+     per ognuno dei nomi che prova. Dare a tutte il tempo di quelle
+     trasformerebbe il rimedio in una finta; darlo a nessuna farebbe fallire
+     proprio quelle che funzionano. */
+  var API_ATTESA = 25000;
+  var API_ATTESA_LUNGA = 90000;
+  var API_LENTE = /\/(photos|photo|geocode)(\/|$)|\/social\//;
+
   function api(method, path, body){
     var opts = {method:method, headers:{}};
     if(body !== undefined){
       opts.headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
     }
+    var controllo = window.AbortController ? new AbortController() : null;
+    if(controllo) opts.signal = controllo.signal;
+    var scaduto = false;
+    var cronometro = setTimeout(function(){
+      scaduto = true;
+      if(controllo) controllo.abort();
+    }, API_LENTE.test(path) ? API_ATTESA_LUNGA : API_ATTESA);
+
     return fetch(path, opts).then(function(res){
       if(res.status === 204) return null;
       return res.json().then(function(data){
@@ -2909,6 +2932,18 @@
         }
         return data;
       });
+    }).then(function(dati){
+      clearTimeout(cronometro);
+      return dati;
+    }, function(err){
+      clearTimeout(cronometro);
+      if(scaduto){
+        // Detto com'e': non e' un errore dell'app, e riprovare ha senso.
+        var e = new Error("La rete non risponde. Riprova fra poco.");
+        e.code = "rete";
+        throw e;
+      }
+      throw err;
     });
   }
 
