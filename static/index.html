@@ -3616,13 +3616,19 @@
   var tastieraNota = 0;
   try { tastieraNota = parseInt(localStorage.getItem("gigflow.tastiera") || "0", 10) || 0; } catch(e){}
 
+  /* Col dito o col mouse: non e' un vezzo, cambia cosa fanno i calendari e
+     le tastiere native. Scritto una volta sola perche' serve in due posti
+     lontani e due copie divergerebbero al primo ritocco. */
+  function conIlDito(){
+    return (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+      || navigator.maxTouchPoints > 0;
+  }
+
   function altezzaTastieraAttesa(){
     // Da computer la tastiera non si apre: prevederla vorrebbe dire
     // rimpicciolire il foglio per far posto a niente, e poi allargarlo
     // quando ci si accorge che non arriva — cioè lo scatto, al contrario.
-    var tocco = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
-      || navigator.maxTouchPoints > 0;
-    if(!tocco) return 0;
+    if(!conIlDito()) return 0;
     if(tastieraNota) return tastieraNota;
     // Una tastiera sta in genere fra il 40% e il 50% dello schermo.
     return Math.round((window.innerHeight || 700) * 0.45);
@@ -5270,6 +5276,7 @@
   var elRecontactSub = document.getElementById("recontactSub");
   var elAgendaGigs = document.getElementById("agendaGigsList");
   var elPlanList = document.getElementById("planList");
+  var elScrollRecontact = document.getElementById("scrollRecontact");
   /* L'Agenda si apre sui Compiti: e' la prima scheda, ed e' la domanda con
      cui si apre l'agenda al mattino — cosa devo fare oggi. Le altre tre
      restano a un tocco. */
@@ -5629,14 +5636,57 @@
   /* Un gesto solo, e la riga passa nell'altro segmento. Il campo data e' lo
      stesso della scheda, e sta nella riga: un foglio che si apre per una
      scelta sola sarebbe un tocco in piu' per niente. */
+  /* Col dito non si salva mentre si gira la rotella: si salva quando la si
+     chiude. Su iPhone il campo prende il valore di oggi appena il calendario
+     si apre e "change" scatta subito; salvando li' per li' la riga usciva da
+     "Da pianificare" — una data adesso ce l'ha — e il calendario si chiudeva
+     da solo perche' gli avevamo tolto da sotto l'elemento a cui era
+     attaccato. Sembrava che l'app scegliesse la data al posto tuo.
+
+     Col mouse invece "change" arriva a scelta fatta, una volta: si toglie il
+     fuoco e il salvataggio parte subito, come prima. */
+  var dataDaSalvare = null;
   elPlanList.addEventListener("change", function(e){
     var quando = e.target.closest("[data-period]");
-    if(quando && quando.value) saveNextContact(quando.getAttribute("data-period"), quando.value);
+    if(!quando || !quando.value) return;
+    var giri = dataDaSalvare ? dataDaSalvare.giri + 1 : 1;
+    dataDaSalvare = {id: quando.getAttribute("data-period"), valore: quando.value, giri: giri};
+    if(!conIlDito()) quando.blur();
+  });
+  elPlanList.addEventListener("focusout", function(e){
+    if(!e.target.closest("[data-period]") || !dataDaSalvare) return;
+    var scelta = dataDaSalvare;
+    dataDaSalvare = null;
+    // Un solo scatto, e la data e' quella di oggi: e' la rotella che si e'
+    // aperta e richiusa senza che nessuno la girasse, non una scelta. Girare
+    // la rotella ne fa scattare parecchi, quindi "oggi" scelto davvero
+    // arriva sempre con piu' di uno. Vale solo col dito: col mouse lo scatto
+    // e' uno solo per definizione, e oggi vuol dire oggi.
+    if(conIlDito() && scelta.giri === 1 && scelta.valore === todayStr()) return;
+    // L'elenco si accorcia di una riga: senza rimettere lo scorrimento dove
+    // era, quello che stavi guardando si sposta sotto il dito. Cosi' invece
+    // al posto della riga che se ne va trovi la successiva.
+    var scroll = elScrollRecontact ? elScrollRecontact.scrollTop : 0;
+    saveNextContact(scelta.id, scelta.valore).then(function(){
+      if(elScrollRecontact) elScrollRecontact.scrollTop = scroll;
+    });
   });
   elPlanList.addEventListener("click", function(e){
     // Il pulsante sta dentro la riga: senza questa riga il calendario si
     // aprirebbe insieme alla scheda del palco.
-    if(e.target.closest(".plan-date")) return;
+    var pastiglia = e.target.closest(".plan-date");
+    if(pastiglia){
+      // Da computer un campo data trasparente non apre niente: il calendario
+      // lo apre solo il clic sull'iconcina, che qui e' invisibile per scelta.
+      // showPicker e' il modo di chiederlo. Col dito non si chiama: la
+      // rotella la apre gia' il tocco, e chiamarlo di nuovo la farebbe
+      // sfarfallare.
+      if(!conIlDito()){
+        var campo = pastiglia.querySelector(".plan-date-input");
+        if(campo && campo.showPicker){ try { campo.showPicker(); } catch(err){} }
+      }
+      return;
+    }
     var row = e.target.closest("[data-open-id]");
     if(row) openDetail(row.getAttribute("data-open-id"));
   });
