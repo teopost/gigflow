@@ -5716,7 +5716,6 @@
     apertoAlle = Date.now();
   }
   function chiudeIlCalendario(){
-    if(!pickerAperto) return;
     pickerAperto = false;
     if(!dataScritta) return;
     dataScritta = false;
@@ -5746,9 +5745,18 @@
     if(campo.value === todayStr() && Date.now() - apertoAlle < 500) return;
 
     dataScritta = true;
-    saveNextContact(campo.getAttribute("data-period"), campo.value);
-    // Col mouse il calendario si e' gia' chiuso da se'.
-    if(!conIlDito()) campo.blur();
+    saveNextContact(campo.getAttribute("data-period"), campo.value).then(function(){
+      // Il server ha detto di si': la riga adesso una data ce l'ha, quindi
+      // esce da "Da pianificare" e l'elenco si rifa. Il calendario era
+      // attaccato a quella riga e si chiude con lei — che dopo una data
+      // scelta e' proprio quello che deve succedere. Era il contrario a
+      // essere il guaio di partenza: si chiudeva PRIMA che tu scegliessi,
+      // perche' si salvava la data che il calendario si mette da solo
+      // aprendosi. Su iOS non c'e' nessun evento per "Fine", quindi questo
+      // e' anche l'unico momento in cui si puo' sapere che hai finito.
+      campo.blur();
+      chiudeIlCalendario();
+    });
   });
 
   elPlanList.addEventListener("focusout", function(e){
